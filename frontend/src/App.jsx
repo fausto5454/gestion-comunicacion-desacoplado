@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
-  Lock, Mail, LogIn, Menu, X, Home, Users, MessageSquare, LogOut, Edit2, Trash2, 
+  Lock, Mail, LogIn, Menu, X, Home, Users, Settings, MessageSquare, LogOut, Bell, Edit2, Trash2, 
   AlertTriangle, Loader, UserPlus, FileText, BarChart2, Shield, Upload, Download 
 } from 'lucide-react';
 import { createClient } from '@supabase/supabase-js';
@@ -8,6 +8,16 @@ import { Toaster, toast } from 'react-hot-toast';
 import { motion } from "framer-motion";
 import ModalConfirmacion from "./components/ModalConfirmacion";
 import ReportesPage from "./pages/ReportesPage";
+// Importamos componentes de Recharts para el gráfico
+import { 
+    AreaChart, 
+    Area, 
+    XAxis, 
+    YAxis, 
+    CartesianGrid, 
+    Tooltip, 
+    ResponsiveContainer 
+} from 'recharts';
 import {
   verificarMensajesNoLeidos,
   verificarMensajesAtrasados,
@@ -180,22 +190,158 @@ const LoginPage = ({ onLoginSuccess }) => {
 // ======================================================================
 // COMPONENTES DE VISTA (Dashboard, Usuarios, Placeholders)
 // ======================================================================
-const DashboardPage = ({ userEmail }) => (
-    <div className="p-4 md:p-8">
-        <h1 className="text-3xl font-extrabold text-gray-800 mb-4" style={{ color: 'var(--ie-green)' }}>
-            Dashboard de Administración
-        </h1>
-        <p className="text-gray-600 mb-6">Vista general del sistema de comunicación.</p>
+const DashboardPage = ({ userEmail, onLogout }) => {
+    const userInitial = userEmail ? userEmail[0].toUpperCase() : 'D';
+    const [showNotif, setShowNotif] = useState(false);
+    const [isProfileOpen, setIsProfileOpen] = useState(false);
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-lg shadow-sm">
-                <p className="text-sm text-red-700 font-semibold">Tu Email</p>
-                <p className="text-base font-bold text-red-900 break-words">{userEmail}</p>
+    const dataGrafico = [
+        { name: 'Lun', mensajes: 400 }, { name: 'Mar', mensajes: 300 },
+        { name: 'Mie', mensajes: 900 }, { name: 'Jue', mensajes: 600 },
+        { name: 'Vie', mensajes: 800 }, { name: 'Sab', mensajes: 500 },
+        { name: 'Dom', mensajes: 200 },
+    ];
+
+    const stats = [
+        { label: 'Usuarios Activos', value: '124', icon: "👥", color: 'bg-blue-500' },
+        { label: 'Mensajes Enviados', value: '1,240', icon: "📩", color: 'bg-green-600' },
+        { label: 'Documentos', value: '45', icon: "📄", color: 'bg-purple-500' },
+        { label: 'Alertas Hoy', value: '3', icon: "🔔", color: 'bg-amber-500' },
+    ];
+
+    return (
+        <div className="p-6 md:p-10 bg-gray-50 min-h-screen font-sans text-gray-800">
+            {/* HEADER */}
+            <div className="flex justify-between items-center mb-8 bg-green-200 p-5 rounded-2xl shadow-sm border border-gray-100">
+                <div>
+                    <h1 className="text-2xl font-black text-green-600 leading-none">BIENVENIDO AL SISTEMA WEB</h1>
+                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1">Panel de Control</p>
+                </div>
+
+                <div className="flex items-center gap-6 relative">
+                    {/* NOTIFICACIONES */}
+                    <div className="relative cursor-pointer" onClick={() => { setShowNotif(!showNotif); setIsProfileOpen(false); }}>
+                        <span className="text-2xl hover:scale-110 transition-transform block">🔔</span>
+                        <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center border-2 border-white font-bold">3</span>
+                        
+                        {showNotif && (
+                            <div className="absolute right-0 top-12 w-64 bg-white shadow-2xl rounded-xl border border-gray-100 z-50 p-4 animate-in fade-in zoom-in-95">
+                                <h3 className="text-xs text-gray-400 mb-2 uppercase font-black">Notificaciones</h3>
+                                <div className="space-y-2">
+                                    <p className="text-sm border-b pb-2 text-gray-600">✅ Reporte mensual listo.</p>
+                                    <p className="text-sm text-gray-600">📩 2 nuevos mensajes.</p>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="h-8 w-[1px] bg-gray-300 hidden md:block"></div>
+
+                    {/* PERFIL INTERACTIVO CORREGIDO */}
+                    <div className="relative">
+                        <button 
+                            onClick={() => { setIsProfileOpen(!isProfileOpen); setShowNotif(false); }}
+                            className="flex items-center gap-3 focus:outline-none group"
+                        >
+                            <span className="hidden md:block text-sm font-bold text-gray-600 group-hover:text-green-700 transition-colors">
+                                {userEmail}
+                            </span>
+                            <div className="w-11 h-11 bg-green-600 text-white rounded-full flex items-center justify-center font-black text-lg shadow-md group-hover:shadow-green-200 transition-all border-2 border-white group-active:scale-90">
+                                {userInitial}
+                            </div>
+                        </button>
+
+                        {/* MENÚ DESPLEGABLE */}
+                        {isProfileOpen && (
+                            <>
+                                {/* Overlay para cerrar al hacer clic fuera */}
+                                <div className="fixed inset-0 z-40" onClick={() => setIsProfileOpen(false)}></div>
+                                
+                                <div className="absolute right-0 mt-3 w-60 bg-white shadow-2xl rounded-2xl border border-gray-100 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2">
+                                    <div className="p-4 bg-green-50 border-b border-gray-100">
+                                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Sesión iniciada como</p>
+                                        <p className="text-xs font-bold text-gray-700 truncate">{userEmail}</p>
+                                    </div>
+                                    <div className="p-2">
+                                        <button className="w-full text-left px-4 py-2.5 text-xs font-semibold text-gray-600 hover:bg-green-50 hover:text-green-700 rounded-xl transition-all flex items-center gap-3">
+                                            <span className="text-lg">👤</span> Mi Perfil
+                                        </button>
+                                        <button className="w-full text-left px-4 py-2.5 text-xs font-semibold text-gray-600 hover:bg-green-50 hover:text-green-700 rounded-xl transition-all flex items-center gap-3">
+                                            <span className="text-lg">⚙️</span> Configuración
+                                        </button>
+                                        <div className="my-1 border-t border-gray-100"></div>
+                                        <button 
+                                            onClick={onLogout}
+                                            className="w-full text-left px-4 py-2.5 text-xs font-bold text-red-600 hover:bg-red-50 rounded-xl transition-all flex items-center gap-3"
+                                        >
+                                            <span className="text-lg">🚪</span> Cerrar Sesión
+                                        </button>
+                                    </div>
+                                </div>
+                            </>
+                        )}
+                    </div>
+                </div>
+            </div>
+            {/* KPIs */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
+                {stats.map((stat, index) => (
+                    <div key={index} className="bg-yellow-100 p-6 rounded-3xl shadow-sm border border-gray-50 flex items-center hover:shadow-md transition-all group">
+                        <div className={`${stat.color} w-14 h-14 rounded-2xl text-white flex items-center justify-center text-2xl group-hover:rotate-6 transition-transform`}>
+                            {stat.icon}
+                        </div>
+                        <div className="ml-5">
+                            <p className="text-xs text-gray-700 uppercase font-bold">{stat.label}</p>
+                            <p className="text-3xl font-black text-gray-800">{stat.value}</p>
+                        </div>
+                    </div>
+                ))}
+            </div>
+
+            {/* GRÁFICO Y ESTADO */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div className="lg:col-span-2 bg-white p-8 rounded-3xl shadow-sm border border-gray-100">
+                    <div className="flex justify-between items-center mb-6">
+                        <h2 className="text-xl font-black text-gray-700">Flujo de Actividad</h2>
+                        <span className="text-xs font-bold text-green-600 bg-green-50 px-3 py-1 rounded-full">Últimos 7 días</span>
+                    </div>
+                    <div className="h-72 w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <AreaChart data={dataGrafico}>
+                                <defs>
+                                    <linearGradient id="colorMsg" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="#16a34a" stopOpacity={0.3}/>
+                                        <stop offset="95%" stopColor="#16a34a" stopOpacity={0}/>
+                                    </linearGradient>
+                                </defs>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 12, fill: '#9ca3af'}} />
+                                <YAxis hide />
+                                <Tooltip contentStyle={{ borderRadius: '15px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} />
+                                <Area type="monotone" dataKey="mensajes" stroke="#16a34a" strokeWidth={3} fillOpacity={1} fill="url(#colorMsg)" />
+                            </AreaChart>
+                        </ResponsiveContainer>
+                    </div>
+                </div>
+
+                <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100">
+                    <h2 className="text-xl font-black text-gray-700 mb-6">Información</h2>
+                    <div className="space-y-4">
+                        <div className="bg-blue-50 p-5 rounded-2xl border border-blue-100">
+                            <p className="text-[10px] font-bold text-blue-700 uppercase mb-1">Estado</p>
+                            <p className="text-sm font-bold text-gray-700 italic">Usuario Conectado</p>
+                        </div>
+                        <div className="p-4 border border-gray-100 rounded-2xl">
+                            <p className="text-xs text-gray-400 font-bold mb-2 uppercase">Email</p>
+                            <p className="text-sm font-medium text-gray-600 break-all">{userEmail}</p>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
-    </div>
-);
-
+    );
+};
+  
 const UsuariosPage = () => {
     const [users, setUsers] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -350,28 +496,51 @@ const UsuariosPage = () => {
     };
 
     // Modal de confirmación antes de eliminar
+    const [confirmText, setConfirmText] = useState('');
     const openDeleteModal = (user) => {
-        setDeleteModal({
-            open: true,
-            id_usuario: user.id_usuario,
-            nombre_completo: user.nombre_completo,
-        });
+    setConfirmText('');
+    setDeleteModal({
+        open: true,
+        id_usuario: user.id_usuario,
+        nombre_completo: user.nombre_completo,
+    });
     };
 
-    const confirmDelete = async () => {
-        try {
-            const { error } = await supabase
-                .from('usuarios')
-                .delete()
-                .eq('id_usuario', deleteModal.id_usuario);
+   const confirmDelete = async () => {
+    if (confirmText !== 'ELIMINAR') {
+        alert('Debes escribir ELIMINAR para confirmar');
+        return;
+    }
 
-            if (error) throw error;
-            setDeleteModal({ open: false, id_usuario: null, nombre_completo: '' });
-            fetchUsers();
-            await registrarAuditoria('ELIMINAR', `Se eliminó al usuario ${userToDelete?.nombre_completo}`);
-        } catch (err) {
-            alert('Error eliminando usuario: ' + (err.message || err));
-        }
+    if (!deleteModal.id_usuario) {
+        alert('ID de usuario inválido');
+        return;
+    }
+
+    try {
+        console.log('Eliminando usuario ID:', deleteModal.id_usuario);
+
+        await registrarAuditoria(
+            'ELIMINAR',
+            `Se eliminó al usuario ${deleteModal.nombre_completo}`
+        );
+
+        const { error } = await supabase
+            .from('usuarios')
+            .delete()
+            .eq('id_usuario', deleteModal.id_usuario);
+
+        if (error) throw error;
+
+        setDeleteModal({ open: false, id_usuario: null, nombre_completo: '' });
+        setConfirmText('');
+
+        fetchUsers();
+        alert('Usuario eliminado correctamente');
+      } catch (err) {
+        console.error(err);
+        alert('Error eliminando usuario: ' + err.message);
+    }
     };
 
     return (
@@ -417,6 +586,7 @@ const UsuariosPage = () => {
                                         </span>
                                     </td>
                                     <td className="px-6 py-4 text-right text-sm font-medium space-x-2">
+                                      
                                         <button onClick={() => openEditModal(user)} className="hover:text-green-700 p-1 rounded-full hover:bg-gray-200" style={{ color: 'var(--ie-green)' }}>
                                             <Edit2 className="w-4 h-4" />
                                         </button>
@@ -440,27 +610,46 @@ const UsuariosPage = () => {
                         <p className="text-sm text-gray-600 mb-4">
                             Estás a punto de eliminar a <strong>{deleteModal.nombre_completo}</strong>. Esta acción no se puede deshacer.
                         </p>
-                        <div className="flex justify-center space-x-3">
-                            <button
-                                onClick={() => setDeleteModal({ open: false, id_usuario: null, nombre_completo: '' })}
-                                className="px-4 py-2 rounded-lg border border-gray-300 text-white bg-green-700 hover:bg-green-400"
-                            >
-                                Cancelar
-                            </button>
-                            <button
-                                onClick={confirmDelete}
-                                className="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700"
-                            >
-                                Eliminar
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
+                        <div className="space-y-3">
+                         <input
+                          type="text"
+                           placeholder="Escribe ELIMINAR para confirmar"
+                            value={confirmText}
+                             onChange={(e) => setConfirmText(e.target.value)}
+                              className="w-full px-3 py-2 border rounded-lg text-sm"
+                               />
 
-            {/* Modal Crear / Editar (se mantiene igual que tu estructura) */}
-            {isModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+                              <div className="flex justify-center space-x-3">
+                           <button
+                          onClick={() => {
+                        setDeleteModal({ open: false, id_usuario: null, nombre_completo: '' });
+                      setConfirmText('');
+                    }}
+                  className="px-4 py-2 rounded-lg bg-green-700 text-white hover:bg-green-500"
+                  >
+               Cancelar
+              </button>
+
+            <button
+             onClick={confirmDelete}
+              disabled={confirmText !== 'ELIMINAR'}
+               className={`px-4 py-2 rounded-lg text-white ${
+                confirmText === 'ELIMINAR'
+                 ? 'bg-red-600 hover:bg-red-700'
+                  : 'bg-gray-400 cursor-not-allowed'
+                   }`}
+                    >
+                    Eliminar
+                   </button>
+                    </div>
+                     </div>
+                      </div>
+                       </div>
+                         )}
+
+               {/* Modal Crear / Editar (se mantiene igual que tu estructura) */}
+                 {isModalOpen && (
+                  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
                     <div className="bg-white rounded-2xl p-6 w-full max-w-lg shadow-xl">
                         <h3 className="text-xl font-semibold mb-4">{isEditMode ? 'Editar Usuario' : 'Crear Nuevo Usuario'}</h3>
                         <form onSubmit={isEditMode ? handleUpdate : handleCreate} className="space-y-4">
@@ -1517,7 +1706,7 @@ const AppLayout = ({ session, onLogout, currentView, setCurrentView }) => {
                             className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-lg"
                             style={{ backgroundColor: 'var(--ie-green-light)', color: 'var(--ie-green)' }}
                         >
-                            {userName.charAt(0)}
+                            {userName?.charAt(0).toUpperCase()}
                         
                         </div>
                           <BellNotificaciones />

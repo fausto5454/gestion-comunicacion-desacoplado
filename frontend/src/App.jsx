@@ -128,7 +128,7 @@ const LoginPage = ({ onLoginSuccess }) => {
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
                             required
-                            className="shadow-inner border border-green-100 rounded-lg w-full py-2.5 px-4 text-gray-400 focus:ring-2 focus-ring-ie-green focus-border-ie-green-100 focus:outline-none transition-all duration-150"
+                            className="shadow-inner border border-gray-500 rounded-lg w-full py-2.5 px-4 text-gray-400 focus:ring-2 focus-ring-ie-green focus-border-ie-green-100 focus:outline-none transition-all duration-150"
                         />
                     </div>
 
@@ -143,7 +143,7 @@ const LoginPage = ({ onLoginSuccess }) => {
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
                             required
-                            className="shadow-inner border border-gray-100 rounded-lg w-full py-2.5 px-4 text-gray-400 focus:ring-2 focus-ring-ie-green focus-border-ie-green-100 focus:outline-none transition-all duration-150"
+                            className="shadow-inner border border-gray-500 rounded-lg w-full py-2.5 px-4 text-gray-400 focus:ring-2 focus-ring-ie-green focus-border-ie-green-100 focus:outline-none transition-all duration-150"
                         />
                     </div>
 

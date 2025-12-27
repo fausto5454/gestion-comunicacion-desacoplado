@@ -58,7 +58,7 @@ const CustomStyles = () => (
 );
 
 // ======================================================================
-// LOGIN PAGE
+// LOGIN PAGE (MEJORADO PARA MÓVIL Y ESCRITORIO)
 // ======================================================================
 const LoginPage = ({ onLoginSuccess }) => {
     const [email, setEmail] = useState('');
@@ -94,9 +94,11 @@ const LoginPage = ({ onLoginSuccess }) => {
     };
 
     return (
-        <div className="min-h-screen w-screen flex items-center justify-center bg-gradient-to-br from-gray-100 via-gray-100 to-gray-100 px-4 py-12 overflow-auto">
-            <div className="bg-gradient-to-br from-green-300 to-green-300 p-8 md:p-6 shadow-3xl rounded-4xl w-full max-w-sm border border-green-400 transform hover:scale-[1.01] transition-transform duration-300">
-                <div className="flex justify-center mb-8">
+        <div className="min-h-screen w-full flex items-center justify-center bg-slate-900 px-4 py-8">
+            {/* Contenedor Principal: bg-green-300 fijo para mantener el look de la imagen */}
+            <div className="bg-[#86EFAC] p-8 md:p-10 shadow-2xl rounded-[40px] w-full max-w-sm border border-green-400 transform transition-all duration-300">
+                
+                <div className="flex justify-center mb-6">
                     <img 
                         src="logo.png" 
                         alt="Logo Institucional" 
@@ -105,20 +107,20 @@ const LoginPage = ({ onLoginSuccess }) => {
                     />
                 </div>
 
-                <h2 className="text-2xl font-extrabold text-center text-green-700 mb-6 tracking-wide">
+                <h2 className="text-3xl font-extrabold text-center text-green-700 mb-8 tracking-tight">
                     Bienvenido
                 </h2>
 
                 {error && (
-                    <div className="bg-red-50 border-l-4 border-red-500 text-red-800 p-4 rounded-md mb-6 text-sm font-medium flex items-center">
-                        <AlertTriangle className="w-5 h-5 mr-3 flex-shrink-0" />
+                    <div className="bg-red-50 border-l-4 border-red-500 text-red-800 p-3 rounded-md mb-6 text-sm font-medium flex items-center animate-pulse">
+                        <AlertTriangle className="w-5 h-5 mr-2 flex-shrink-0" />
                         <p>{error}</p>
                     </div>
                 )}
 
-                <form onSubmit={handleSubmit}>
-                    <div className="mb-5">
-                        <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="email">
+                <form onSubmit={handleSubmit} className="space-y-5">
+                    <div>
+                        <label className="block text-green-900 text-sm font-semibold mb-2 ml-1" htmlFor="email">
                             Correo Electrónico
                         </label>
                         <input
@@ -128,12 +130,13 @@ const LoginPage = ({ onLoginSuccess }) => {
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
                             required
-                            className="shadow-inner border border-gray-500 rounded-lg w-full py-2.5 px-4 text-gray-400 focus:ring-2 focus-ring-ie-green focus-border-ie-green-100 focus:outline-none transition-all duration-150"
+                            /* bg-white y text-gray-800 para que las celdas sean blancas e idénticas a escritorio */
+                            className="shadow-sm border border-transparent rounded-xl w-full py-3 px-4 bg-white text-gray-800 focus:ring-2 focus:ring-green-500 focus:outline-none transition-all duration-200"
                         />
                     </div>
 
-                    <div className="mb-8">
-                        <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="password">
+                    <div>
+                        <label className="block text-green-900 text-sm font-semibold mb-2 ml-1" htmlFor="password">
                             Contraseña
                         </label>
                         <input
@@ -143,21 +146,22 @@ const LoginPage = ({ onLoginSuccess }) => {
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
                             required
-                            className="shadow-inner border border-gray-500 rounded-lg w-full py-2.5 px-4 text-gray-400 focus:ring-2 focus-ring-ie-green focus-border-ie-green-100 focus:outline-none transition-all duration-150"
+                            /* bg-white y text-gray-800 para mantener consistencia */
+                            className="shadow-sm border border-transparent rounded-xl w-full py-3 px-4 bg-white text-gray-800 focus:ring-2 focus:ring-green-500 focus:outline-none transition-all duration-200"
                         />
                     </div>
 
                     <button
                         type="submit"
                         disabled={loading}
-                        className={`w-full flex items-center justify-center bg-red-600 hover:bg-green-600 text-white font-semibold py-3 px-4 rounded-2xl transition duration-200 shadow-xl hover:shadow-2xl transform hover:scale-[1.02] active:scale-[0.98] ${
+                        className={`w-full flex items-center justify-center bg-red-600 hover:bg-red-700 text-white font-bold py-3.5 px-4 rounded-2xl transition-all duration-300 shadow-lg active:scale-95 ${
                             loading ? 'opacity-70 cursor-not-allowed' : ''
                         }`}
                     >
                         {loading ? (
                             <>
                                 <Loader className="w-5 h-5 mr-2 animate-spin" />
-                                Validando credenciales...
+                                Validando...
                             </>
                         ) : (
                             'Iniciar Sesión'
@@ -165,7 +169,7 @@ const LoginPage = ({ onLoginSuccess }) => {
                     </button>
                 </form>
 
-                <p className="text-center text-xs text-green-800 mt-4">
+                <p className="text-center text-[10px] text-green-900 mt-8 font-medium opacity-75">
                     © 2025 I.E.N° 2079-A.R. Todos los derechos reservados
                 </p>
             </div>

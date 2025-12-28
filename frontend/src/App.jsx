@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
-  Lock, Mail, LogIn, Menu, X, Home, Users, Settings, MessageSquare, LogOut, Bell, Edit2, Trash2, 
-  AlertTriangle, Loader, UserPlus, FileText, BarChart2, Shield, Upload, Download 
+  Lock, Mail, LogIn, Menu, X, Eye, Home, Users, ShieldCheck, Clock, Tag, Settings, MessageSquare, LogOut, Bell, Edit2, Trash2, 
+  AlertTriangle, Loader, LayoutDashboard, Shield, UserPlus, FileText, BarChart2, Upload, Download 
 } from 'lucide-react';
 import { createClient } from '@supabase/supabase-js';
 import { Toaster, toast } from 'react-hot-toast';
@@ -104,9 +104,9 @@ const LoginPage = ({ onLoginSuccess }) => {
     };
 
     return (
-        <div className="min-h-screen w-full flex items-center justify-center bg-slate-200 px-4 py-8">
+        <div className="min-h-screen w-full flex items-center justify-center bg-gray-100 px-4 py-8">
             {/* Contenedor Principal: bg-green-300 fijo para mantener el look de la imagen */}
-            <div className="bg-[#86EFAC] p-8 md:p-10 shadow-2xl rounded-[40px] w-full max-w-sm border border-green-400 transform transition-all duration-300">
+            <div className="bg-[#86EFAC] p-8 md:p-10 shadow-[12px_0_35px_rgba(0,0,0,0.50)] rounded-[40px] w-full max-w-sm border border-gray-400 transform transition-all duration-300">
                 
                 <div className="flex justify-center mb-6">
                     <img 
@@ -726,303 +726,253 @@ const PlaceholderPage = ({ title, icon: Icon }) => (
 const ComunicacionesPage = ({ session }) => {
     const user = session?.user;
     const userId = user?.id;
+    
+    // Estados de datos
     const [usuarios, setUsuarios] = useState([]);
     const [mensajesEnviados, setMensajesEnviados] = useState([]);
     const [mensajesRecibidos, setMensajesRecibidos] = useState([]);
+    
+    // Estados del formulario
     const [titulo, setTitulo] = useState('');
     const [mensaje, setMensaje] = useState('');
     const [destinatario, setDestinatario] = useState('');
+    const [prioridad, setPrioridad] = useState('normal');
     const [loading, setLoading] = useState(false);
+    
+    // ESTADOS DE CONTROL Y SEGURIDAD
     const [selectedMessage, setSelectedMessage] = useState(null);
     const [openDeleteModal, setOpenDeleteModal] = useState(false);
     const [idMensajeAEliminar, setIdMensajeAEliminar] = useState(null);
-    
+    const [confirmacionTexto, setConfirmacionTexto] = useState(''); // Para el input de "ELIMINAR"
 
-    // === 1. Cargar usuarios disponibles ===
-    useEffect(() => {
-        const fetchUsuarios = async () => {
-            const { data, error } = await supabase
-                .from('usuarios')
-                .select('id_usuario, nombre_completo, correo_electronico');
-            if (!error) setUsuarios(data || []);
-            else console.error('❌ Error cargando usuarios:', error.message);
-        };
-        fetchUsuarios();
-    }, []);
+    // === 1. CARGA DE DATOS ===
+    const fetchUsuarios = async () => {
+        const { data, error } = await supabase
+            .from('usuarios')
+            .select('id_usuario, nombre_completo, correo_electronico');
+        if (!error) setUsuarios(data || []);
+    };
 
-    // === 2. Cargar mensajes enviados y recibidos ===
     const fetchMensajes = useCallback(async () => {
-        if (!userId) return;
-
+        if (!userId || usuarios.length === 0) return;
         try {
-            const { data: enviados, error: errEnv } = await supabase
+            const { data: enviados } = await supabase
                 .from('comunicaciones')
                 .select('*')
                 .eq('remitente_id', userId)
                 .order('fecha_envio', { ascending: false });
 
-            const { data: recibidos, error: errRec } = await supabase
+            const { data: recibidos } = await supabase
                 .from('comunicaciones')
                 .select('*')
                 .eq('destinatario_id', userId)
                 .order('fecha_envio', { ascending: false });
 
-            if (errEnv || errRec) throw errEnv || errRec;
+            const usuariosMap = Object.fromEntries(usuarios.map(u => [u.id_usuario, u.nombre_completo]));
 
-            const usuariosMap = Object.fromEntries(
-                usuarios.map(u => [u.id_usuario, u.nombre_completo])
-            );
-
-            const enviadosConNombres = (enviados || []).map(m => ({
+            setMensajesEnviados((enviados || []).map(m => ({
                 ...m,
                 destinatario_nombre: usuariosMap[m.destinatario_id] || 'Desconocido'
-            }));
-
-            const recibidosConNombres = (recibidos || []).map(m => ({
+            })));
+            setMensajesRecibidos((recibidos || []).map(m => ({
                 ...m,
                 remitente_nombre: usuariosMap[m.remitente_id] || 'Desconocido'
-            }));
-
-            setMensajesEnviados(enviadosConNombres);
-            setMensajesRecibidos(recibidosConNombres);
-        } catch (error) {
-            console.error('❌ Error cargando mensajes:', error.message);
-        }
+            })));
+        } catch (e) { console.error('Error fetch:', e); }
     }, [userId, usuarios]);
 
-    useEffect(() => {
-        if (usuarios.length > 0) fetchMensajes();
-    }, [usuarios, fetchMensajes]);
+    useEffect(() => { fetchUsuarios(); }, []);
+    useEffect(() => { fetchMensajes(); }, [usuarios, fetchMensajes]);
 
-    // === 3. Enviar mensaje ===
-    const handleEnviarMensaje = async (e) => {
-        e.preventDefault();
-        if (!titulo || !mensaje || !destinatario)
-            return toast.error('Por favor complete todos los campos.');
+    // === 2. FUNCIONES DE ACCIÓN ===
 
-        setLoading(true);
-        const { error } = await supabase.from('comunicaciones').insert([{
-            titulo,
-            mensaje,
-            remitente_id: userId,
-            destinatario_id: destinatario,
-            estado: 'no leído'
-        }]);
-
-        setLoading(false);
-        if (error) return toast.error('❌ Error al enviar mensaje.');
-        setTitulo(''); setMensaje(''); setDestinatario('');
-        fetchMensajes();
-        toast.success('📩 Mensaje enviado correctamente.');
-    };
-
-    // === 4. Ver mensaje ===
     const handleVerMensaje = async (msg) => {
         setSelectedMessage(msg);
-        if (msg.estado === 'no leído') {
-            const { error } = await supabase
-                .from('comunicaciones')
-                .update({ estado: 'leído' })
-                .eq('id_comunicacion', msg.id_comunicacion);
-            if (!error) {
-                toast.success('✅ Mensaje marcado como leído.');
-                fetchMensajes();
-            }
+        if (msg.estado === 'no leído' && msg.destinatario_id === userId) {
+            await supabase.from('comunicaciones').update({ 
+                estado: 'leído', fecha_lectura: new Date().toISOString() 
+            }).eq('id_comunicacion', msg.id_comunicacion);
+            fetchMensajes();
         }
     };
 
-    // === 5. Eliminar mensaje ===
- const handleEliminarMensaje = (id) => {
-    setIdMensajeAEliminar(id);
-    setOpenDeleteModal(true);
- };
+    const handleEliminarClick = (id) => {
+        setIdMensajeAEliminar(id);
+        setConfirmacionTexto(''); // Resetear el input de seguridad
+        setOpenDeleteModal(true);
+    };
 
- const confirmarEliminarMensaje = async () => {
-    if (!idMensajeAEliminar) return;
+    const confirmarEliminacion = async () => {
+        // VALIDACIÓN DE SEGURIDAD: Solo procede si el texto coincide exactamente
+        if (confirmacionTexto !== 'ELIMINAR') {
+            toast.error('Debe escribir ELIMINAR para confirmar');
+            return;
+        }
 
-    const { error } = await supabase
-        .from('comunicaciones')
-        .delete()
-        .eq('id_comunicacion', idMensajeAEliminar);
+        const { error } = await supabase
+            .from('comunicaciones')
+            .delete()
+            .eq('id_comunicacion', idMensajeAEliminar);
 
-    if (error) {
-        toast.error('❌ Error al eliminar mensaje.');
-    } else {
-        toast.success('🗑️ Mensaje eliminado correctamente.');
-        fetchMensajes();
-    }
+        if (error) {
+            toast.error('Error al eliminar');
+        } else {
+            toast.success('Registro eliminado permanentemente');
+            fetchMensajes();
+            setOpenDeleteModal(false);
+            setIdMensajeAEliminar(null);
+            setConfirmacionTexto('');
+            if (selectedMessage?.id_comunicacion === idMensajeAEliminar) setSelectedMessage(null);
+        }
+    };
 
-    setOpenDeleteModal(false);
-    setIdMensajeAEliminar(null);
-    setSelectedMessage(null); // ✅ cierre seguro del modal de lectura
-  };
-
-    // === 6. Renderizado ===
     return (
-        <div className="p-4 md:p-8">
+        <div className="p-4 md:p-8 bg-gray-50 min-h-screen">
             <Toaster position="top-right" />
-            <h1 className="text-3xl font-bold mb-6 text-gray-800 flex items-center">
-                <MessageSquare className="w-7 h-7 mr-3" style={{ color: 'var(--ie-green)' }} />
-                Enviar Mensaje
-            </h1>
-
-            {/* === Formulario de envío === */}
-            <form onSubmit={handleEnviarMensaje} className="bg-white p-6 rounded-xl shadow-md mb-8">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label className="block text-sm font-semibold mb-2 text-gray-700">Destinatario</label>
-                        <select
-                            className="border rounded-lg w-full p-2"
-                            value={destinatario}
-                            onChange={(e) => setDestinatario(e.target.value)}
-                            required
-                        >
-                            <option value="">Seleccione destinatario</option>
-                            {usuarios
-                                .filter(u => u.id_usuario !== userId)
-                                .map(u => (
-                                    <option key={u.id_usuario} value={u.id_usuario}>
-                                        {u.nombre_completo} ({u.correo_electronico})
-                                    </option>
-                                ))}
-                        </select>
-                    </div>
-                    <div>
-                        <label className="block text-sm font-semibold mb-2 text-gray-700">Título</label>
-                        <input
-                            type="text"
-                            className="border rounded-lg w-full p-2"
-                            value={titulo}
-                            onChange={(e) => setTitulo(e.target.value)}
-                            required
-                        />
-                    </div>
+            
+            <header className="flex justify-between items-center mb-8">
+                <h1 className="text-2xl font-bold text-gray-800 flex items-center">
+                    <MessageSquare className="mr-3 text-green-600 w-8 h-8" /> Módulo de Comunicaciones
+                </h1>
+                <div className="flex items-center text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                    <ShieldCheck className="w-4 h-4 mr-1 text-blue-500"/> Auditoría Activa
                 </div>
+            </header>
 
-                <div className="mt-4">
-                    <label className="block text-sm font-semibold mb-2 text-gray-700">Mensaje</label>
-                    <textarea
-                        className="border rounded-lg w-full p-2"
-                        rows="3"
-                        value={mensaje}
-                        onChange={(e) => setMensaje(e.target.value)}
-                        required
-                    />
-                {/* === Modal de confirmación de eliminación === */}
-                <ModalConfirmacion
-                isOpen={openDeleteModal}
-                onClose={() => {
-                    setOpenDeleteModal(false);
-                    setIdMensajeAEliminar(null);
-                }}
-                onConfirm={confirmarEliminarMensaje}
-                titulo="Eliminar mensaje"
-                mensaje="Esta acción eliminará permanentemente el mensaje seleccionado."
-                requireText
-                />
+            {/* Formulario de Envío */}
+            <form onSubmit={async (e) => {
+                e.preventDefault();
+                setLoading(true);
+                const start = performance.now();
+                const { error } = await supabase.from('comunicaciones').insert([{
+                    titulo, mensaje, remitente_id: userId, destinatario_id: destinatario, prioridad, estado: 'no leído'
+                }]);
+                if (!error) {
+                    toast.success(`Enviado (${Math.round(performance.now() - start)}ms)`);
+                    setTitulo(''); setMensaje(''); fetchMensajes();
+                }
+                setLoading(false);
+            }} className="bg-white p-6 rounded-2xl shadow-sm border mb-8">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                    <select className="border p-2 rounded-lg bg-gray-50" value={destinatario} onChange={e => setDestinatario(e.target.value)} required>
+                        <option value="">Destinatario...</option>
+                        {usuarios.filter(u => u.id_usuario !== userId).map(u => (
+                            <option key={u.id_usuario} value={u.id_usuario}>{u.nombre_completo}</option>
+                        ))}
+                    </select>
+                    <input className="border p-2 rounded-lg bg-gray-50" placeholder="Asunto" value={titulo} onChange={e => setTitulo(e.target.value)} required />
+                    <select className="border p-2 rounded-lg bg-gray-50" value={prioridad} onChange={e => setPrioridad(e.target.value)}>
+                        <option value="normal">Normal</option>
+                        <option value="alta">Alta</option>
+                    </select>
                 </div>
-
-                <button
-                    type="submit"
-                    disabled={loading}
-                    style={{ backgroundColor: 'var(--ie-green)' }}
-                    className="mt-4 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition"
-                >
-                    {loading ? 'Enviando...' : 'Enviar Mensaje'}
+                <textarea className="w-full border p-3 rounded-lg bg-gray-50 mb-4" rows="3" placeholder="Contenido del mensaje..." value={mensaje} onChange={e => setMensaje(e.target.value)} required />
+                <button disabled={loading} className="bg-green-600 text-white px-8 py-2 rounded-xl font-bold hover:bg-green-700 transition">
+                    {loading ? 'Enviando...' : 'Enviar Comunicado'}
                 </button>
             </form>
 
-            {/* === Mensajes enviados y recibidos === */}
+            {/* Listas de Mensajes */}
             <div className="grid md:grid-cols-2 gap-8">
-                {/* Enviados */}
-                <div>
-                    <h2 className="text-xl font-semibold mb-3 text-gray-700">Mensajes Enviados</h2>
-                    <div className="bg-white p-4 rounded-lg shadow-md max-h-[400px] overflow-y-auto">
-                        {mensajesEnviados.length === 0 ? (
-                            <p className="text-gray-500">No hay mensajes enviados.</p>
-                        ) : (
-                            mensajesEnviados.map((msg) => (
-                                <div key={msg.id_comunicacion} className="border-b py-3">
-                                    <p className="font-semibold">{msg.titulo}</p>
-                                    <p className="text-sm text-gray-600">Para: {msg.destinatario_nombre}</p>
-                                    <p className="text-xs text-gray-400">{new Date(msg.fecha_envio).toLocaleString()}</p>
-                                    <div className="flex justify-end space-x-2 mt-2">
-                                        <button
-                                            onClick={() => handleVerMensaje(msg)}
-                                            className="text-blue-600 text-sm hover:underline"
-                                        >
-                                            Ver
-                                        </button>
-                                        <button
-                                            onClick={() => handleEliminarMensaje(msg.id_comunicacion)}
-                                            className="text-red-600 text-sm hover:underline"
-                                        >
-                                            Eliminar
-                                        </button>
-                                    </div>
+                <section>
+                    <h2 className="font-bold mb-4 text-gray-700">Mensajes Enviados</h2>
+                    <div className="space-y-4">
+                        {mensajesEnviados.map(msg => (
+                            <div key={msg.id_comunicacion} className="bg-white p-5 rounded-2xl border shadow-sm">
+                                <div className="flex justify-between mb-2">
+                                    <span className="text-[9px] font-black px-2 py-0.5 rounded uppercase bg-blue-50 text-blue-600">{msg.prioridad}</span>
+                                    <span className="text-[10px] text-gray-400">{new Date(msg.fecha_envio).toLocaleDateString()}</span>
                                 </div>
-                            ))
-                        )}
+                                <h3 className="font-bold text-gray-800">{msg.titulo}</h3>
+                                <p className="text-xs text-gray-500 mb-4">Para: {msg.destinatario_nombre}</p>
+                                <div className="flex justify-end space-x-6 border-t pt-3">
+                                    <button onClick={() => handleVerMensaje(msg)} className="text-blue-600 text-[11px] font-black flex items-center hover:opacity-70">
+                                        <Eye className="w-3.5 h-3.5 mr-1"/> DETALLES
+                                    </button>
+                                    <button onClick={() => handleEliminarClick(msg.id_comunicacion)} className="text-red-500 text-[11px] font-black flex items-center hover:opacity-70">
+                                        <Trash2 className="w-3.5 h-3.5 mr-1"/> ELIMINAR
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
                     </div>
-                </div>
+                </section>
 
-                {/* Recibidos */}
-                <div>
-                    <h2 className="text-xl font-semibold mb-3 text-gray-700">Mensajes Recibidos</h2>
-                    <div className="bg-white p-4 rounded-lg shadow-md max-h-[400px] overflow-y-auto">
-                        {mensajesRecibidos.length === 0 ? (
-                            <p className="text-gray-500">No hay mensajes recibidos.</p>
+                <section>
+                    <h2 className="font-bold mb-4 text-gray-700">Mensajes Recibidos</h2>
+                    <div className="space-y-4">
+                        {mensajesRecibidos.map(msg => (
+                            <div key={msg.id_comunicacion} onClick={() => handleVerMensaje(msg)} className={`p-5 rounded-2xl border shadow-sm cursor-pointer transition ${msg.estado === 'no leído' ? 'bg-green-50/50 border-green-200' : 'bg-white'}`}>
+                                <h3 className="font-bold text-gray-700">{msg.titulo}</h3>
+                                <p className="text-xs text-gray-500">De: {msg.remitente_nombre}</p>
+                            </div>
+                        ))}
+                    </div>
+                </section>
+            </div>
+
+            {/* MODAL DE SEGURIDAD INTEGRADO (COMO EN TU IMAGEN) */}
+            {openDeleteModal && (
+                <div className="fixed inset-0 bg-black backdrop-blur-sm flex items-center justify-center z-[100] p-4">
+                    <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl relative animate-in fade-in zoom-in duration-200">
+                        <button onClick={() => setOpenDeleteModal(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600">
+                            <X className="w-5 h-5" />
+                        </button>
+                        
+                        <div className="flex flex-col items-center text-center">
+                            <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mb-4">
+                                <Trash2 className="w-6 h-6 text-red-600" />
+                            </div>
+                            <h3 className="text-lg font-bold text-gray-900 mb-2">Eliminar comunicación</h3>
+                            <p className="text-sm text-gray-500 mb-6">
+                                ¿Realmente deseas eliminar este registro? <br />
+                                <span className="font-semibold text-red-500">Esta acción no se puede deshacer.</span>
+                            </p>
                             
-                        ) : (
-                            mensajesRecibidos.map((msg) => (
-                                <div
-                                    key={msg.id_comunicacion}
-                                    className={`border-b py-3 transition ${msg.estado === 'no leído' ? 'bg-green-50' : ''}`}
+                            <div className="w-full text-left mb-6">
+                                <label className="text-[10px] font-bold text-gray-400 uppercase mb-2 block">
+                                    Escribe <span className="text-gray-800">ELIMINAR</span> para confirmar:
+                                </label>
+                                <input 
+                                    type="text" 
+                                    className="w-full border-2 border-gray-100 p-3 rounded-xl bg-gray-50 focus:border-red-200 outline-none transition text-center font-bold tracking-widest"
+                                    placeholder="ELIMINAR"
+                                    value={confirmacionTexto}
+                                    onChange={(e) => setConfirmacionTexto(e.target.value.toUpperCase())}
+                                />
+                            </div>
+
+                            <div className="flex w-full gap-3">
+                                <button 
+                                    onClick={() => setOpenDeleteModal(false)}
+                                    className="flex-1 py-3 bg-green-600 text-white rounded-xl font-bold hover:bg-gray-200 transition"
                                 >
-                                    <p className="font-semibold">{msg.titulo}</p>
-                                    <p className="text-sm text-gray-600">De: {msg.remitente_nombre}</p>
-                                    <p className="text-xs text-gray-400">{new Date(msg.fecha_envio).toLocaleString()}</p>
-                                    <div className="flex justify-between items-center mt-2">
-                                        <span className={`text-xs font-medium ${msg.estado === 'leído'
-                                            ? 'text-gray-500'
-                                            : 'text-green-600 font-semibold'}`}>
-                                            {msg.estado}
-                                        </span>
-                                        <div className="flex space-x-2">
-                                            <button
-                                                onClick={() => handleVerMensaje(msg)}
-                                                className="text-blue-600 text-sm hover:underline"
-                                            >
-                                                Ver
-                                            </button>
-                                            <button
-                                                onClick={() => handleEliminarMensaje(msg.id_comunicacion)}
-                                                className="text-red-600 text-sm hover:underline"
-                                            >
-                                                Eliminar
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            ))
-                        )}
+                                    Cancelar
+                                </button>
+                                <button 
+                                    onClick={confirmarEliminacion}
+                                    disabled={confirmacionTexto !== 'ELIMINAR'}
+                                    className={`flex-1 py-3 rounded-xl font-bold text-white transition shadow-lg ${
+                                        confirmacionTexto === 'ELIMINAR' 
+                                        ? 'bg-red-500 hover:bg-red-600 shadow-red-100' 
+                                        : 'bg-red-200 cursor-not-allowed'
+                                    }`}
+                                >
+                                    Eliminar
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
-            </div>
-            {/* === Modal de mensaje === */}
+            )}
+
+            {/* MODAL DE DETALLES */}
             {selectedMessage && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                    <div className="bg-white rounded-2xl p-6 w-full max-w-lg shadow-xl">
-                        <h3 className="text-xl font-semibold mb-3">{selectedMessage.titulo}</h3>
-                        <p className="text-gray-700 mb-4">{selectedMessage.mensaje}</p>
-                        <div className="flex justify-end">
-                            <button
-                                onClick={() => setSelectedMessage(null)}
-                                className="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300 transition"
-                            >
-                                Cerrar
-                            </button>
-                        </div>
+                <div className="fixed inset-0 bg-black backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-3xl p-8 w-full max-w-lg shadow-2xl">
+                        <h3 className="text-2xl font-black text-gray-800 mb-4">{selectedMessage.titulo}</h3>
+                        <p className="text-gray-700 text-sm mb-6 bg-gray-50 p-4 rounded-xl leading-relaxed">{selectedMessage.mensaje}</p>
+                        <button onClick={() => setSelectedMessage(null)} className="w-full py-4 bg-blue-900 text-white rounded-2xl font-black">Cerrar</button>
                     </div>
                 </div>
             )}

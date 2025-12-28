@@ -104,7 +104,7 @@ const LoginPage = ({ onLoginSuccess }) => {
     };
 
     return (
-        <div className="min-h-screen w-full flex items-center justify-center bg-slate-900 px-4 py-8">
+        <div className="min-h-screen w-full flex items-center justify-center bg-gray-100 px-4 py-8">
             {/* Contenedor Principal: bg-green-300 fijo para mantener el look de la imagen */}
             <div className="bg-[#86EFAC] p-8 md:p-10 shadow-2xl rounded-[40px] w-full max-w-sm border border-green-400 transform transition-all duration-300">
                 

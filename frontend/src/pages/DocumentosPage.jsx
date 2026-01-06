@@ -134,7 +134,7 @@ const DocumentosPage = ({ session }) => {
                         <FileText size={28} />
                     </div>
                     <div>
-                        <h1 className="text-xl md:text-2xl font-black text-gray-800 tracking-tight">Repositorio Escolar</h1>
+                        <h1 className="text-xl md:text-3xl font-black text-gray-800 tracking-tight">Repositorio Institucional</h1>
                         <p className="text-[10px] font-black text-green-600 uppercase tracking-widest">I.E. 2079 - Gestión Digital</p>
                     </div>
                 </div>

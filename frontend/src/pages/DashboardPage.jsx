@@ -106,7 +106,7 @@ const DashboardPage = ({ userEmail }) => {
             {/* CABECERA */}
             <div className="bg-green-300/50 p-6 rounded-3xl border border-green-200/50 shadow-sm relative overflow-hidden flex justify-between items-center">
                 <div className="relative z-10">
-                    <h1 className="text-2xl md:text-3xl font-black text-gray-700 leading-tight">Bienvenido al Sistema</h1>
+                    <h1 className="text-2xl md:text-3xl font-black text-gray-800 leading-tight">Bienvenido al Sistema</h1>
                     <p className="text-xs md:text-sm text-green-600 font-bold tracking-widest mt-1">Panel de control • Gestión de comunicaciones</p>
                 </div>
                 <button 

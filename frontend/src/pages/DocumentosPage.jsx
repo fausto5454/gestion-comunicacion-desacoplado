@@ -124,11 +124,11 @@ const DocumentosPage = ({ session }) => {
     );
 
     return (
-        <div className="p-4 md:p-6 bg-green-50 min-h-screen">
+        <div className="p-4 md:p-6 bg-white min-h-screen">
             <Toaster />
             
             {/* Header */}
-            <header className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4 bg-white/80 backdrop-blur-sm p-5 md:p-8 rounded-[2.5rem] shadow-sm border border-green-100">
+            <header className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4 bg-green-300/50 backdrop-blur-sm p-5 md:p-8 rounded-[2.5rem] shadow-sm border border-green-100">
                 <div className="flex items-center gap-4">
                     <div className="bg-green-600 p-3 rounded-2xl text-white shadow-lg">
                         <FileText size={28} />
@@ -175,7 +175,7 @@ const DocumentosPage = ({ session }) => {
             ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                     {filteredDocs.map((doc) => (
-                        <div key={doc.id_documento} className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-gray-100 hover:shadow-xl transition-all group relative overflow-hidden">
+                        <div key={doc.id_documento} className="bg-green-200/50 p-6 rounded-[2.5rem] shadow-sm border border-gray-100 hover:shadow-xl transition-all group relative overflow-hidden">
                             <div className="flex justify-between items-start mb-4">
                                 <div className="p-4 bg-gray-50 rounded-2xl text-green-600 group-hover:bg-green-600 group-hover:text-white transition-colors">
                                     {doc.nombre_archivo.match(/\.(xls|xlsx)$/i) ? <FileSpreadsheet size={24} /> : <File size={24} />}

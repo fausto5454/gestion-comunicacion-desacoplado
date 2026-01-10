@@ -1,7 +1,7 @@
 // src/components/Sidebar.jsx
 import React from 'react';
-import { LayoutDashboard, Users, Send, Inbox, FileText, BarChart, ShieldCheck, X } from 'lucide-react';
-import { COLOR_IE_GREEN_LIGHT, COLOR_IE_GREEN } from '../styles/CustomStyles'; // Asegúrate de que esta ruta sea correcta
+import { LayoutDashboard, Users, Send, Inbox, FileText, BarChart, ShieldCheck, X, GraduationCap, CalendarCheck, Bell } from 'lucide-react';
+import { COLOR_IE_GREEN_LIGHT, COLOR_IE_GREEN } from '../styles/CustomStyles';
 
 const Sidebar = ({ rol_id, userName, userEmail, onLogout, currentView, setCurrentView, isSidebarOpen, setIsSidebarOpen }) => {
     /**
@@ -11,13 +11,17 @@ const Sidebar = ({ rol_id, userName, userEmail, onLogout, currentView, setCurren
      * 3: Docente (Comunicaciones institucionales)
      * 4: Personal Administrativo (Documentos y avisos)
      * 5: Auxiliar (Asistencia y comunicaciones)
+     * 6: Estudiante (Calificaciones, asistencia y comunicados)
      */
     const navItems = [
-        { name: 'Panel Principal', view: 'dashboard', icon: LayoutDashboard, roles: [1, 2, 3, 4, 5] },
+        { name: 'Panel Principal', view: 'dashboard', icon: LayoutDashboard, roles: [1, 2, 3, 4, 5, 6] },
         { name: 'Gestión de Usuarios', view: 'usuarios', icon: Users, roles: [1] },
         { name: 'Enviar Mensaje', view: 'enviar', icon: Send, roles: [1, 2, 3, 4, 5] },
-        { name: 'Bandeja de Entrada', view: 'bandeja', icon: Inbox, roles: [1, 2, 3, 4, 5] },
-        { name: 'Documentos', view: 'documentos', icon: FileText, roles: [1, 2, 3,4, 5] },
+        { name: 'Bandeja de Entrada', view: 'bandeja', icon: Inbox, roles: [1, 2, 3, 4, 5, 6] },
+        { name: 'Mis Calificaciones', view: 'calificaciones', icon: GraduationCap, roles: [1, 6] },
+        { name: 'Mi Asistencia', view: 'asistencia_estudiante', icon: CalendarCheck, roles: [1, 6] },
+        { name: 'Comunicados', view: 'comunicados_estudiante', icon: Bell, roles: [1, 6] },
+        { name: 'Documentos', view: 'documentos', icon: FileText, roles: [1, 2, 3, 4, 5] },
         { name: 'Reportes', view: 'reportes', icon: BarChart, roles: [1, 2] },
         { name: 'Auditoría de Sistema', view: 'auditoria', icon: ShieldCheck, roles: [1] },
     ];
@@ -43,7 +47,7 @@ const Sidebar = ({ rol_id, userName, userEmail, onLogout, currentView, setCurren
                         key={item.view}
                         onClick={() => {
                             setCurrentView(item.view);
-                            if (isSidebarOpen) setIsSidebarOpen(false); // Cierra el sidebar en móvil al hacer clic
+                            if (isSidebarOpen) setIsSidebarOpen(false);
                         }}
                         className={`flex items-center w-full px-4 py-3 rounded-xl transition-all duration-300 group
                             ${currentView === item.view 
@@ -65,6 +69,7 @@ const Sidebar = ({ rol_id, userName, userEmail, onLogout, currentView, setCurren
                         {rol_id === 3 && "Docente"}
                         {rol_id === 4 && "Administrativo"}
                         {rol_id === 5 && "Auxiliar"}
+                        {rol_id === 6 && "Estudiante"}
                     </span>
                 </div>
                 

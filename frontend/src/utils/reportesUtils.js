@@ -16,5 +16,6 @@ export const agruparPorUsuario = (mensajes) => {
       mapa[nombreDestinatario].recibidos++;
     }
   });
-  return mapa;
+  return Object.values(mapa);
 };
+

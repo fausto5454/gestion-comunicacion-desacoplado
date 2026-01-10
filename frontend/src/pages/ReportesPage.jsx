@@ -6,75 +6,86 @@ import FiltrosReportes from "../components/reportes/FiltrosReportes";
 import KPIsReportes from "../components/reportes/KPIsReportes";
 import GraficosReportes from "../components/reportes/GraficosReportes";
 import ExportarReportes from "../components/reportes/ExportarReportes";
-import TablaReportes from "../components/reportes/TablaReportes"; // ✅ Agregada la tabla
-import { agruparPorUsuario } from "../utils/reportesUtils"; // ✅ Importar tu helper
+import TablaReportes from "../components/reportes/TablaReportes";
+import { agruparPorUsuario } from "../utils/reportesUtils";
 
 const ReportesPage = () => {
   const [loading, setLoading] = useState(true);
-  const [datosTabla, setDatosTabla] = useState({});
+  const [datosTabla, setDatosTabla] = useState([]); // ✅ Inicializado como array
   const [stats, setStats] = useState({
-    total: 0,
-    enviados: 0,
-    recibidos: 0,
-    leidos: 0,
-    noLeidos: 0,
+    total: 0, enviados: 0, recibidos: 0, leidos: 0, noLeidos: 0,
   });
 
-  // Filtros
   const [fechaInicio, setFechaInicio] = useState("");
   const [fechaFin, setFechaFin] = useState("");
   const [estado, setEstado] = useState("todos");
 
-  // Usamos useCallback para evitar re-renderizados innecesarios
  const fetchReportes = useCallback(async () => {
-    setLoading(true);
-    try {
-      // ✅ Tip: He añadido los filtros directamente en la consulta para que 
-      // la tabla y los KPIs respondan a las fechas y estados seleccionados.
-      let query = supabase
-        .from("comunicaciones")
-        .select(`
-          estado, 
-          fecha_envio, 
-          remitente_id, 
-          destinatario_id,
-          remitente:usuarios!remitente_id(nombre_completo),
-          destinatario:usuarios!destinatario_id(nombre_completo)
-        `);
+  setLoading(true);
+  try {
+    // 1. Corregimos el error de la consola usando !remitente_id
+    // Esto le dice a Supabase qué relación exacta usar
+    let query = supabase
+      .from("comunicaciones")
+      .select(`
+      estado, 
+      fecha_envio, 
+      remitente_id, 
+      destinatario_id,
+      remitente:usuarios!comunicaciones_remitente_id_fkey(nombre_completo),
+      destinatario:usuarios!comunicaciones_destinatario_id_fkey(nombre_completo)
+   `);
 
-      if (estado !== "todos") query = query.eq("estado", estado);
-      if (fechaInicio) query = query.gte("fecha_envio", fechaInicio);
-      if (fechaFin) query = query.lte("fecha_envio", fechaFin);
-
-      const { data, error } = await query;
-
-      if (error) throw error;
-
-      if (data) {
-        setDatosTabla(agruparPorUsuario(data));
-        
-        const total = data.length;
-        const leidos = data.filter(m => 
-          m.estado?.trim().toLowerCase() === "leído"
-        ).length;
-
-        setStats({
-          total,
-          enviados: total,
-          recibidos: total,
-          leidos,
-          noLeidos: total - leidos,
-        });
-      }
-    } catch (error) {
-      console.error("❌ Error cargando reportes:", error.message);
-    } finally {
-      setLoading(false); 
+    if (estado !== "todos" && estado !== "") {
+      query = query.eq("estado", estado);
     }
-   }, [estado, fechaInicio, fechaFin]);
-    useEffect(() => {
+
+    const { data, error } = await query;
+    if (error) throw error;
+
+    if (data && data.length > 0) {
+  // 1. Usamos tu función agruparPorUsuario ya integrada
+  // Esta función ahora devuelve el Array de objetos gracias al Object.values
+  const datosAgrupados = agruparPorUsuario(data);
+  setDatosTabla(datosAgrupados);
+
+  // 2. Cálculo de KPIs con tildes exactas: "leído" y "no leído"
+  const total = data.length; // Los 27 registros
+
+  // Contamos estrictamente lo que hay en la DB
+  const leidosCount = data.filter(m => 
+    m.estado?.toLowerCase().trim() === "leído"
+  ).length;
+
+  setStats({
+    total: total,
+    enviados: total, // Representa el tráfico total de la bandeja
+    recibidos: total,
+    leidos: leidosCount,
+    noLeidos: total - leidosCount,
+  });
+  
+  console.log("📊 Reporte actualizado:", { total, leidosCount });
+  } else {
+  setDatosTabla([]);
+  setStats({ total: 0, enviados: 0, recibidos: 0, leidos: 0, noLeidos: 0 });
+  }
+
+  // ✅ Importante: Convertir el mapa en Array para la tabla
+  const datosProcesados = agruparPorUsuario(data);
+  setDatosTabla(Object.values(datosProcesados)); 
+  
+  } catch (error) {
+    // Este log te dirá si el error de "relationship" desapareció
+    console.error("❌ Error en Reportes:", error.message);
+  } finally {
+    setLoading(false); 
+  }
+  }, [estado, fechaInicio, fechaFin]);
+  
+  useEffect(() => {
     fetchReportes();
-   }, []);
+  }, [fetchReportes]);
 
   return (
     <div className="p-4 md:p-8 bg-gray-50 min-h-screen">
@@ -85,11 +96,10 @@ const ReportesPage = () => {
             Reportes del Sistema
           </h1>
           <p className="text-gray-500 mt-1">
-            Visualiza y exporta el rendimiento de las comunicaciones institucionales.
+            Visualiza y exporta el rendimiento de las {stats.total} comunicaciones encontradas.
           </p>
         </header>
 
-        {/* FILTROS */}
         <FiltrosReportes
           fechaInicio={fechaInicio}
           fechaFin={fechaFin}
@@ -103,29 +113,25 @@ const ReportesPage = () => {
         {loading ? (
           <div className="flex flex-col items-center justify-center h-64">
             <Loader2 className="w-10 h-10 text-green-600 animate-spin mb-2" />
-            <p className="text-gray-500 font-medium">Actualizando reportes...</p>
+            <p className="text-gray-500 font-medium">Consultando base de datos...</p>
           </div>
         ) : (
           <div className="space-y-8 animate-in fade-in duration-500">
-            {/* KPIs */}
             <KPIsReportes stats={stats} />
 
             <div className="grid lg:grid-cols-3 gap-8">
-              {/* GRÁFICOS (Ocupa 1/3) */}
               <div className="lg:col-span-1">
                 <GraficosReportes stats={stats} />
               </div>
 
-              {/* TABLA DE DETALLE (Ocupa 2/3) */}
               <div className="lg:col-span-2">
                 <TablaReportes data={datosTabla} />
               </div>
             </div>
 
-            {/* BOTONES DE EXPORTACIÓN */}
             <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
               <h3 className="text-lg font-semibold mb-4 text-gray-700">Herramientas de Exportación</h3>
-              <ExportarReportes stats={stats} />
+              <ExportarReportes data={datosTabla} stats={stats} />
             </div>
           </div>
         )}

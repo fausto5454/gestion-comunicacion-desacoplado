@@ -227,15 +227,6 @@ const ComunicacionesPage = ({ session }) => {
                     <div className="bg-green-600 p-3 rounded-2xl text-white shadow-lg shrink-0"><Send size={24} /></div>
                     <h1 className="text-2xl md:text-3xl font-black text-gray-800 tracking-tight">Comunicaciones</h1>
                 </div>
-                <button
-                  type="button"
-                    aria-label="Cerrar sesión"
-                      onClick={handleLogout}
-                       className="flex items-center gap-1 px-4 py-2 bg-blue-700 text-white rounded-xl font-bold text-[10px] uppercase border border-blue-300 hover:bg-red-600 hover:text-white transition-all shadow-sm mr-6 mt-2"
-                       >
-                    <LogOut size={14} />
-                   <span>Salir</span>
-               </button>
             </div>
 
             {userRol !== 6 && (

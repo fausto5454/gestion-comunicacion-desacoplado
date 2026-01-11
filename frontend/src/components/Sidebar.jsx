@@ -1,6 +1,9 @@
 // src/components/Sidebar.jsx
 import React from 'react';
-import { LayoutDashboard, Users, Send, Inbox, FileText, BarChart, ShieldCheck, X, GraduationCap, CalendarCheck, Bell } from 'lucide-react';
+import { 
+    LayoutDashboard, Users, Send, Inbox, FileText, BarChart, 
+    ShieldCheck, X, GraduationCap, CalendarCheck, Bell, LogOut 
+} from 'lucide-react';
 import { COLOR_IE_GREEN_LIGHT, COLOR_IE_GREEN } from '../styles/CustomStyles';
 
 const Sidebar = ({ rol_id, userName, userEmail, onLogout, currentView, setCurrentView, isSidebarOpen, setIsSidebarOpen }) => {
@@ -18,8 +21,8 @@ const Sidebar = ({ rol_id, userName, userEmail, onLogout, currentView, setCurren
         { name: 'Gestión de Usuarios', view: 'usuarios', icon: Users, roles: [1] },
         { name: 'Enviar Mensaje', view: 'enviar', icon: Send, roles: [1, 2, 3, 4, 5] },
         { name: 'Bandeja de Entrada', view: 'bandeja', icon: Inbox, roles: [1, 2, 3, 4, 5, 6] },
-        { name: 'Mis Calificaciones', view: 'calificaciones', icon: GraduationCap, roles: [1, 6] },
-        { name: 'Mi Asistencia', view: 'asistencia_estudiante', icon: CalendarCheck, roles: [1, 6] },
+        { name: 'Mis Calificaciones', view: 'calificaciones', icon: GraduationCap, roles: [1, 3, 5, 6] },
+        { name: 'Mi Asistencia', view: 'asistencia_estudiante', icon: CalendarCheck, roles: [1, 3, 5, 6] },
         { name: 'Comunicados', view: 'comunicados_estudiante', icon: Bell, roles: [1, 6] },
         { name: 'Documentos', view: 'documentos', icon: FileText, roles: [1, 2, 3, 4, 5] },
         { name: 'Reportes', view: 'reportes', icon: BarChart, roles: [1, 2] },
@@ -78,11 +81,13 @@ const Sidebar = ({ rol_id, userName, userEmail, onLogout, currentView, setCurren
                     <p className="text-[11px] text-gray-500 truncate mt-1 font-medium">{userEmail}</p>
                 </div>
 
+                {/* BOTÓN CERRAR SESIÓN: Funcional al 100% */}
                 <button
                     onClick={onLogout}
-                    className="w-full py-3 rounded-xl bg-red-500 text-white border border-red-500/20 font-black text-[15px] tracking-[0.2em]
-                    hover:bg-red-400 hover:text-white transition-all duration-500 active:scale-95 mb-2"
+                    className="w-full py-3 rounded-xl bg-red-500 text-white border border-red-500/20 font-black text-[14px] tracking-[0.2em] 
+                    hover:bg-red-400 hover:text-white transition-all duration-500 active:scale-95 mb-2 flex items-center justify-center gap-2"
                 >
+                    <LogOut size={16} />
                     Cerrar Sesión
                 </button>
             </div>

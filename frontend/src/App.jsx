@@ -1,19 +1,43 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from './config/supabaseClient';
-import { Toaster } from 'react-hot-toast';
+import { Toaster, toast } from 'react-hot-toast';
 import AppLayout from './components/AppLayout';
 import LoginPage from './pages/LoginPage';
 
 // Importamos los módulos
 import ComunicacionesPage from './pages/ComunicacionesPage'; 
 import ComunicacionesEstudiante from './pages/ComunicacionesEstudiante'; 
-import ReportesPage from './pages/ReportesPage'; // ✅ Asegúrate de importar la página de reportes
+import ReportesPage from './pages/ReportesPage'; 
 
 const App = () => {
   const [session, setSession] = useState(null);
   const [perfilUsuario, setPerfilUsuario] = useState(null); 
   const [loading, setLoading] = useState(true);
   const [currentView, setCurrentView] = useState('dashboard');
+
+  // --- MEJORA: FUNCIÓN DE CIERRE DE SESIÓN PROFESIONAL ---
+  const handleLogout = async () => {
+    try {
+      // 1. Cerramos sesión en Supabase
+      await supabase.auth.signOut();
+      
+      // 2. Limpieza total de rastros en el navegador
+      localStorage.clear();
+      sessionStorage.clear();
+      
+      // 3. Reset de estados locales
+      setSession(null);
+      setPerfilUsuario(null);
+      setCurrentView('dashboard');
+
+      // 4. Redirección forzada para limpiar el historial y evitar "Atrás"
+      window.location.replace('/'); 
+      
+    } catch (err) {
+      toast.error("Error al cerrar sesión");
+      console.error(err);
+    }
+  };
 
   const cargarPerfil = async (userId) => {
     try {
@@ -25,12 +49,10 @@ const App = () => {
 
       if (data) {
         setPerfilUsuario(data);
-        console.log("Rol detectado:", data.rol_id); 
       }
     } catch (err) {
       console.error("Error al cargar perfil:", err);
     } finally {
-      // ✅ CRÍTICO: Una vez cargado el perfil (o si falla), quitamos el loading
       setLoading(false); 
     }
   };
@@ -75,23 +97,13 @@ const App = () => {
     }
 
     switch (currentView) {
-      case 'reportes': // ✅ Agregamos el caso para reportes
+      case 'reportes': 
         return <ReportesPage />;
 
-      case 'comunicaciones':
-        if (!esAdminAutorizado) {
-          return (
-            <div className="p-10 bg-slate-50 min-h-screen">
-              <div className="bg-emerald-600 text-white p-10 rounded-[3rem] shadow-2xl">
-                <h1 className="text-4xl font-black italic uppercase">Mi Bandeja de Entrada</h1>
-                <p className="opacity-70 font-bold text-xs tracking-[0.4em] mt-2">Portal Oficial de Alumno</p>
-              </div>
-              <div className="mt-10 bg-white border-4 border-dashed border-slate-200 rounded-[4rem] p-20 text-center">
-                <p className="text-slate-400 font-black text-xl uppercase">No hay comunicados nuevos</p>
-              </div>
-            </div>
-          );
-        } 
+      case 'bandeja': // Vinculado al nombre de vista que definimos en el Sidebar
+        if (perfilUsuario?.rol_id === 6) {
+          return <ComunicacionesEstudiante session={session} />;
+        }
         return <ComunicacionesPage session={session} userProfile={perfilUsuario} />;
 
       case 'dashboard':
@@ -105,7 +117,7 @@ const App = () => {
         );
       
       default:
-        return <div className="p-8 font-bold text-gray-400">MÓDULO EN DESARROLLO</div>;
+        return <div className="p-8 font-bold text-gray-400 uppercase tracking-widest">Módulo en Desarrollo: {currentView}</div>;
     }
   };
 
@@ -127,7 +139,7 @@ const App = () => {
           userProfile={perfilUsuario} 
           currentView={currentView} 
           setCurrentView={setCurrentView} 
-          onLogout={() => supabase.auth.signOut()}
+          onLogout={handleLogout} // ✅ Usamos la nueva función robusta
         >
           <div className="animate-in fade-in duration-500">
             {renderView()}

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
-  FileText, Upload, Trash2, Search, AlertTriangle,
-  File, Loader2, Globe, Lock, Eye, FileSpreadsheet, X
+    FileText, Upload, Trash2, Search, AlertTriangle,
+    File, Loader2, Globe, Lock, Eye, FileSpreadsheet, X
 } from 'lucide-react';
 import { supabase } from '../config/supabaseClient';
 import { toast, Toaster } from 'react-hot-toast';
@@ -11,11 +11,12 @@ const DocumentosPage = ({ session }) => {
     const [documentos, setDocumentos] = useState([]);
     const [loading, setLoading] = useState(true);
     const [isUploading, setIsUploading] = useState(false);
-    const [isDeleting, setIsDeleting] = useState(false); // Nuevo estado
+    const [isDeleting, setIsDeleting] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const [filterCategory, setFilterCategory] = useState('Todos');
     const [viewMode, setViewMode] = useState('publicos');
-    const [docAEliminar, setDocAEliminar] = useState(null); // Para controlar el modal
+    const [docAEliminar, setDocAEliminar] = useState(null);
+    const [confirmacionText, setConfirmacionText] = useState('');
 
     const categorias = ['Todos', 'Administrativo', 'Académico', 'Planificaciones', 'Recursos', 'Otros'];
 
@@ -97,7 +98,7 @@ const DocumentosPage = ({ session }) => {
     };
 
     const ejecutarEliminacion = async () => {
-        if (!docAEliminar) return;
+        if (!docAEliminar || confirmacionText !== 'ELIMINAR') return;
         setIsDeleting(true);
         try {
             const urlParts = docAEliminar.url_archivo.split('institucion_docs/');
@@ -109,13 +110,18 @@ const DocumentosPage = ({ session }) => {
             if (dbError) throw dbError;
 
             toast.success("Eliminado correctamente");
-            setDocAEliminar(null);
+            Eliminar();
             fetchDocumentos();
         } catch (error) {
             toast.error("Error al eliminar");
         } finally {
             setIsDeleting(false);
         }
+    };
+
+    const Eliminar = () => {
+        setDocAEliminar(null);
+        setConfirmacionText('');
     };
 
     const filteredDocs = documentos.filter(doc => 
@@ -127,7 +133,6 @@ const DocumentosPage = ({ session }) => {
         <div className="p-4 md:p-6 bg-white min-h-screen">
             <Toaster />
             
-            {/* Header */}
             <header className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4 bg-green-300/50 backdrop-blur-sm p-5 md:p-8 rounded-[2.5rem] shadow-sm border border-green-100">
                 <div className="flex items-center gap-4">
                     <div className="bg-green-600 p-3 rounded-2xl text-white shadow-lg">
@@ -149,7 +154,6 @@ const DocumentosPage = ({ session }) => {
                 </div>
             </header>
 
-            {/* Barra de Búsqueda y Subida */}
             <div className="grid grid-cols-1 md:grid-cols-12 gap-4 mb-8">
                 <div className="md:col-span-8 relative">
                     <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
@@ -213,34 +217,54 @@ const DocumentosPage = ({ session }) => {
                 </div>
             )}
 
-            {/* MODAL SEGURO DE ELIMINACIÓN */}
+            {/* MODAL SEGURO DE ELIMINACIÓN UNIFORMIZADO */}
             {docAEliminar && (
-                <div className="fixed inset-0 bg-gray-800 backdrop-blur-sm z-50 flex items-end md:items-center justify-center p-0 md:p-4">
-                    <div className="bg-white w-full max-w-sm rounded-t-[2.5rem] md:rounded-[3rem] p-8 shadow-2xl animate-in slide-in-from-bottom duration-300">
+                <div className="fixed inset-0 bg-gray-800 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-white w-full max-w-sm rounded-[2rem] p-8 shadow-2xl relative animate-in fade-in zoom-in duration-200">
+                        {/* Botón X superior derecho */}
+                        <button 
+                            onClick={Eliminar}
+                            className="absolute top-5 right-5 text-gray-400 hover:text-gray-600 transition-colors"
+                        >
+                            <X size={20} />
+                        </button>
+
                         <div className="flex flex-col items-center text-center">
-                            <div className="w-16 h-16 bg-red-50 text-red-500 rounded-3xl flex items-center justify-center mb-6">
+                            <div className="w-16 h-16 bg-red-50 text-red-500 rounded-2xl flex items-center justify-center mb-6">
                                 <AlertTriangle size={32} />
                             </div>
-                            <h2 className="text-xl font-black text-gray-800 mb-2">¿Confirmar eliminación?</h2>
-                            <p className="text-xs font-bold text-gray-400 uppercase tracking-tighter mb-8 leading-relaxed px-4">
-                                Estás a punto de borrar permanentemente: <br/>
-                                <span className="text-gray-800 italic mt-1 block">"{docAEliminar.nombre_archivo}"</span>
-                            </p>
                             
-                            <div className="flex flex-col w-full gap-3">
+                            <h2 className="text-xl font-black text-gray-800 mb-2">¿Confirmar eliminación?</h2>
+                            <p className="text-[11px] font-bold text-gray-500 mb-6">
+                                Eliminarás a <span className="text-gray-800 font-black italic">"{docAEliminar.nombre_archivo}"</span>
+                            </p>
+
+                            {/* Campo de validación - Diseño adaptado a capturas */}
+                            <input 
+                                type="text"
+                                className="w-full p-3 bg-white border border-gray-400 rounded-xl mb-6 text-center font-bold text-red-500 placeholder:text-gray-300 focus:border-red-300 focus:ring-0 outline-none uppercase text-xs"
+                                placeholder="Escribe ELIMINAR"
+                                value={confirmacionText}
+                                onChange={(e) => setConfirmacionText(e.target.value.toUpperCase())}
+                            />
+                            
+                            <div className="flex w-full gap-3">
                                 <button 
-                                    onClick={ejecutarEliminacion}
+                                    onClick={Eliminar}
                                     disabled={isDeleting}
-                                    className="w-full py-4 bg-red-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-red-100 flex items-center justify-center"
-                                >
-                                    {isDeleting ? <Loader2 className="animate-spin mr-2" size={16}/> : 'Sí, borrar para siempre'}
-                                </button>
-                                <button 
-                                    onClick={() => setDocAEliminar(null)}
-                                    disabled={isDeleting}
-                                    className="w-full py-4 bg-green-600 text-white hover:text-white rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all"
+                                    className="flex-1 py-3 bg-green-500 text-white rounded-xl font-black text-[11px] uppercase tracking-wide hover:bg-green-600 transition-all"
                                 >
                                     Cancelar
+                                </button>
+                                <button 
+                                    onClick={ejecutarEliminacion}
+                                    disabled={isDeleting || confirmacionText !== 'ELIMINAR'}
+                                    className={`flex-1 py-3 rounded-xl font-black text-[11px] uppercase tracking-wide transition-all flex items-center justify-center 
+                                        ${confirmacionText === 'ELIMINAR' 
+                                            ? 'bg-red-500 text-white hover:bg-red-600' 
+                                            : 'bg-red-300 text-white cursor-not-allowed'}`}
+                                >
+                                    {isDeleting ? <Loader2 className="animate-spin" size={16}/> : 'Eliminar'}
                                 </button>
                             </div>
                         </div>

@@ -34,21 +34,13 @@ const ComunicacionesPage = ({ session }) => {
         }
     };
 
-    // --- CORRECCIÓN: FORMATO DE FECHA Y HORA (12H AM/PM) ---
     const formatFecha = (fechaRaw, extendido = false) => {
         if (!fechaRaw) return "";
         const fecha = new Date(fechaRaw);
-    
-        // Configuración para: DD/MM/AAAA • HH:MM AM/PM
         const opciones = { 
-        day: '2-digit', 
-        month: '2-digit', 
-        year: 'numeric', // Esto asegura la fecha íntegra
-        hour: '2-digit', 
-        minute: '2-digit', 
-        hour12: true 
-    };
-        
+            day: '2-digit', month: '2-digit', year: 'numeric', 
+            hour: '2-digit', minute: '2-digit', hour12: true 
+        };
         const formateada = fecha.toLocaleString('es-ES', opciones).toUpperCase();
         return extendido ? formateada : formateada.replace(',', ' •');
     };
@@ -95,7 +87,6 @@ const ComunicacionesPage = ({ session }) => {
                 const currentRol = Number(userData.rol_id);
                 setUserRol(currentRol);
 
-                // --- CORRECCIÓN ERROR DE CONSOLA: ESPECIFICAR RELACIÓN ---
                 let query = supabase.from('comunicaciones').select(`
                     id_comunicacion, titulo, mensaje, prioridad, estado, fecha_envio, remitente_id, destinatario_id, archivo_url,
                     remitente:usuarios!comunicaciones_remitente_id_fkey(nombre_completo),
@@ -117,7 +108,29 @@ const ComunicacionesPage = ({ session }) => {
         } finally { setLoading(false); }
     }, [userId]);
 
-    useEffect(() => { fetchData(); }, [fetchData]);
+    // --- NUEVO: SUSCRIPCIÓN EN TIEMPO REAL ---
+    useEffect(() => {
+        fetchData();
+
+        const channel = supabase
+            .channel('cambios-comunicaciones')
+            .on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'comunicaciones' },
+                (payload) => {
+                    // Si el nuevo mensaje es para mí, avisar con un Toast
+                    if (payload.eventType === 'INSERT' && payload.new.destinatario_id === userId) {
+                        toast('📬 ¡Tienes un nuevo mensaje!', { icon: '🔔', duration: 4000 });
+                    }
+                    fetchData(); // Recargar la lista automáticamente
+                }
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, [fetchData, userId]);
 
     const abrirMensaje = async (msg) => {
         setMsgDetalle(msg);
@@ -128,42 +141,84 @@ const ComunicacionesPage = ({ session }) => {
     };
 
     const handleEnviar = async (e) => {
-        e.preventDefault();
-        if (userRol === 6) return toast.error("Sin permisos");
-        if (!form.destinatario_id) return toast.error("Seleccione destinatario");
-        setLoading(true);
-        const timestamp = new Date().toISOString();
-        try {
-            let urlAdjunto = null;
-            if (archivo) {
-                const cleanName = `${Date.now()}_${archivo.name.replace(/\s/g, '_')}`;
-                await supabase.storage.from('comunicaciones_adjuntos').upload(`${userId}/${cleanName}`, archivo);
-                const { data } = supabase.storage.from('comunicaciones_adjuntos').getPublicUrl(`${userId}/${cleanName}`);
-                urlAdjunto = data.publicUrl;
-            }
-            let dIds = [];
-            if (form.destinatario_id === 'TODOS') {
-                const { data: todos } = await supabase.from('usuarios').select('id_usuario').neq('id_usuario', userId);
-                dIds = todos.map(u => u.id_usuario);
-            } else if (/^\d[AB]$/.test(form.destinatario_id)) {
-                const { data: filtrados } = await supabase.from('usuarios').select('id_usuario').eq('grado', form.destinatario_id.charAt(0)).eq('seccion', form.destinatario_id.charAt(1)).neq('id_usuario', userId);
-                dIds = filtrados?.map(u => u.id_usuario) || [];
-            } else { dIds = [form.destinatario_id]; }
+    e.preventDefault();
+    console.log("Iniciando proceso de envío..."); // Debug
+    
+    if (userRol === 6) return toast.error("Sin permisos");
+    if (!form.destinatario_id) return toast.error("Seleccione destinatario");
+    
+    setLoading(true);
 
-            const envios = dIds.map(id => ({
-                titulo: form.titulo, mensaje: form.mensaje, prioridad: form.prioridad,
-                destinatario_id: id, remitente_id: userId, archivo_url: urlAdjunto,
-                estado: 'no leído', fecha_envio: timestamp
-            }));
-            await supabase.from('comunicaciones').insert(envios);
-            toast.success("Enviado correctamente");
-            setForm({ titulo: '', mensaje: '', destinatario_id: '', prioridad: 'Normal' });
-            setArchivo(null);
-            if (selectRef.current) selectRef.current.clearValue(); 
-            fetchData();
+    try {
+        const ahoraPeru = new Date().toLocaleString("sv-SE", { timeZone: "America/Lima" }).replace(' ', 'T');
+        let urlAdjunto = null;
+
+        // 1. Manejo de Archivo
+        if (archivo) {
+            console.log("Subiendo archivo...");
+            const cleanName = `${Date.now()}_${archivo.name.replace(/\s/g, '_')}`;
+            const { data: uploadData, error: uploadError } = await supabase.storage
+                .from('comunicaciones_adjuntos')
+                .upload(`${userId}/${cleanName}`, archivo);
+            
+            if (uploadError) throw new Error("Error al subir archivo: " + uploadError.message);
+
+            const { data: publicUrlData } = supabase.storage
+                .from('comunicaciones_adjuntos')
+                .getPublicUrl(`${userId}/${cleanName}`);
+            urlAdjunto = publicUrlData.publicUrl;
+        }
+
+        // 2. Determinar Destinatarios
+        console.log("Determinando destinatarios para:", form.destinatario_id);
+        let dIds = [];
+        if (form.destinatario_id === 'TODOS') {
+            const { data: todos, error: errTodos } = await supabase.from('usuarios').select('id_usuario').neq('id_usuario', userId);
+            if (errTodos) throw errTodos;
+            dIds = todos.map(u => u.id_usuario);
+        } else if (/^\d[AB]$/.test(form.destinatario_id)) {
+            const { data: filtrados, error: errFiltro } = await supabase.from('usuarios')
+                .select('id_usuario')
+                .eq('grado', form.destinatario_id.charAt(0))
+                .eq('seccion', form.destinatario_id.charAt(1))
+                .neq('id_usuario', userId);
+            if (errFiltro) throw errFiltro;
+            dIds = filtrados?.map(u => u.id_usuario) || [];
+        } else { 
+            dIds = [form.destinatario_id]; 
+        }
+
+        if (dIds.length === 0) throw new Error("No se encontraron destinatarios");
+
+        // 3. Preparar e Insertar
+        const envios = dIds.map(id => ({
+            titulo: form.titulo,
+            mensaje: form.mensaje,
+            prioridad: form.prioridad,
+            destinatario_id: id,
+            remitente_id: userId,
+            archivo_url: urlAdjunto,
+            estado: 'no leído',
+            fecha_envio: ahoraPeru
+        }));
+
+        console.log("Insertando en la base de datos...");
+        const { error: insertError } = await supabase.from('comunicaciones').insert(envios);
+        
+        if (insertError) throw insertError;
+
+        // 4. Éxito y Limpieza
+        toast.success(`Enviado correctamente a ${dIds.length} usuario(s)`);
+        setForm({ titulo: '', mensaje: '', destinatario_id: '', prioridad: 'Normal' });
+        setArchivo(null);
+        if (selectRef.current) selectRef.current.clearValue();
+        
         } catch (err) {
-            toast.error("Error al enviar");
-        } finally { setLoading(false); }
+        console.error("ERROR DETALLADO EN ENVÍO:", err);
+        toast.error(err.message || "Error al enviar");
+        } finally {
+        setLoading(false);
+      }
     };
 
     const handleEliminar = async () => {
@@ -176,36 +231,25 @@ const ComunicacionesPage = ({ session }) => {
             } else { query = query.eq('id_comunicacion', msgDetalle.id_comunicacion); }
             await query;
             toast.success("Eliminado");
-            setMsgDetalle(null); setShowConfirm(false); setConfirmText(""); fetchData();
+            setMsgDetalle(null); setShowConfirm(false); setConfirmText(""); 
         } finally { setLoading(false); }
     };
 
-    // --- LÓGICA DE FILTRADO Y AGRUPACIÓN DE ENVIADOS ---
     const filtrados = (tab === 'recibidos') 
         ? mensajes.filter(m => m.destinatario_id === userId) 
         : (() => {
             const enviados = mensajes.filter(m => m.remitente_id === userId);
             const agrupados = []; 
             const procesados = new Set();
-
             enviados.forEach(m => {
                 if (procesados.has(m.id_comunicacion)) return;
-                
-                // Agrupamos por misma fecha (segundos ignorados), título y mensaje
                 const fechaBase = m.fecha_envio.substring(0, 16);
                 const rel = enviados.filter(r => 
                     r.fecha_envio.substring(0, 16) === fechaBase && 
-                    r.titulo === m.titulo && 
-                    r.mensaje === m.mensaje
+                    r.titulo === m.titulo && r.mensaje === m.mensaje
                 );
-
                 if (rel.length > 1) {
-                    agrupados.push({ 
-                        ...m, 
-                        esDifusion: true, 
-                        totalDestinatarios: rel.length, 
-                        id_comunicacion: `group-${m.id_comunicacion}` 
-                    });
+                    agrupados.push({ ...m, esDifusion: true, totalDestinatarios: rel.length, id_comunicacion: `group-${m.id_comunicacion}` });
                     rel.forEach(r => procesados.add(r.id_comunicacion));
                 } else { 
                     agrupados.push(m); 
@@ -220,7 +264,7 @@ const ComunicacionesPage = ({ session }) => {
 
     return (
         <div className="max-w-6xl mx-auto p-4 md:p-6 space-y-6">
-            <Toaster />
+            <Toaster position="top-right" />
             
             <div className="flex items-center justify-between gap-4 mb-2">
                 <div className="flex items-center gap-4">
@@ -277,15 +321,10 @@ const ComunicacionesPage = ({ session }) => {
                                 </div>
                             </div>
                             <div className="flex items-center gap-4 shrink-0">
-                                <span className={`text-[9px] font-black uppercase px-3 py-1.5 rounded-lg shadow-sm border ${
-                                 msg.estado === 'leído' 
-                                 ? 'text-green-600 bg-green-50 border-green-100' 
-                                 : 'text-red-600 bg-red-50 border-red-100'
-                                }`}>
-                                {msg.estado === 'leído' ? 'LEÍDO' : 'NO LEÍDO'}
-                               </span>
-    
-                              <ChevronRight className="text-gray-300" size={18} />
+                                <span className={`text-[9px] font-black uppercase px-3 py-1.5 rounded-lg shadow-sm border ${msg.estado === 'leído' ? 'text-green-600 bg-green-50 border-green-100' : 'text-red-600 bg-red-50 border-red-100'}`}>
+                                    {msg.estado === 'leído' ? 'LEÍDO' : 'NO LEÍDO'}
+                                </span>
+                                <ChevronRight className="text-gray-300" size={18} />
                             </div>
                         </div>
                     ))}

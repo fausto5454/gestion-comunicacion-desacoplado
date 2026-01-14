@@ -333,7 +333,7 @@ const UsuariosPage = () => {
 
             {/* --- MODAL CREAR / EDITAR --- */}
             {isModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-800/60 backdrop-blur-sm p-4">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-800 backdrop-blur-sm p-4">
                     <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
                         <div className="p-6 border-b flex justify-between items-center bg-gray-50">
                             <h2 className="text-xl font-bold text-gray-800">{isEdit ? 'Editar Usuario' : 'Nuevo Usuario'}</h2>
@@ -376,7 +376,7 @@ const UsuariosPage = () => {
 
             {/* --- MODAL ELIMINACIÓN --- */}
             {deleteModal.open && (
-                <div className="fixed inset-0 flex items-center justify-center bg-gray-800/60 z-50 p-4 backdrop-blur-sm">
+                <div className="fixed inset-0 flex items-center justify-center bg-gray-800 z-50 p-4 backdrop-blur-sm">
                     <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-sm w-full animate-in zoom-in duration-200">
                         <AlertTriangle className="w-12 h-12 mx-auto text-red-500 mb-4" />
                         <h3 className="text-xl font-bold text-center mb-2">¿Confirmar eliminación?</h3>

@@ -8,31 +8,28 @@ import LoginPage from './pages/LoginPage';
 import ComunicacionesPage from './pages/ComunicacionesPage'; 
 import ComunicacionesEstudiante from './pages/ComunicacionesEstudiante'; 
 import ReportesPage from './pages/ReportesPage'; 
+// Reemplazamos el uso de CalificacionesPage por RegistroCompetencias para el flujo profesional
+import RegistroCompetencias from './pages/RegistroCompetencias';
 
 const App = () => {
   const [session, setSession] = useState(null);
   const [perfilUsuario, setPerfilUsuario] = useState(null); 
   const [loading, setLoading] = useState(true);
   const [currentView, setCurrentView] = useState('dashboard');
+  
+  // ✅ ESTADO CRÍTICO: Mantiene la información del curso seleccionado
+  const [cursoActivo, setCursoActivo] = useState({ nombre: 'MATEMÁTICA', grado: '1° A' });
 
   // --- MEJORA: FUNCIÓN DE CIERRE DE SESIÓN PROFESIONAL ---
   const handleLogout = async () => {
     try {
-      // 1. Cerramos sesión en Supabase
       await supabase.auth.signOut();
-      
-      // 2. Limpieza total de rastros en el navegador
       localStorage.clear();
       sessionStorage.clear();
-      
-      // 3. Reset de estados locales
       setSession(null);
       setPerfilUsuario(null);
       setCurrentView('dashboard');
-
-      // 4. Redirección forzada para limpiar el historial y evitar "Atrás"
       window.location.replace('/'); 
-      
     } catch (err) {
       toast.error("Error al cerrar sesión");
       console.error(err);
@@ -85,41 +82,57 @@ const App = () => {
   }, []);
 
   const renderView = () => {
-    const esAdminAutorizado = perfilUsuario?.rol_id === 1;
+    console.log("DEBUG - Renderizando vista:", currentView, "Curso:", cursoActivo.nombre);
 
     if (session && !perfilUsuario) {
-      return (
-        <div className="p-20 text-center flex flex-col items-center">
-          <div className="w-8 h-8 border-4 border-green-600 border-t-transparent rounded-full animate-spin mb-4"></div>
-          <p className="font-bold text-gray-500">Validando permisos de seguridad...</p>
-        </div>
-      );
-    }
-
-    switch (currentView) {
-      case 'reportes': 
-        return <ReportesPage />;
-
-      case 'bandeja': // Vinculado al nombre de vista que definimos en el Sidebar
-        if (perfilUsuario?.rol_id === 6) {
-          return <ComunicacionesEstudiante session={session} />;
-        }
-        return <ComunicacionesPage session={session} userProfile={perfilUsuario} />;
-
-      case 'dashboard':
         return (
-          <div className="p-8">
-            <h1 className="text-2xl font-black uppercase tracking-tighter">
-              {esAdminAutorizado ? "Panel de Control Administrativo" : "Mi Panel de Estudiante"}
-            </h1>
-            <p className="text-gray-500">Bienvenido, {perfilUsuario?.nombre_completo}</p>
-          </div>
+            <div className="p-20 text-center flex flex-col items-center">
+                <div className="w-8 h-8 border-4 border-green-600 border-t-transparent rounded-full animate-spin mb-4"></div>
+                <p className="font-bold text-gray-500">Validando permisos...</p>
+            </div>
         );
-      
-      default:
-        return <div className="p-8 font-bold text-gray-400 uppercase tracking-widest">Módulo en Desarrollo: {currentView}</div>;
     }
-  };
+
+    // ✅ INTEGRACIÓN: Ahora 'calificaciones' carga el registro por competencias avanzado
+    if (currentView === 'calificaciones') {
+        return (
+            <RegistroCompetencias 
+                key={`${cursoActivo.nombre}-${cursoActivo.grado}`} // FORZA EL REFRESCO VISUAL AL CAMBIAR DE ÁREA
+                session={session} 
+                areaNombre={cursoActivo.nombre}
+                gradoSeccion={cursoActivo.grado}
+            />
+        );
+    }
+
+    if (currentView === 'reportes') {
+        return <ReportesPage />;
+    }
+
+    if (currentView === 'bandeja') {
+        return perfilUsuario?.rol_id === 6 
+            ? <ComunicacionesEstudiante session={session} /> 
+            : <ComunicacionesPage session={session} userProfile={perfilUsuario} />;
+    }
+
+    if (currentView === 'dashboard') {
+        return (
+            <div className="p-8">
+                <h1 className="text-2xl font-black uppercase tracking-tighter">
+                    {perfilUsuario?.rol_id === 1 ? "Panel de Control Administrativo" : "Mi Panel de Estudiante"}
+                </h1>
+                <p className="text-gray-500">Bienvenido, {perfilUsuario?.nombre_completo}</p>
+            </div>
+        );
+    }
+
+    return (
+        <div className="p-10 border-4 border-dashed rounded-[3rem] text-center text-gray-400">
+            <p className="font-black uppercase tracking-widest text-xs">Módulo en construcción o no encontrado</p>
+            <p className="text-[10px] mt-2">ID Vista: {currentView}</p>
+        </div>
+    );
+   };
 
   if (loading) return (
     <div className="flex h-screen items-center justify-center bg-white">
@@ -130,7 +143,7 @@ const App = () => {
     </div>
   );
 
-  return (
+    return (
     <>
       <Toaster position="top-right" />
       {session ? (
@@ -139,7 +152,10 @@ const App = () => {
           userProfile={perfilUsuario} 
           currentView={currentView} 
           setCurrentView={setCurrentView} 
-          onLogout={handleLogout} // ✅ Usamos la nueva función robusta
+          onLogout={handleLogout}
+          // ✅ Estas dos líneas permiten que el Layout y el Sidebar actualicen la vista
+          onCursoSelect={(datos) => setCursoActivo(datos)} 
+          cursoActivo={cursoActivo} 
         >
           <div className="animate-in fade-in duration-500">
             {renderView()}
@@ -149,7 +165,6 @@ const App = () => {
         <LoginPage onLoginSuccess={setSession} />
       )}
     </>
-  );
-};
-
-export default App;
+   );
+ };
+ export default App;

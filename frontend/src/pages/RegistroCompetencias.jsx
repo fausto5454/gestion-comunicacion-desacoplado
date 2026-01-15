@@ -29,23 +29,31 @@ const RegistroCompetencias = () => {
 
   const competencias = CONFIG_AREAS[area] || [];
 
-  // 3. FUNCIÓN DE CARGA REUTILIZABLE (Asegura rellenar hasta 35 si faltan datos)
+  // --- MEJORA DE CONECTIVIDAD (Generación de Key segura) ---
+  const generarKey = useCallback(() => {
+    // Normaliza el texto para quitar tildes y caracteres que puedan romper la URL de la base de datos
+    const areaSegura = area.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    return `reg_2026_${grado}_${areaSegura}_B${bimestre}`.replace(/\s+/g, '_').replace(/°/g, '');
+  }, [grado, area, bimestre]);
+
+  // 3. FUNCIÓN DE CARGA REUTILIZABLE
   const fetchDatos = useCallback(async () => {
     setLoading(true);
-    const key = `reg_2026_${grado}_${area}_B${bimestre}`.replace(/\s+/g, '_');
+    const key = generarKey();
     
     try {
-      const { data, error } = await supabase
-        .from('calificaciones')
-        .select('*')
-        .eq('id', key)
-        .maybeSingle(); 
+      // Ejemplo de cómo asegurar el orden ascendente al consultar
+  const { data, error } = await supabase
+      .from('calificaciones')
+      .select('alumnos, notas')
+      .eq('id', key)
+      .order('id', { ascending: true }) // Asegura el orden ascendente por ID
+      .maybeSingle();
 
       if (error) throw error;
 
       if (data) {
         const listaCargada = data.alumnos || [];
-        // Rellenamos con strings vacíos hasta completar 35 filas exactas
         const lista35 = [...listaCargada, ...Array(35).fill("")].slice(0, 35);
         setAlumnos(lista35);
         setNotas(data.notas || {});
@@ -55,10 +63,11 @@ const RegistroCompetencias = () => {
       }
     } catch (err) { 
       console.error("Error de conexión:", err.message);
+      setMensaje({ texto: "Error al cargar datos", tipo: "error" });
     } finally { 
       setLoading(false); 
     }
-  }, [grado, area, bimestre]);
+  }, [generarKey]);
 
   useEffect(() => {
     fetchDatos();
@@ -67,21 +76,24 @@ const RegistroCompetencias = () => {
   // 4. LÓGICA DE CALIFICACIÓN
   const escala = { "AD": 4, "A": 3, "B": 2, "C": 1, "": 0 };
   const revertirEscala = (num) => {
-    const v = Math.round(num); 
-    if (v >= 4) return "AD";
-    if (v === 3) return "A";
-    if (v === 2) return "B";
-    if (v === 1) return "C";
-    return "-";
+  const v = Math.round(num); // 1.5 -> 2 (B), 2.5 -> 3 (A), 3.5 -> 4 (AD)
+  if (v >= 4) return "AD";
+  if (v === 3) return "A";
+  if (v === 2) return "B";
+  if (v >= 1) return "C";
+  return "-";
   };
 
-  const calcularPromedio = useCallback((estIdx, compIdx) => {
-    let suma = 0, cont = 0;
-    [1, 2, 3, 4].forEach(d => {
-      const n = notas[`${estIdx}-${compIdx}-${d}`];
-      if (n && escala[n] > 0) { suma += escala[n]; cont++; }
-    });
-    return cont > 0 ? revertirEscala(suma / cont) : "-";
+  const calcularPromedio = useCallback((nombreAlumno, compIdx) => {
+  let suma = 0, cont = 0;
+  [1, 2, 3, 4].forEach(d => {
+    const n = notas[`${nombreAlumno}-${compIdx}-${d}`]; // Usa el nombre como clave
+    if (n && escala[n] > 0) { 
+      suma += escala[n]; 
+      cont++; 
+    }
+  });
+  return cont > 0 ? revertirEscala(suma / cont) : "-";
   }, [notas]);
 
   const calcularLogroBimestral = useCallback((estIdx) => {
@@ -96,13 +108,10 @@ const RegistroCompetencias = () => {
     return contComp > 0 ? revertirEscala(sumaLetras / contComp) : "-";
   }, [competencias, calcularPromedio]);
 
-  // 5. FUNCIÓN DE EXPORTACIÓN A EXCEL (Incluye las 35 filas)
+  // 5. FUNCIÓN DE EXPORTACIÓN A EXCEL
   const exportarExcel = () => {
     const dataExcel = alumnos.map((nombre, stIdx) => {
-      const fila = {
-        "N°": stIdx + 1,
-        "ESTUDIANTE": nombre || ""
-      };
+      const fila = { "N°": stIdx + 1, "ESTUDIANTE": nombre || "" };
       competencias.forEach((comp, cIdx) => {
         [1, 2, 3, 4].forEach(dIdx => {
           fila[`${comp.substring(0, 15)}... D${dIdx}`] = notas[`${stIdx}-${cIdx}-${dIdx}`] || "";
@@ -119,24 +128,38 @@ const RegistroCompetencias = () => {
     XLSX.writeFile(wb, `Registro_${grado}_${area}_B${bimestre}.xlsx`);
   };
 
-  // 6. GUARDADO
+  // 6. GUARDADO OPTIMIZADO
   const handleGuardarTodo = async () => {
-    setLoading(true);
-    const key = `reg_2026_${grado}_${area}_B${bimestre}`.replace(/\s+/g, '_');
-    const payload = {
-      id: key, grado, area, bimestre: parseInt(bimestre),
-      alumnos, notas, updated_at: new Date().toISOString()
-    };
-    try {
-      const { error } = await supabase.from('calificaciones').upsert(payload, { onConflict: 'id' });
-      if (error) throw error;
-      setMensaje({ texto: "¡Sincronizado con éxito!", tipo: "success" });
-    } catch (error) {
-      setMensaje({ texto: "Error al guardar", tipo: "error" });
-    } finally {
-      setLoading(false);
-      setTimeout(() => setMensaje(null), 3000);
+  setLoading(true);
+  
+  // 1. Filtramos solo alumnos reales (quitamos los vacíos)
+  const alumnosValidos = alumnos.filter(n => n && n !== "" && n !== "INGRESE ESTUDIANTE...");
+
+  // 2. Limpiamos el objeto de notas para enviar solo lo que pertenece a alumnos reales
+  const notasLimpias = {};
+  Object.keys(notas).forEach(key => {
+    // Solo incluimos la nota si la clave comienza con un nombre de la lista válida
+    if (alumnosValidos.some(nombre => key.startsWith(nombre))) {
+      notasLimpias[key] = notas[key];
     }
+  });
+
+  try {
+    const { error } = await supabase.from('calificaciones').upsert({
+      id: `reg_2026_1_A_MATEMATICA_B1`, // Tu ID de registro
+      alumnos: alumnosValidos.sort(), // Guardamos ordenados de A-Z
+      notas: notasLimpias, // Enviamos el JSON con los nombres como clave
+      updated_at: new Date().toISOString()
+    });
+
+    if (error) throw error;
+    alert("¡Datos sincronizados con éxito!");
+  } catch (err) {
+    console.error("Error completo:", err);
+    alert("Error al guardar: " + err.message);
+  } finally {
+    setLoading(false);
+  }
   };
 
   return (
@@ -171,7 +194,7 @@ const RegistroCompetencias = () => {
           <div className="flex flex-wrap items-center gap-3">
             <div className="flex bg-gray-100 p-1.5 rounded-[1.25rem] border border-slate-200">
               {[1, 2, 3, 4].map(n => (
-                <button key={n} onClick={() => setBimestre(n)} className={`px-5 py-2.5 rounded-xl text-[10px] font-black transition-all ${bimestre === n ? 'bg-green-500 text-white shadow-sm' : 'text-slate-400'}`}>
+                <button key={n} onClick={() => setBimestre(n)} className={`px-4 py-2 rounded-xl text-[10px] font-black transition-all ${bimestre === n ? 'bg-green-500 text-white shadow-sm' : 'text-slate-400'}`}>
                   {n}° BIM
                 </button>
               ))}
@@ -179,7 +202,7 @@ const RegistroCompetencias = () => {
             <button onClick={exportarExcel} className="bg-green-500 border border-slate-200 text-white px-6 py-3.5 rounded-2xl text-[11px] font-black flex items-center gap-2 hover:bg-slate-400 transition-all shadow-sm">
               <Download className="w-4 h-4 text-white" /> EXCEL
             </button>
-            <button onClick={handleGuardarTodo} disabled={loading} className="bg-slate-900 text-white px-8 py-3.5 rounded-2xl text-[11px] font-black flex items-center gap-2 hover:bg-black transition-all shadow-xl">
+            <button onClick={handleGuardarTodo} disabled={loading} className="bg-slate-900 text-white px-8 py-3.5 rounded-2xl text-[11px] font-black flex items-center gap-2 hover:bg-black transition-all shadow-xl disabled:opacity-70">
               {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4 text-green-400" />}
               {loading ? "GUARDANDO..." : "GUARDAR TODO"}
             </button>
@@ -187,79 +210,107 @@ const RegistroCompetencias = () => {
         </div>
       </div>
 
-      {/* TABLA OPTIMIZADA PARA 35 FILAS */}
+      {/* TABLA */}
       <div className="p-4 md:p-6 flex-1 overflow-hidden">
-        <div className="bg-white border shadow-2xl rounded-[1.5rem] overflow-hidden flex flex-col h-full">
+        <div className="bg-white border shadow-2xl rounded-[1rem] overflow-hidden flex flex-col h-full">
           <div className="overflow-auto scrollbar-hide">
             <table className="w-full border-collapse">
-              <thead className="sticky top-0 z-30">
-                <tr className="bg-green-600 text-white text-[9px] uppercase tracking-widest">
-                  <th className="p-2 w-10 sticky left-0 bg-green-600 z-50 border-r border-white/20">N°</th>
-                  <th className="p-2 w-67 md:w-80 text-left sticky left-12 bg-green-600 z-50 border-r border-white italic">ESTUDIANTES</th>
-                  {competencias.map((c, i) => (
-                    <th key={i} colSpan="5" className="p-2 border-r border-white/10 bg-green-700/40 text-center min-w-[200px] text-[8px] leading-tight px-4">{c}</th>
-                  ))}
-                  <th className="p-1 w-12 bg-yellow-400 text-black sticky right-0 z-40 font-black text-center border-l border-yellow-500">LOGRO</th>
-                </tr>
-                <tr className="bg-green-500 text-white text-[8px] font-bold">
-                  <th className="sticky left-0 bg-green-500"></th>
-                  <th className="sticky left-12 bg-green-500"></th>
-                  {competencias.map((_, i) => (
-                    <React.Fragment key={i}>
-                      <th className="w-7 border-r border-white/5">D1</th>
-                      <th className="w-7 border-r border-white/5">D2</th>
-                      <th className="w-7 border-r border-white/5">D3</th>
-                      <th className="w-7 border-r border-white/5">D4</th>
-                      <th className="w-8 bg-green-800/20 border-r border-white italic text-[10px]">PROM</th>
-                    </React.Fragment>
-                  ))}
-                  <th className="sticky right-0 bg-yellow-500"></th>
-                </tr>
-              </thead>
-              <tbody className="text-[10px]">
-                {alumnos.map((nombre, stIdx) => (
-                  <tr key={stIdx} className="border-b hover:bg-green-50 transition-colors group">
-                    <td className="p-3 text-center text-slate-400 border-r sticky left-0 bg-white group-hover:bg-green-50 font-bold z-10">{stIdx + 1}</td>
-                    <td className="p-0 border-r sticky left-12 bg-white group-hover:bg-green-50 z-10">
-                      <input 
-                        type="text" 
-                        value={nombre || ""}
-                        onChange={(e) => {
-                          const next = [...alumnos];
-                          next[stIdx] = e.target.value.toUpperCase();
-                          setAlumnos(next);
-                        }}
-                        className="w-full h-11 px-4 outline-none bg-transparent font-bold text-slate-700 uppercase placeholder:text-slate-200"
-                        placeholder="..."
-                      />
-                    </td>
-                    {competencias.map((_, cIdx) => (
-                      <React.Fragment key={cIdx}>
-                        {[1, 2, 3, 4].map(dIdx => (
-                          <td key={dIdx} className="p-0 border-r w-10">
-                            <select 
-                              value={notas[`${stIdx}-${cIdx}-${dIdx}`] || ""}
-                              onChange={(e) => setNotas({...notas, [`${stIdx}-${cIdx}-${dIdx}`]: e.target.value})}
-                              className={`w-full h-11 text-center bg-transparent appearance-none outline-none cursor-pointer ${
-                                notas[`${stIdx}-${cIdx}-${dIdx}`] === 'C' ? 'text-red-500' : 
-                                notas[`${stIdx}-${cIdx}-${dIdx}`] === 'AD' ? 'text-blue-600' : 'text-slate-600'
-                              }`}
-                            >
-                              <option value="">-</option>
-                              <option value="AD">AD</option><option value="A">A</option><option value="B">B</option><option value="C">C</option>
-                            </select>
-                          </td>
-                        ))}
-                        <td className="p-3 text-center bg-green-100/50 font-black text-green-700 border-r italic">
-                          {calcularPromedio(stIdx, cIdx)}
-                        </td>
-                      </React.Fragment>
-                    ))}
-                    <td className="p-3 text-center bg-yellow-300/50 text-yellow-800 font-black sticky right-0 z-10 border-l border-yellow-200">
-                      {calcularLogroBimestral(stIdx)}
-                    </td>
+              <thead>
+              <tr className="bg-green-600 text-white text-[9px] uppercase">
+                <th className="p-2 w-7 sticky left-0 bg-green-600 z-50 text-center border-r border-gray-300">N°</th>
+    
+                  {/* COLUMNA AMPLIADA: Se eliminó el límite estricto para dar paso al nombre completo */}
+                  <th className="p-2 w-[350px] text-center sticky left-8 bg-green-600 z-50 border-r-2 border-green-400">
+                  APELLIDOS Y NOMBRES
+                  </th>
+
+                   {competencias.map((c, i) => (
+                   <th key={i} colSpan="5" className="p-1 border-r border-gray-300 bg-green-700/40 text-center text-[7.5px]">
+                 <div className="line-clamp-2 leading-tight px-1">{c}</div>
+               </th>
+             ))}
+           <th className="p-0 w-8 bg-yellow-400 text-gray-700 sticky right-0 z-40 font-black text-center">LOGRO</th>
+         </tr>
+
+       <tr className="bg-green-700 text-white text-[10px]">
+       <th className="sticky left-0 bg-green-700"></th>
+       <th className="sticky left-8 bg-green-700 border-r border-gray-300"></th>
+       {competencias.map((_, i) => (
+       <React.Fragment key={i}>
+        {/* COLUMNAS D1-D4 MÁS PEQUEÑAS (w-7) */}
+        <th className="w-[35px] min-w-[35px] border-r border-white/10">D1</th>
+        <th className="w-[35px] min-w-[35px] border-r border-white/10">D2</th>
+        <th className="w-[35px] min-w-[35px] border-r border-white/10">D3</th>
+        <th className="w-[35px] min-w-[35px] border-r border-white/10">D4</th>
+        <th className="w-[35px] min-w-[35px] bg-green-500 border-r border-white/20 text-center text-[8px]">PROM</th>
+      </React.Fragment>
+      ))}
+      <th className="sticky right-0 bg-yellow-600"></th>
+    </tr>
+   </thead>
+    <tbody className="text-[10px]">
+  {alumnos.map((nombre, stIdx) => {
+    // Definimos el ID único para las notas: usa el nombre si existe, sino el índice temporal
+    const alumnoId = nombre || `vacio-${stIdx}`;
+
+    return (
+      <tr key={stIdx} className="border-b hover:bg-green-50 h-7">
+        {/* Columna N° */}
+        <td className="text-center sticky left-0 bg-green-100 font-bold z-10 text-slate-800 text-[9px] border-r border-slate-300">
+          {stIdx + 1}
+        </td>
+
+        {/* Columna Nombres */}
+        <td className="p-0 sticky left-8 bg-white z-10 border-r border-slate-300 after:content-[''] after:absolute after:right-0 after:top-0 after:h-full after:w-[1px] after:bg-slate-300">
+          <input
+            type="text" 
+            value={nombre || ""}
+            onChange={(e) => {
+              const next = [...alumnos];
+              next[stIdx] = e.target.value.toUpperCase();
+              setAlumnos(next);
+            }}
+            className="w-full h-7 px-4 outline-none bg-transparent font-bold text-slate-700 text-[10px]"
+            placeholder="INGRESE ESTUDIANTE..."
+          />
+        </td>
+
+        {/* Columnas de Competencias y Notas - Integración de Clave por Nombre */}
+        {competencias.map((_, cIdx) => (
+          <React.Fragment key={cIdx}>
+            {[1, 2, 3, 4].map(dIdx => {
+              const notaKey = `${alumnoId}-${cIdx}-${dIdx}`;
+              return (
+                <td key={dIdx} className="p-0 border-r border-slate-300 h-7">
+                  <select 
+                    value={notas[notaKey] || ""}
+                    onChange={(e) => setNotas({ ...notas, [notaKey]: e.target.value })}
+                    className="w-full h-full text-center bg-green-100/50 font-bold appearance-none outline-none text-[9px] text-slate-800"
+                  >
+                    <option value="">-</option>
+                    <option value="AD">AD</option>
+                    <option value="A">A</option>
+                    <option value="B">B</option>
+                    <option value="C">C</option>
+                  </select>
+                </td>
+              );
+            })}
+
+            {/* Columna PROM - Ahora usa alumnoId para calcular correctamente */}
+            <td className="text-center font-bold text-black bg-white w-10 border-r border-slate-300 h-7">
+              {calcularPromedio(alumnoId, cIdx)} 
+             </td>
+             </React.Fragment>
+               ))}
+
+               {/* Columna LOGRO BIMESTRAL - Calculado con el identificador único */}
+               <td className="text-center font-bold bg-yellow-300/80 text-black w-12 sticky right-0 border-l border-slate-400 h-7">
+                {calcularLogroBimestral(alumnoId)}
+                 </td>
                   </tr>
-                ))}
+                  );
+                  })}
               </tbody>
             </table>
           </div>

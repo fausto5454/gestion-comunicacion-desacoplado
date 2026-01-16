@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { Save, FileSpreadsheet, CheckCircle2, Loader2, Download } from 'lucide-react';
+import { Save, FileSpreadsheet, CheckCircle2, Loader2, Download, AlertCircle } from 'lucide-react';
 import { supabase } from '../config/supabaseClient'; 
 import * as XLSX from 'xlsx';
 
@@ -12,6 +12,7 @@ const RegistroCompetencias = ({ userProfile }) => {
   const [notas, setNotas] = useState({});
   const [mensaje, setMensaje] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
 
   const CONFIG_AREAS = {
     "MATEMÁTICA": ["RESUELVE PROBLEMAS DE CANTIDAD", "RESUELVE PROBLEMAS DE REGULARIDAD", "FORMA Y MOVIMIENTO", "GESTIÓN DE DATOS"],
@@ -27,19 +28,14 @@ const RegistroCompetencias = ({ userProfile }) => {
   };
 
   const competencias = CONFIG_AREAS[area] || [];
-
-  // --- LÓGICA DE PERMISOS ---
   const esAdministrador = !userProfile || userProfile?.rol_id === 1;
   const esDocente = userProfile?.rol_id === 3;
   const esEstudiante = userProfile?.rol_id === 6;
-
   const tienePermisoEscritura = esAdministrador || (esDocente && area === userProfile?.area_asignada);
 
-  // Utilidad para comparar nombres sin errores por tildes o espacios
   const normalizarTexto = (texto) => 
     texto ? texto.trim().toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") : "";
 
-  // --- AUTO-CONFIGURACIÓN ---
   useEffect(() => {
     if (userProfile) {
       if (esDocente && userProfile.area_asignada) setArea(userProfile.area_asignada);
@@ -47,11 +43,11 @@ const RegistroCompetencias = ({ userProfile }) => {
     }
   }, [userProfile, esDocente, esEstudiante]);
 
-  // --- LÓGICA DE COLOR DINÁMICO ---
   const getColorNota = (nota) => {
     if (nota === 'C') return 'text-red-600';
     if (nota === 'B') return 'text-blue-600';
-    return 'text-slate-800';
+    if (nota === 'A' || nota === 'AD') return 'text-slate-700';
+    return 'text-slate-700';
   };
 
   const generarKey = useCallback(() => {
@@ -106,6 +102,7 @@ const RegistroCompetencias = ({ userProfile }) => {
     return contComp > 0 ? revertirEscala(sumaLetras / contComp) : "-";
   };
 
+  // --- LÓGICA DE EXPORTACIÓN ---
   const exportarExcel = () => {
     const dataExcel = alumnos
       .filter(n => n.trim() !== "")
@@ -114,7 +111,7 @@ const RegistroCompetencias = ({ userProfile }) => {
         const fila = { "N°": idx + 1, "Estudiante": nombre };
         competencias.forEach((c, cIdx) => {
           [1, 2, 3, 4].forEach(d => {
-            fila[`${c.substring(0,10)}.. D${d}`] = notas[`${nombre}-${cIdx}-${d}`] || "-";
+            fila[`${c.substring(0,15)}.. D${d}`] = notas[`${nombre}-${cIdx}-${d}`] || "-";
           });
           fila[`PROM C${cIdx+1}`] = calcularPromedio(nombre, cIdx);
         });
@@ -129,6 +126,7 @@ const RegistroCompetencias = ({ userProfile }) => {
   };
 
   const handleGuardarTodo = async () => {
+    setShowConfirm(false);
     setLoading(true);
     try {
       const { error } = await supabase.from('calificaciones').upsert({
@@ -146,14 +144,32 @@ const RegistroCompetencias = ({ userProfile }) => {
 
   return (
     <div className="flex flex-col min-h-screen bg-slate-50 font-sans text-slate-900">
+      {/* MENSAJE DE ÉXITO */}
       {mensaje && (
-        <div className="fixed top-6 right-6 z-[100] bg-slate-900 text-white px-8 py-4 rounded-2xl shadow-2xl flex items-center gap-3">
+        <div className="fixed top-6 right-6 z-[100] bg-slate-900 text-white px-8 py-4 rounded-2xl shadow-2xl flex items-center gap-3 animate-in fade-in slide-in-from-top-4">
           <CheckCircle2 className="w-5 h-5 text-green-400" />
           <span className="text-[10px] font-black uppercase tracking-widest">{mensaje.texto}</span>
         </div>
       )}
 
-      {/* HEADER */}
+      {/* MODAL DE CONFIRMACIÓN */}
+      {showConfirm && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-gray-800 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-[2rem] p-8 max-w-sm w-full shadow-2xl text-center">
+            <div className="bg-blue-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
+              <AlertCircle className="w-10 h-10 text-blue-600" />
+            </div>
+            <h3 className="text-xl font-black mb-2 text-slate-800">¿Guardar cambios?</h3>
+            <p className="text-slate-500 text-sm mb-8">Esta acción actualizará el registro oficial en Supabase.</p>
+            <div className="flex gap-4">
+              <button onClick={() => setShowConfirm(false)} className="flex-1 py-4 bg-green-600 text-slate-600 font-black rounded-2xl text-white uppercase tracking-widest">Cancelar</button>
+              <button onClick={handleGuardarTodo} className="flex-1 py-4 bg-slate-900 text-white font-black rounded-2xl text-xs uppercase tracking-widest shadow-lg shadow-slate-300">Confirmar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* HEADER ORIGINAL */}
       <div className="bg-white border-b rounded-b-[2.5rem] p-6 shadow-sm z-40">
         <div className="max-w-full mx-auto flex flex-col xl:flex-row xl:items-center justify-between gap-6">
           <div className="flex items-center gap-6">
@@ -163,29 +179,11 @@ const RegistroCompetencias = ({ userProfile }) => {
             <div className="flex flex-col gap-2">
               <h1 className="text-2xl font-black text-slate-800 tracking-tighter">Registro 2026</h1>
               <div className="flex items-center gap-2">
-                <select 
-                  value={grado} 
-                  onChange={(e) => setGrado(e.target.value)} 
-                  disabled={!esAdministrador}
-                  className="bg-slate-100 border text-[10px] font-bold px-4 py-2 rounded-xl outline-none border-slate-200"
-                >
-                  {esAdministrador ? (
-                    ["1° A", "1° B", "1° C", "2° A", "2° B", "2° C", "3° A", "3° B", "4° A", "4° B", "5° A", "5° B"].map(g => <option key={g} value={g}>{g}</option>)
-                  ) : (
-                    <option value={grado}>{grado}</option>
-                  )}
+                <select value={grado} onChange={(e) => setGrado(e.target.value)} disabled={!esAdministrador} className="bg-slate-100 border text-[10px] font-bold px-4 py-2 rounded-xl outline-none border-slate-200">
+                  {esAdministrador ? ["1° A", "1° B", "1° C", "2° A", "2° B", "2° C", "3° A", "3° B", "4° A", "4° B", "5° A", "5° B"].map(g => <option key={g} value={g}>{g}</option>) : <option value={grado}>{grado}</option>}
                 </select>
-                <select 
-                  value={area} 
-                  onChange={(e) => setArea(e.target.value)} 
-                  disabled={!esAdministrador}
-                  className="bg-green-50 text-green-700 border border-green-200 text-[10px] font-bold px-4 py-2 rounded-xl outline-none"
-                >
-                  {esAdministrador ? (
-                    Object.keys(CONFIG_AREAS).map(a => <option key={a} value={a}>{a}</option>)
-                  ) : (
-                    <option value={area}>{area}</option>
-                  )}
+                <select value={area} onChange={(e) => setArea(e.target.value)} disabled={!esAdministrador} className="bg-green-50 text-green-700 border border-green-200 text-[10px] font-bold px-4 py-2 rounded-xl outline-none">
+                  {esAdministrador ? Object.keys(CONFIG_AREAS).map(a => <option key={a} value={a}>{a}</option>) : <option value={area}>{area}</option>}
                 </select>
               </div>
             </div>
@@ -199,11 +197,14 @@ const RegistroCompetencias = ({ userProfile }) => {
                 </button>
               ))}
             </div>
+            
+            {/* BOTÓN EXCEL RESTAURADO */}
             <button onClick={exportarExcel} className="bg-green-500 hover:bg-green-600 text-white px-6 py-3.5 rounded-2xl text-[11px] font-black flex items-center gap-2 shadow-sm transition-all active:scale-95">
               <Download className="w-4 h-4" /> EXCEL
             </button>
+
             {tienePermisoEscritura && !esEstudiante && (
-              <button onClick={handleGuardarTodo} disabled={loading} className="bg-slate-900 hover:bg-slate-800 text-white px-8 py-3.5 rounded-2xl text-[11px] font-black flex items-center gap-2 shadow-xl transition-all active:scale-95">
+              <button onClick={() => setShowConfirm(true)} disabled={loading} className="bg-slate-900 hover:bg-slate-800 text-white px-8 py-3.5 rounded-2xl text-[11px] font-black flex items-center gap-2 shadow-xl transition-all active:scale-95">
                 {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4 text-green-400" />}
                 GUARDAR TODO
               </button>
@@ -214,17 +215,17 @@ const RegistroCompetencias = ({ userProfile }) => {
 
       {/* TABLA */}
       <div className="p-4 md:p-6 flex-1 overflow-hidden">
-        <div className="bg-green-50/50 border border-slate-200 shadow-2xl rounded-[1rem] overflow-hidden flex flex-col h-full">
-          <div className="overflow-auto scrollbar-hide">
-            <table className="w-full border-collapse border-spacing-0">
+        <div className="bg-green-50/50 border border-slate-200 shadow-2xl rounded-[1.5rem] overflow-hidden flex flex-col h-full">
+          <div className="overflow-auto relative">
+            <table className="w-full border-collapse">
               <thead>
                 <tr className="bg-green-600 text-white text-[9px] uppercase">
-                  <th rowSpan="2" className="p-2 w-10 sticky left-0 bg-green-600 z-50 border-r border-b border-green-400">N°</th>
-                  <th rowSpan="2" className="p-2 w-[300px] sticky left-10 bg-green-600 z-50 border-r-2 border-b border-green-400">APELLIDOS Y NOMBRES</th>
+                  <th rowSpan="2" className="p-2 w-10 sticky left-0 bg-green-600 z-[55] border-r border-b border-green-400">N°</th>
+                  <th rowSpan="2" className="p-2 w-[180px] md:w-[300px] sticky left-10 bg-green-600 z-[55] border-r-2 border-b border-green-400 text-left">APELLIDOS Y NOMBRES</th>
                   {competencias.map((c, i) => (
-                    <th key={i} colSpan="5" className="p-1 border-r border-b border-green-500 bg-green-700/30 text-center text-[7.5px] h-8 leading-tight">{c}</th>
+                    <th key={i} colSpan="5" className="p-1 border-r border-b border-green-500 bg-green-700/30 text-center text-[7.5px] min-w-[150px]">{c}</th>
                   ))}
-                  <th rowSpan="2" className="p-0 w-12 bg-yellow-400 text-gray-700 sticky right-0 z-40 font-black text-center border-l border-b border-yellow-500">LOGRO</th>
+                  <th rowSpan="2" className="p-0 w-12 bg-yellow-400 text-gray-700 sticky right-0 z-[55] font-black text-center border-l border-b border-yellow-500 shadow-[-2px_0_5px_rgba(0,0,0,0.1)]">LOGRO</th>
                 </tr>
                 <tr className="bg-green-700 text-white text-[8px] text-center">
                   {competencias.map((_, i) => (
@@ -249,9 +250,9 @@ const RegistroCompetencias = ({ userProfile }) => {
                   .map(({ nombre, stIdx }) => {
                     const alumnoId = nombre || `vacio-${stIdx}`;
                     return (
-                      <tr key={stIdx} className="border-b border-slate-200 hover:bg-green-50 h-8 transition-colors">
-                        <td className="text-center sticky left-0 bg-green-200/80 font-bold z-10 border-r border-slate-300 text-slate-600">{stIdx + 1}</td>
-                        <td className="p-0 sticky left-7 bg-white z-10 border-r border-slate-300">
+                      <tr key={stIdx} className="border-b border-slate-200 hover:bg-green-50/50 h-8 transition-colors">
+                        <td className="text-center sticky left-0 bg-green-100/50 font-bold z-10 border-r border-slate-300 text-slate-600">{stIdx + 1}</td>
+                        <td className="p-0 sticky left-10 bg-white z-10 border-r border-slate-300">
                           <input
                             type="text" 
                             value={nombre || ""}
@@ -262,7 +263,7 @@ const RegistroCompetencias = ({ userProfile }) => {
                               setAlumnos(next);
                             }}
                             className="w-full h-8 px-4 outline-none font-bold text-slate-700 text-[10px] bg-transparent disabled:opacity-80"
-                            placeholder="INGRESE ESTUDIANTE..."
+                            placeholder="Estudiante..."
                           />
                         </td>
                         {competencias.map((_, cIdx) => {
@@ -272,12 +273,12 @@ const RegistroCompetencias = ({ userProfile }) => {
                               {[1, 2, 3, 4].map(dIdx => {
                                 const notaVal = notas[`${alumnoId}-${cIdx}-${dIdx}`];
                                 return (
-                                  <td key={dIdx} className="p-0 border-r border-slate-300">
+                                  <td key={dIdx} className="p-0 border-r border-slate-200 relative">
                                     <select 
                                       value={notaVal || ""}
                                       disabled={!tienePermisoEscritura || esEstudiante}
                                       onChange={(e) => setNotas({ ...notas, [`${alumnoId}-${cIdx}-${dIdx}`]: e.target.value })}
-                                      className={`w-full h-8 text-center font-bold appearance-none outline-none text-[9px] bg-transparent cursor-pointer ${getColorNota(notaVal)}`}
+                                      className={`w-full h-8 text-center font-bold appearance-none outline-none text-[9px] bg-transparent cursor-pointer z-20 relative ${getColorNota(notaVal)}`}
                                     >
                                       <option value="">-</option>
                                       <option value="AD">AD</option>
@@ -294,7 +295,7 @@ const RegistroCompetencias = ({ userProfile }) => {
                             </React.Fragment>
                           );
                         })}
-                        <td className={`text-center font-bold bg-yellow-200 w-12 sticky right-0 border-l border-yellow-300 ${getColorNota(calcularLogroBimestral(alumnoId))}`}>
+                        <td className={`text-center font-bold bg-yellow-200/80 w-12 sticky right-0 z-10 border-l border-yellow-300 ${getColorNota(calcularLogroBimestral(alumnoId))}`}>
                           {calcularLogroBimestral(alumnoId)}
                         </td>
                       </tr>

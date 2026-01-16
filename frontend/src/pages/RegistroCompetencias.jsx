@@ -102,7 +102,6 @@ const RegistroCompetencias = ({ userProfile }) => {
     return contComp > 0 ? revertirEscala(sumaLetras / contComp) : "-";
   };
 
-  // --- LÓGICA DE EXPORTACIÓN ---
   const exportarExcel = () => {
     const dataExcel = alumnos
       .filter(n => n.trim() !== "")
@@ -144,7 +143,6 @@ const RegistroCompetencias = ({ userProfile }) => {
 
   return (
     <div className="flex flex-col min-h-screen bg-slate-50 font-sans text-slate-900">
-      {/* MENSAJE DE ÉXITO */}
       {mensaje && (
         <div className="fixed top-6 right-6 z-[100] bg-slate-900 text-white px-8 py-4 rounded-2xl shadow-2xl flex items-center gap-3 animate-in fade-in slide-in-from-top-4">
           <CheckCircle2 className="w-5 h-5 text-green-400" />
@@ -152,7 +150,6 @@ const RegistroCompetencias = ({ userProfile }) => {
         </div>
       )}
 
-      {/* MODAL DE CONFIRMACIÓN */}
       {showConfirm && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center bg-gray-800 backdrop-blur-sm p-4">
           <div className="bg-white rounded-[2rem] p-8 max-w-sm w-full shadow-2xl text-center">
@@ -160,86 +157,85 @@ const RegistroCompetencias = ({ userProfile }) => {
               <AlertCircle className="w-10 h-10 text-blue-600" />
             </div>
             <h3 className="text-xl font-black mb-2 text-slate-800">¿Guardar cambios?</h3>
-            <p className="text-slate-500 text-sm mb-8">Esta acción actualizará el registro oficial en Supabase.</p>
+            <p className="text-slate-500 text-sm mb-8">Esta acción actualizará el registro oficial en la base de datos.</p>
             <div className="flex gap-4">
-              <button onClick={() => setShowConfirm(false)} className="flex-1 py-4 bg-green-600 text-slate-600 font-black rounded-2xl text-white uppercase tracking-widest">Cancelar</button>
-              <button onClick={handleGuardarTodo} className="flex-1 py-4 bg-slate-900 text-white font-black rounded-2xl text-xs uppercase tracking-widest shadow-lg shadow-slate-300">Confirmar</button>
+              <button onClick={() => setShowConfirm(false)} className="flex-1 py-4 bg-green-600 text-white font-black rounded-2xl text-xs uppercase tracking-widest transition-colors hover:bg-green-400">Cancelar</button>
+              <button onClick={handleGuardarTodo} className="flex-1 py-4 bg-slate-900 text-white font-black rounded-2xl text-xs uppercase tracking-widest shadow-lg shadow-slate-300 transition-transform active:scale-95">Confirmar</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* HEADER ORIGINAL */}
-      <div className="bg-white border-b rounded-b-[2.5rem] p-6 shadow-sm z-40">
-        <div className="max-w-full mx-auto flex flex-col xl:flex-row xl:items-center justify-between gap-6">
-          <div className="flex items-center gap-6">
-            <div className="bg-green-600 p-4 rounded-3xl text-white shadow-lg">
-              <FileSpreadsheet className="w-7 h-7" />
+      {/* Header adaptable */}
+      <div className="bg-white border-b rounded-b-[2.5rem] p-4 md:p-6 shadow-sm z-40">
+        <div className="max-w-full mx-auto flex flex-col xl:flex-row xl:items-center justify-between gap-4 md:gap-6">
+          <div className="flex items-center gap-4 md:gap-6">
+            <div className="bg-green-600 p-3 md:p-4 rounded-2xl md:rounded-3xl text-white shadow-lg">
+              <FileSpreadsheet className="w-5 h-5 md:w-7 md:h-7" />
             </div>
-            <div className="flex flex-col gap-2">
-              <h1 className="text-2xl font-black text-slate-800 tracking-tighter">Registro 2026</h1>
+            <div className="flex flex-col gap-1 md:gap-2">
+              <h1 className="text-lg md:text-2xl font-black text-slate-800 tracking-tighter">Registro 2026</h1>
               <div className="flex items-center gap-2">
-                <select value={grado} onChange={(e) => setGrado(e.target.value)} disabled={!esAdministrador} className="bg-slate-100 border text-[10px] font-bold px-4 py-2 rounded-xl outline-none border-slate-200">
+                <select value={grado} onChange={(e) => setGrado(e.target.value)} disabled={!esAdministrador} className="bg-slate-100 border text-[9px] md:text-[10px] font-bold px-2 md:px-4 py-1.5 md:py-2 rounded-lg md:rounded-xl outline-none border-slate-200">
                   {esAdministrador ? ["1° A", "1° B", "1° C", "2° A", "2° B", "2° C", "3° A", "3° B", "4° A", "4° B", "5° A", "5° B"].map(g => <option key={g} value={g}>{g}</option>) : <option value={grado}>{grado}</option>}
                 </select>
-                <select value={area} onChange={(e) => setArea(e.target.value)} disabled={!esAdministrador} className="bg-green-50 text-green-700 border border-green-200 text-[10px] font-bold px-4 py-2 rounded-xl outline-none">
+                <select value={area} onChange={(e) => setArea(e.target.value)} disabled={!esAdministrador} className="bg-green-50 text-green-700 border border-green-200 text-[9px] md:text-[10px] font-bold px-2 md:px-4 py-1.5 md:py-2 rounded-lg md:rounded-xl outline-none">
                   {esAdministrador ? Object.keys(CONFIG_AREAS).map(a => <option key={a} value={a}>{a}</option>) : <option value={area}>{area}</option>}
                 </select>
               </div>
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="flex bg-gray-100 p-1.5 rounded-[1.25rem] border border-slate-200">
+          <div className="flex flex-wrap items-center gap-2 md:gap-3">
+            <div className="flex bg-gray-100 p-1 md:p-1.5 rounded-xl md:rounded-[1.25rem] border border-slate-200">
               {[1, 2, 3, 4].map(n => (
-                <button key={n} onClick={() => setBimestre(n)} className={`px-4 py-2 rounded-xl text-[10px] font-black transition-all ${bimestre === n ? 'bg-green-500 text-white shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>
+                <button key={n} onClick={() => setBimestre(n)} className={`px-2 md:px-4 py-1.5 md:py-2 rounded-lg md:rounded-xl text-[9px] md:text-[10px] font-black transition-all ${bimestre === n ? 'bg-green-500 text-white shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>
                   {n}° BIM
                 </button>
               ))}
             </div>
             
-            {/* BOTÓN EXCEL RESTAURADO */}
-            <button onClick={exportarExcel} className="bg-green-500 hover:bg-green-600 text-white px-6 py-3.5 rounded-2xl text-[11px] font-black flex items-center gap-2 shadow-sm transition-all active:scale-95">
-              <Download className="w-4 h-4" /> EXCEL
+            <button onClick={exportarExcel} className="bg-green-500 hover:bg-green-600 text-white px-4 md:px-6 py-2 md:py-3.5 rounded-xl md:rounded-2xl text-[10px] md:text-[11px] font-black flex items-center gap-2 shadow-sm transition-all active:scale-95">
+              <Download className="w-3.5 h-3.5 md:w-4 md:h-4" /> EXCEL
             </button>
 
             {tienePermisoEscritura && !esEstudiante && (
-              <button onClick={() => setShowConfirm(true)} disabled={loading} className="bg-slate-900 hover:bg-slate-800 text-white px-8 py-3.5 rounded-2xl text-[11px] font-black flex items-center gap-2 shadow-xl transition-all active:scale-95">
-                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4 text-green-400" />}
-                GUARDAR TODO
+              <button onClick={() => setShowConfirm(true)} disabled={loading} className="bg-slate-900 hover:bg-slate-800 text-white px-4 md:px-8 py-2 md:py-3.5 rounded-xl md:rounded-2xl text-[10px] md:text-[11px] font-black flex items-center gap-2 shadow-xl transition-all active:scale-95">
+                {loading ? <Loader2 className="w-3.5 h-3.5 md:w-4 md:h-4 animate-spin" /> : <Save className="w-3.5 h-3.5 md:w-4 md:h-4 text-green-400" />}
+                GUARDAR
               </button>
             )}
           </div>
         </div>
       </div>
 
-      {/* TABLA */}
-      <div className="p-4 md:p-6 flex-1 overflow-hidden">
-        <div className="bg-green-50/50 border border-slate-200 shadow-2xl rounded-[1.5rem] overflow-hidden flex flex-col h-full">
-          <div className="overflow-auto relative">
+      <div className="p-2 md:p-6 flex-1 overflow-hidden">
+        <div className="bg-white border border-slate-200 shadow-2xl rounded-2xl md:rounded-[1.5rem] overflow-hidden flex flex-col h-full">
+          <div className="overflow-auto relative h-full">
             <table className="w-full border-collapse">
               <thead>
-                <tr className="bg-green-600 text-white text-[9px] uppercase">
-                  <th rowSpan="2" className="p-2 w-10 sticky left-0 bg-green-600 z-[55] border-r border-b border-green-400">N°</th>
-                  <th rowSpan="2" className="p-2 w-[180px] md:w-[300px] sticky left-10 bg-green-600 z-[55] border-r-2 border-b border-green-400 text-left">APELLIDOS Y NOMBRES</th>
+                <tr className="bg-green-600 text-white text-[8px] md:text-[9px] uppercase">
+                  <th rowSpan="2" className="p-1 md:p-2 w-7 md:w-10 sticky left-0 bg-green-600 z-[55] border-r border-b border-green-400">N°</th>
+                  {/* Columna Estudiante: Ancho fijo suficiente para apellidos en móvil */}
+                  <th rowSpan="2" className="p-4 w-[160px] md:w-[600px] sticky left-6 md:left-8 bg-green-600 z-[55] border-r-2 border-b border-green-400 text-center">APELLIDOS Y NOMBRES</th>
                   {competencias.map((c, i) => (
-                    <th key={i} colSpan="5" className="p-1 border-r border-b border-green-500 bg-green-700/30 text-center text-[7.5px] min-w-[150px]">{c}</th>
+                    <th key={i} colSpan="5" className="p-1 border-r border-b border-green-500 bg-green-700/30 text-center text-[7px] md:text-[7px] min-w-[140px] md:min-w-[150px]">{c}</th>
                   ))}
-                  <th rowSpan="2" className="p-0 w-12 bg-yellow-400 text-gray-700 sticky right-0 z-[55] font-black text-center border-l border-b border-yellow-500 shadow-[-2px_0_5px_rgba(0,0,0,0.1)]">LOGRO</th>
+                  <th rowSpan="2" className="p-0 w-10 md:w-12 bg-yellow-400 text-gray-700 sticky right-0 z-[55] font-black text-center border-l border-b border-yellow-500 shadow-[-2px_0_5px_rgba(0,0,0,0.1)]">LOGRO</th>
                 </tr>
-                <tr className="bg-green-700 text-white text-[8px] text-center">
+                <tr className="bg-green-700 text-white text-[8px] md:text-[8px] text-center">
                   {competencias.map((_, i) => (
                     <React.Fragment key={i}>
-                      <th className="w-8 border-r border-green-600/50 py-1">D1</th>
-                      <th className="w-8 border-r border-green-600/50 py-1">D2</th>
-                      <th className="w-8 border-r border-green-600/50 py-1">D3</th>
-                      <th className="w-8 border-r border-green-600/50 py-1">D4</th>
-                      <th className="w-9 bg-green-500 font-bold border-r border-green-600">PROM</th>
+                      <th className="w-7 md:w-8 border-r border-green-600/50 py-1">D1</th>
+                      <th className="w-7 md:w-8 border-r border-green-600/50 py-1">D2</th>
+                      <th className="w-7 md:w-8 border-r border-green-600/50 py-1">D3</th>
+                      <th className="w-7 md:w-8 border-r border-green-600/50 py-1">D4</th>
+                      <th className="w-8 md:w-9 bg-green-500 font-bold border-r border-green-600">PROM</th>
                     </React.Fragment>
                   ))}
                 </tr>
               </thead>
-              <tbody className="text-[10px]">
+              <tbody className="text-[8px] md:text-[10px]">
                 {alumnos
                   .map((nombre, stIdx) => ({ nombre, stIdx }))
                   .filter(({ nombre }) => {
@@ -250,9 +246,9 @@ const RegistroCompetencias = ({ userProfile }) => {
                   .map(({ nombre, stIdx }) => {
                     const alumnoId = nombre || `vacio-${stIdx}`;
                     return (
-                      <tr key={stIdx} className="border-b border-slate-200 hover:bg-green-50/50 h-8 transition-colors">
-                        <td className="text-center sticky left-0 bg-green-100/50 font-bold z-10 border-r border-slate-300 text-slate-600">{stIdx + 1}</td>
-                        <td className="p-0 sticky left-10 bg-white z-10 border-r border-slate-300">
+                      <tr key={stIdx} className="border-b border-slate-200 hover:bg-green-50/50 h-8 md:h-9 transition-colors">
+                        <td className="text-center sticky left-0 bg-green-100 font-bold z-10 border-r border-slate-300 text-slate-600">{stIdx + 1}</td>
+                        <td className="p-0 sticky left-7 md:left-10 bg-white z-10 border-r-2 border-slate-300 overflow-hidden">
                           <input
                             type="text" 
                             value={nombre || ""}
@@ -262,8 +258,8 @@ const RegistroCompetencias = ({ userProfile }) => {
                               next[stIdx] = e.target.value.toUpperCase();
                               setAlumnos(next);
                             }}
-                            className="w-full h-8 px-4 outline-none font-bold text-slate-700 text-[10px] bg-transparent disabled:opacity-80"
-                            placeholder="Estudiante..."
+                            className="w-full h-full px-2 outline-none font-bold text-slate-700 text-[8px] md:text-[10px] bg-transparent whitespace-nowrap overflow-ellipsis"
+                            placeholder=""
                           />
                         </td>
                         {competencias.map((_, cIdx) => {
@@ -273,12 +269,12 @@ const RegistroCompetencias = ({ userProfile }) => {
                               {[1, 2, 3, 4].map(dIdx => {
                                 const notaVal = notas[`${alumnoId}-${cIdx}-${dIdx}`];
                                 return (
-                                  <td key={dIdx} className="p-0 border-r border-slate-200 relative">
+                                  <td key={dIdx} className="p-0 border-r border-slate-300 relative">
                                     <select 
                                       value={notaVal || ""}
                                       disabled={!tienePermisoEscritura || esEstudiante}
                                       onChange={(e) => setNotas({ ...notas, [`${alumnoId}-${cIdx}-${dIdx}`]: e.target.value })}
-                                      className={`w-full h-8 text-center font-bold appearance-none outline-none text-[9px] bg-transparent cursor-pointer z-20 relative ${getColorNota(notaVal)}`}
+                                      className={`w-full h-8 md:h-9 text-center font-bold appearance-none outline-none text-[8px] md:text-[9px] bg-green-50/50 cursor-pointer z-20 relative ${getColorNota(notaVal)}`}
                                     >
                                       <option value="">-</option>
                                       <option value="AD">AD</option>
@@ -289,13 +285,15 @@ const RegistroCompetencias = ({ userProfile }) => {
                                   </td>
                                 );
                               })}
-                              <td className={`text-center font-bold bg-white border-r border-slate-300 w-10 ${getColorNota(prom)}`}>
+                              {/* Promedio por competencia: siempre visible */}
+                              <td className={`text-center font-black bg-white border-r border-slate-200 w-8 md:w-9 ${getColorNota(prom)}`}>
                                 {prom}
                               </td>
                             </React.Fragment>
                           );
                         })}
-                        <td className={`text-center font-bold bg-yellow-200/80 w-12 sticky right-0 z-10 border-l border-yellow-300 ${getColorNota(calcularLogroBimestral(alumnoId))}`}>
+                        {/* Logro Final: siempre visible */}
+                        <td className={`text-center font-black bg-yellow-200 w-10 md:w-12 sticky right-0 z-10 border-l border-yellow-300 ${getColorNota(calcularLogroBimestral(alumnoId))}`}>
                           {calcularLogroBimestral(alumnoId)}
                         </td>
                       </tr>

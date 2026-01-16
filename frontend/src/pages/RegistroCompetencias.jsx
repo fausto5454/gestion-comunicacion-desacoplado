@@ -216,8 +216,7 @@ const RegistroCompetencias = ({ userProfile }) => {
               <thead>
                 <tr className="bg-green-600 text-white text-[8px] md:text-[9px] uppercase">
                   <th rowSpan="2" className="p-1 md:p-2 w-7 md:w-10 sticky left-0 bg-green-600 z-[55] border-r border-b border-green-400">N°</th>
-                  {/* Columna Estudiante: Ancho fijo suficiente para apellidos en móvil */}
-                  <th rowSpan="2" className="p-4 w-[160px] md:w-[600px] sticky left-6 md:left-8 bg-green-600 z-[55] border-r-2 border-b border-green-400 text-center">APELLIDOS Y NOMBRES</th>
+                  <th rowSpan="2" className="p-4 w-[160px] md:w-[450px] sticky left-6 md:left-10 bg-green-600 z-[55] border-r-2 border-b border-green-400 text-center">APELLIDOS Y NOMBRES</th>
                   {competencias.map((c, i) => (
                     <th key={i} colSpan="5" className="p-1 border-r border-b border-green-500 bg-green-700/30 text-center text-[7px] md:text-[7px] min-w-[140px] md:min-w-[150px]">{c}</th>
                   ))}
@@ -247,8 +246,11 @@ const RegistroCompetencias = ({ userProfile }) => {
                     const alumnoId = nombre || `vacio-${stIdx}`;
                     return (
                       <tr key={stIdx} className="border-b border-slate-200 hover:bg-green-50/50 h-8 md:h-9 transition-colors">
-                        <td className="text-center sticky left-0 bg-green-100 font-bold z-10 border-r border-slate-300 text-slate-600">{stIdx + 1}</td>
-                        <td className="p-0 sticky left-7 md:left-10 bg-white z-10 border-r-2 border-slate-300 overflow-hidden">
+                        {/* MEJORA 1: z-20 y bg-green-100 para que las notas pasen por detrás */}
+                        <td className="text-center sticky left-0 bg-green-100 font-bold z-20 border-r border-slate-300 text-slate-600">{stIdx + 1}</td>
+                        
+                        {/* MEJORA 2: z-20 y bg-white sólido */}
+                        <td className="p-0 sticky left-7 md:left-10 bg-white z-20 border-r-2 border-slate-300">
                           <input
                             type="text" 
                             value={nombre || ""}
@@ -258,7 +260,8 @@ const RegistroCompetencias = ({ userProfile }) => {
                               next[stIdx] = e.target.value.toUpperCase();
                               setAlumnos(next);
                             }}
-                            className="w-full h-full px-2 outline-none font-bold text-slate-700 text-[8px] md:text-[10px] bg-transparent whitespace-nowrap overflow-ellipsis"
+                            /* MEJORA 3: Eliminado 'overflow-ellipsis' para que el texto sea siempre legible */
+                            className="w-full h-full px-2 outline-none font-bold text-slate-700 text-[8px] md:text-[10px] bg-transparent whitespace-nowrap"
                             placeholder=""
                           />
                         </td>
@@ -274,7 +277,8 @@ const RegistroCompetencias = ({ userProfile }) => {
                                       value={notaVal || ""}
                                       disabled={!tienePermisoEscritura || esEstudiante}
                                       onChange={(e) => setNotas({ ...notas, [`${alumnoId}-${cIdx}-${dIdx}`]: e.target.value })}
-                                      className={`w-full h-8 md:h-9 text-center font-bold appearance-none outline-none text-[8px] md:text-[9px] bg-green-50/50 cursor-pointer z-20 relative ${getColorNota(notaVal)}`}
+                                      /* Las notas mantienen z-10 (implícito) para quedar por debajo de los sticky z-20 */
+                                      className={`w-full h-8 md:h-9 text-center font-bold appearance-none outline-none text-[8px] md:text-[9px] bg-green-50/50 cursor-pointer relative ${getColorNota(notaVal)}`}
                                     >
                                       <option value="">-</option>
                                       <option value="AD">AD</option>
@@ -285,15 +289,14 @@ const RegistroCompetencias = ({ userProfile }) => {
                                   </td>
                                 );
                               })}
-                              {/* Promedio por competencia: siempre visible */}
                               <td className={`text-center font-black bg-white border-r border-slate-200 w-8 md:w-9 ${getColorNota(prom)}`}>
                                 {prom}
                               </td>
                             </React.Fragment>
                           );
                         })}
-                        {/* Logro Final: siempre visible */}
-                        <td className={`text-center font-black bg-yellow-200 w-10 md:w-12 sticky right-0 z-10 border-l border-yellow-300 ${getColorNota(calcularLogroBimestral(alumnoId))}`}>
+                        {/* MEJORA 4: z-20 y bg sólido para que el Logro no sea tapado por las notas móviles */}
+                        <td className={`text-center font-black bg-yellow-200 w-10 md:w-12 sticky right-0 z-20 border-l border-yellow-300 ${getColorNota(calcularLogroBimestral(alumnoId))}`}>
                           {calcularLogroBimestral(alumnoId)}
                         </td>
                       </tr>

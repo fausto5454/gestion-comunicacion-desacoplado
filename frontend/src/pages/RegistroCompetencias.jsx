@@ -216,7 +216,7 @@ const RegistroCompetencias = ({ userProfile }) => {
               <thead>
                 <tr className="bg-green-600 text-white text-[8px] md:text-[9px] uppercase">
                   <th rowSpan="2" className="p-1 md:p-2 w-7 md:w-10 sticky left-0 bg-green-600 z-[55] border-r border-b border-green-400">N°</th>
-                  <th rowSpan="2" className="p-4 w-[160px] md:w-[450px] sticky left-6 md:left-10 bg-green-600 z-[55] border-r-2 border-b border-green-400 text-center">APELLIDOS Y NOMBRES</th>
+                  <th rowSpan="2" className="p-4 w-[160px] md:w-[450px] sticky left-7 md:left-10 bg-green-600 z-[50] border-r-2 border-b border-green-400 text-center">APELLIDOS Y NOMBRES</th>
                   {competencias.map((c, i) => (
                     <th key={i} colSpan="5" className="p-1 border-r border-b border-green-500 bg-green-700/30 text-center text-[7px] md:text-[7px] min-w-[140px] md:min-w-[150px]">{c}</th>
                   ))}
@@ -225,11 +225,11 @@ const RegistroCompetencias = ({ userProfile }) => {
                 <tr className="bg-green-700 text-white text-[8px] md:text-[8px] text-center">
                   {competencias.map((_, i) => (
                     <React.Fragment key={i}>
-                      <th className="w-7 md:w-8 border-r border-green-600/50 py-1">D1</th>
-                      <th className="w-7 md:w-8 border-r border-green-600/50 py-1">D2</th>
-                      <th className="w-7 md:w-8 border-r border-green-600/50 py-1">D3</th>
-                      <th className="w-7 md:w-8 border-r border-green-600/50 py-1">D4</th>
-                      <th className="w-8 md:w-9 bg-green-500 font-bold border-r border-green-600">PROM</th>
+                      <th className="w-10 md:w-8 border-r border-green-600/50 py-1">D1</th>
+                      <th className="w-10 md:w-8 border-r border-green-600/50 py-1">D2</th>
+                      <th className="w-10 md:w-8 border-r border-green-600/50 py-1">D3</th>
+                      <th className="w-10 md:w-8 border-r border-green-600/50 py-1">D4</th>
+                      <th className="w-10 md:w-9 bg-green-500 font-bold border-r border-green-600">PROM</th>
                     </React.Fragment>
                   ))}
                 </tr>
@@ -289,7 +289,7 @@ const RegistroCompetencias = ({ userProfile }) => {
                                   </td>
                                 );
                               })}
-                              <td className={`text-center font-black bg-white border-r border-slate-200 w-8 md:w-9 ${getColorNota(prom)}`}>
+                              <td className={`text-center font-black bg-green-100 border-r border-slate-200 w-8 md:w-9 ${getColorNota(prom)}`}>
                                 {prom}
                               </td>
                             </React.Fragment>

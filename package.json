@@ -1,0 +1,12 @@
+{
+  "dependencies": {
+    "docx": "^9.5.1",
+    "file-saver": "^2.0.5",
+    "jspdf": "^3.0.4",
+    "jspdf-autotable": "^5.0.2",
+    "lucide-react": "^0.552.0",
+    "recharts": "^3.6.0",
+    "sonner": "^2.0.7",
+    "xlsx": "^0.18.5"
+  }
+}

@@ -145,10 +145,10 @@ const DocumentosPage = ({ session }) => {
                 </div>
 
                 <div className="flex bg-gray-100 p-1.5 rounded-2xl w-full md:w-auto">
-                    <button onClick={() => setViewMode('publicos')} className={`flex-1 md:flex-none flex items-center justify-center px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-tighter transition-all ${viewMode === 'publicos' ? 'bg-white text-green-600 shadow-sm' : 'text-gray-400'}`}>
+                    <button onClick={() => setViewMode('publicos')} className={`flex-1 md:flex-none flex items-center justify-center px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-tighter transition-all ${viewMode === 'publicos' ? 'bg-green-300 text-green-600 shadow-sm' : 'text-gray-400'}`}>
                         <Globe className="mr-2 w-4 h-4" /> Generales
                     </button>
-                    <button onClick={() => setViewMode('privados')} className={`flex-1 md:flex-none flex items-center justify-center px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-tighter transition-all ${viewMode === 'privados' ? 'bg-white text-green-600 shadow-sm' : 'text-gray-400'}`}>
+                    <button onClick={() => setViewMode('privados')} className={`flex-1 md:flex-none flex items-center justify-center px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-tighter transition-all ${viewMode === 'privados' ? 'bg-yellow-300 text-green-600 shadow-sm' : 'text-gray-400'}`}>
                         <Lock className="mr-2 w-4 h-4" /> Mis Archivos
                     </button>
                 </div>

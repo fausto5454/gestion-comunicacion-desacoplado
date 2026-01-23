@@ -9,12 +9,11 @@ import ComunicacionesPage from '../pages/ComunicacionesPage';
 import DocumentosPage from '../pages/DocumentosPage';
 import ReportesPage from '../pages/ReportesPage';
 import AuditoriaPage from '../pages/AuditoriaPage';
-// 1. IMPORTACIÓN DEL NUEVO MÓDULO
-import CalificacionesPage from '../pages/CalificacionesPage'; 
 import RegistroCompetencias from '../pages/RegistroCompetencias';
+// ✅ 1. IMPORTACIÓN DEL MÓDULO ESTADÍSTICO
+import IGAEstadistica from '../pages/IGAEstadistica'; 
 import Sidebar from './Sidebar';
 
-// ✅ CORRECCIÓN: Añadimos onCursoSelect a las props desestructuradas
 const AppLayout = ({ session, onLogout, currentView, setCurrentView, onCursoSelect, cursoActivo }) => {
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [unreadCount, setUnreadCount] = useState(0);
@@ -63,7 +62,7 @@ const AppLayout = ({ session, onLogout, currentView, setCurrentView, onCursoSele
         if (usuarioID) fetchUnreadMessages();
     }, [usuarioID, fetchUnreadMessages]);
 
-    // 2. INTEGRACIÓN EN EL MAPEO DE COMPONENTES
+    // ✅ 2. INTEGRACIÓN EN EL MAPEO (Añadimos iga-estadistica)
     const viewComponents = {
         dashboard: DashboardPage,
         usuarios: UsuariosPage,
@@ -74,12 +73,12 @@ const AppLayout = ({ session, onLogout, currentView, setCurrentView, onCursoSele
         enviar: ComunicacionesPage,
         bandeja: ComunicacionesPage,
         calificaciones: RegistroCompetencias,
+        'iga-estadistica': IGAEstadistica, // <--- Clave para que renderice
     };
 
     const renderContent = () => {
         const CurrentComponent = viewComponents[currentView] || DashboardPage;
-        // Pasamos las props necesarias para que CalificacionesPage funcione
-       // ✅ CAMBIO 3: Aseguramos que pasamos los datos del curso activo como props
+        
         const props = { 
             session, 
             userEmail, 
@@ -88,8 +87,8 @@ const AppLayout = ({ session, onLogout, currentView, setCurrentView, onCursoSele
             rolID, 
             setCurrentView, 
             fetchUnreadMessages,
-            areaNombre: cursoActivo?.nombre || 'MATEMÁTICA', // Prop para la tabla
-            gradoSeccion: cursoActivo?.grado || '1° A'    // Prop para la tabla
+            areaNombre: cursoActivo?.nombre || 'MATEMÁTICA', 
+            gradoSeccion: cursoActivo?.grado || '1° A'
         }; 
         
         return <CurrentComponent {...props} />;
@@ -107,21 +106,19 @@ const AppLayout = ({ session, onLogout, currentView, setCurrentView, onCursoSele
                     onLogout={onLogout} 
                     currentView={currentView} 
                     setCurrentView={setCurrentView}
-                    // ✅ PASAMOS LA FUNCIÓN AL SIDEBAR
                     onCursoSelect={onCursoSelect} 
                 />
             </div>
 
-            {/* Sidebar Mobile Overlay */}
+            {/* Sidebar Mobile */}
             {isSidebarOpen && (
                 <div className="fixed inset-0 z-[60] md:hidden">
-                    <div className="absolute inset-0 bg-gray-700 backdrop-blur-sm" onClick={() => setIsSidebarOpen(false)}></div>
+                    <div className="absolute inset-0 bg-gray-700/50 backdrop-blur-sm" onClick={() => setIsSidebarOpen(false)}></div>
                     <div className="relative w-72 h-full">
                         <Sidebar 
                             rol_id={rolID} userName={userName} userEmail={userEmail} 
                             onLogout={onLogout} currentView={currentView} setCurrentView={setCurrentView}
                             isSidebarOpen={isSidebarOpen} setIsSidebarOpen={setIsSidebarOpen}
-                            // ✅ PASAMOS LA FUNCIÓN AL SIDEBAR MÓVIL TAMBIÉN
                             onCursoSelect={onCursoSelect}
                         />
                     </div>
@@ -139,12 +136,11 @@ const AppLayout = ({ session, onLogout, currentView, setCurrentView, onCursoSele
                             <Menu className="w-7 h-7" />
                         </button>
                         <h1 className="hidden md:block text-xl font-black text-white tracking-tighter uppercase">
-                            {currentView}
+                            {currentView.replace('-', ' ')}
                         </h1>
                     </div>
 
                     <div className="flex items-center gap-3">
-                        {/* Perfil */}
                         <div className="flex items-center gap-2 pr-3 border-r border-white/20">
                             <div className="flex flex-col items-end leading-none hidden sm:flex">
                                 <span className="text-xs font-bold text-white">{userName.split(' ')[0]}</span>
@@ -155,7 +151,6 @@ const AppLayout = ({ session, onLogout, currentView, setCurrentView, onCursoSele
                             </div>
                         </div>
 
-                        {/* Notificaciones */}
                         <div 
                             className="relative p-2 cursor-pointer transition-transform hover:scale-110"
                             onClick={() => setCurrentView('bandeja')}

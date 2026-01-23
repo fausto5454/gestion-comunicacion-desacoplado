@@ -2,26 +2,20 @@
 import React from 'react';
 import { 
     LayoutDashboard, Users, Send, Inbox, FileText, BarChart, 
-    ShieldCheck, X, GraduationCap, CalendarCheck, Bell, LogOut 
+    ShieldCheck, X, GraduationCap, CalendarCheck, Bell, LogOut, Loader2 
 } from 'lucide-react';
 import { COLOR_IE_GREEN_LIGHT, COLOR_IE_GREEN } from '../styles/CustomStyles';
 
 const Sidebar = ({ rol_id, userName, userEmail, onLogout, currentView, setCurrentView, isSidebarOpen, setIsSidebarOpen }) => {
-    /**
-     * Definición de navegación basada en la tabla public.roles:
-     * 1: Administrador (Gestión total)
-     * 2: Director (Reportes y documentos)
-     * 3: Docente (Comunicaciones institucionales)
-     * 4: Personal Administrativo (Documentos y avisos)
-     * 5: Auxiliar (Asistencia y comunicaciones)
-     * 6: Estudiante (Calificaciones, asistencia y comunicados)
-     */
+    
     const navItems = [
         { name: 'Panel Principal', view: 'dashboard', icon: LayoutDashboard, roles: [1, 2, 3, 4, 5, 6] },
         { name: 'Gestión de Usuarios', view: 'usuarios', icon: Users, roles: [1] },
         { name: 'Enviar Mensaje', view: 'enviar', icon: Send, roles: [1, 2, 3, 4, 5] },
         { name: 'Bandeja de Entrada', view: 'bandeja', icon: Inbox, roles: [1, 2, 3, 4, 5, 6] },
         { name: 'Mis Calificaciones', view: 'calificaciones', icon: GraduationCap, roles: [1, 3, 5, 6] },
+        // Item Integrado Correctamente
+        { name: 'IGA-Estadistica', view: 'iga-estadistica', icon: BarChart, roles: [1, 2, 3, 5] },
         { name: 'Mi Asistencia', view: 'asistencia_estudiante', icon: CalendarCheck, roles: [1, 3, 5, 6] },
         { name: 'Comunicados', view: 'comunicados_estudiante', icon: Bell, roles: [1, 6] },
         { name: 'Documentos', view: 'documentos', icon: FileText, roles: [1, 2, 3, 4, 5] },
@@ -30,11 +24,11 @@ const Sidebar = ({ rol_id, userName, userEmail, onLogout, currentView, setCurren
     ];
 
     const [isLoggingOut, setIsLoggingOut] = React.useState(false);
-    // Filtrado de items según el rol_id del usuario logueado
+    
     const filteredNavItems = navItems.filter(item => item.roles.includes(rol_id));
 
     return (
-        <div className="flex flex-col h-full bg-gray-800 text-white w-64 fixed md:relative z-40 shadow-2xl">
+        <div className={`flex flex-col h-full bg-gray-800 text-white w-64 fixed md:relative z-40 shadow-2xl transition-transform duration-300 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
             <div className="p-5 flex items-center justify-between border-b border-gray-400">
                 <div className="flex flex-col">
                     <h2 className="text-xl font-black tracking-tight" style={{ color: COLOR_IE_GREEN }}>I.E. N.° 2079</h2>
@@ -50,8 +44,10 @@ const Sidebar = ({ rol_id, userName, userEmail, onLogout, currentView, setCurren
                     <button
                         key={item.view}
                         onClick={() => {
+                            // Cambiamos la vista inmediatamente
                             setCurrentView(item.view);
-                            if (isSidebarOpen) setIsSidebarOpen(false);
+                            // Si estamos en móvil, cerramos el sidebar tras elegir
+                            if (window.innerWidth < 768) setIsSidebarOpen(false);
                         }}
                         className={`flex items-center w-full px-4 py-3 rounded-xl transition-all duration-300 group
                             ${currentView === item.view 
@@ -60,6 +56,11 @@ const Sidebar = ({ rol_id, userName, userEmail, onLogout, currentView, setCurren
                     >
                         <item.icon className={`w-5 h-5 mr-3 transition-transform duration-300 ${currentView === item.view ? 'scale-110' : 'group-hover:scale-110'}`} />
                         <span className="text-sm font-semibold tracking-wide">{item.name}</span>
+                        
+                        {/* Indicador visual de selección para IGA */}
+                        {currentView === item.view && (
+                            <div className="ml-auto w-1.5 h-1.5 rounded-full bg-white shadow-[0_0_8px_white]"></div>
+                        )}
                     </button>
                 ))}
             </nav>
@@ -82,26 +83,25 @@ const Sidebar = ({ rol_id, userName, userEmail, onLogout, currentView, setCurren
                     <p className="text-[11px] text-gray-500 truncate mt-1 font-medium">{userEmail}</p>
                 </div>
 
-                {/* BOTÓN CERRAR SESIÓN: Funcional al 100% */}
                 <button
-                 onClick={async () => {
-                 setIsLoggingOut(true); // Bloqueo visual instantáneo
-                  await onLogout();
-                  }}
-                  disabled={isLoggingOut} // Evita clics repetidos
-                   className={`w-full py-3 rounded-xl font-black text-[14px] tracking-[0.2em] 
-                    transition-all duration-300 active:scale-95 mb-2 flex items-center justify-center gap-2
-                       ${isLoggingOut 
+                    onClick={async () => {
+                        setIsLoggingOut(true);
+                        await onLogout();
+                    }}
+                    disabled={isLoggingOut}
+                    className={`w-full py-3 rounded-xl font-black text-[14px] tracking-[0.2em] 
+                        transition-all duration-300 active:scale-95 mb-2 flex items-center justify-center gap-2
+                        ${isLoggingOut 
                         ? 'bg-gray-600 cursor-not-allowed opacity-50' 
                         : 'bg-red-500 text-white hover:bg-red-400'}`}
-                     >
-                        {isLoggingOut ? (
-                         <Loader2 className="animate-spin" size={16} /> 
-                        ) : (
-                         <LogOut size={16} />
-                          )}
-                      {isLoggingOut ? "CERRANDO..." : "Cerrar Sesión"}
-                 </button>
+                >
+                    {isLoggingOut ? (
+                        <Loader2 className="animate-spin" size={16} /> 
+                    ) : (
+                        <LogOut size={16} />
+                    )}
+                    {isLoggingOut ? "CERRANDO..." : "Cerrar Sesión"}
+                </button>
             </div>
         </div>
     );

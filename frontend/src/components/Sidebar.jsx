@@ -1,4 +1,5 @@
 // src/components/Sidebar.jsx
+import { supabase } from '../config/supabaseClient';
 import React from 'react';
 import { 
     LayoutDashboard, Users, Send, Inbox, FileText, BarChart, 
@@ -83,27 +84,42 @@ const Sidebar = ({ rol_id, userName, userEmail, onLogout, currentView, setCurren
                     <p className="text-[11px] text-gray-500 truncate mt-1 font-medium">{userEmail}</p>
                 </div>
 
-                <button
-                    onClick={async () => {
-                        setIsLoggingOut(true);
-                        await onLogout();
-                    }}
-                    disabled={isLoggingOut}
-                    className={`w-full py-3 rounded-xl font-black text-[14px] tracking-[0.2em] 
-                        transition-all duration-300 active:scale-95 mb-2 flex items-center justify-center gap-2
-                        ${isLoggingOut 
-                        ? 'bg-gray-600 cursor-not-allowed opacity-50' 
-                        : 'bg-red-500 text-white hover:bg-red-400'}`}
-                >
-                    {isLoggingOut ? (
-                        <Loader2 className="animate-spin" size={16} /> 
-                    ) : (
-                        <LogOut size={16} />
-                    )}
-                    {isLoggingOut ? "CERRANDO..." : "Cerrar Sesión"}
-                </button>
-            </div>
-        </div>
+                {/* BOTÓN CERRAR SESIÓN: Centrado y Estilizado al 100% */}
+               <button
+                onClick={async () => {
+                  try {
+                      setIsLoggingOut(true);
+                         // Si ya tienes supabase importado, esto funcionará:
+                         await supabase.auth.signOut(); 
+                          localStorage.clear();
+                           window.location.href = "/"; 
+                            } catch (error) {
+                             console.error("Error al salir:", error);
+                               window.location.href = "/";
+                                 }
+                                 }}
+                                  disabled={isLoggingOut}
+                                    className={`w-full py-3 px-4 rounded-xl font-black text-[14px] tracking-[0.1em] 
+                                      transition-all duration-300 active:scale-95 mb-2 
+                                        flex items-center justify-center gap-3
+                                          ${isLoggingOut 
+                                          ? 'bg-gray-600 cursor-not-allowed opacity-70' 
+                                          : 'bg-red-500 text-white hover:bg-red-600 shadow-md hover:shadow-red-200'}`}
+                                          >
+                                         {isLoggingOut ? (
+                                         <>
+                                     <Loader2 className="animate-spin" size={16} />
+                                 <span className="">Cerrando...</span>
+                                </>
+                                ) : (
+                               <>
+                            <LogOut size={16} />
+                         <span className="">Cerrar Sesión</span>
+                        </>
+                     )}
+               </button>
+           </div>
+       </div>
     );
 };
 

@@ -200,7 +200,7 @@ const RegistroCompetencias = ({ userProfile }) => {
                 <select value={grado} onChange={(e) => setGrado(e.target.value)} className="bg-slate-100 border text-[10px] font-bold px-4 py-1.5 rounded-xl outline-none">
                   {["1° A", "1° B", "1° C", "2° A", "2° B", "2° C", "3° A", "3° B", "4° A", "4° B", "5° A", "5° B"].map(g => <option key={g} value={g}>{g}</option>)}
                 </select>
-                <select value={area} onChange={(e) => setArea(e.target.value)} className="bg-green-100 text-green-700 border border-green-200 text-[10px] font-bold px-4 py-1.5 rounded-xl outline-none">
+                <select value={area} onChange={(e) => setArea(e.target.value)} className="bg-green-100 text-green-700 border border-green-200 text-[10px] font-bold px-2 py-1 rounded-xl outline-none">
                   {Object.keys(CONFIG_AREAS).map(a => <option key={a} value={a}>{a}</option>)}
                 </select>
               </div>
@@ -234,7 +234,7 @@ const RegistroCompetencias = ({ userProfile }) => {
                 <tr className="bg-green-600 text-white text-[9px] uppercase">
                   {/* Celdas STICKY: Se quedan quietas horizontalmente pero se mueven verticalmente con la página */}
                   <th rowSpan="2" className="p-2.5 w-12 sticky left-0 z-30 bg-green-600 border-r border-b border-green-400">N°</th>
-                  <th rowSpan="2" className="p-2.5 w-12 sticky left-5 z-30 bg-green-600 border-r border-b border-green-400">GEN</th>
+                  <th rowSpan="2" className="p-2.5 w-12 sticky left-5 z-30 bg-green-600 border-r border-b border-green-400">SEXO</th>
                   <th rowSpan="2" className="p-4 w-64 sticky left-10 z-30 bg-green-600 border-r-2 border-b border-green-400 text-center">APELLIDOS Y NOMBRES</th>
                   
                   {competencias.map((c, i) => (

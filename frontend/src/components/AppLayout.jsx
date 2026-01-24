@@ -140,7 +140,7 @@ const AppLayout = ({ session, onLogout, currentView, setCurrentView, onCursoSele
                         </h1>
                     </div>
 
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-1">
                         <div className="flex items-center gap-2 pr-3 border-r border-white/20">
                             <div className="flex flex-col items-end leading-none hidden sm:flex">
                                 <span className="text-xs font-bold text-white">{userName.split(' ')[0]}</span>

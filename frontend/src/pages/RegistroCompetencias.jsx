@@ -190,17 +190,17 @@ const RegistroCompetencias = ({ userProfile }) => {
       )}
 
       {/* HEADER */}
-      <div className="bg-white border-b rounded-b-[2.5rem] p-6 shadow-sm z-40">
+      <div className="bg-white border-b rounded-b-[2.5rem] p-4 shadow-sm z-40">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <div className="bg-green-600 p-4 rounded-3xl text-white shadow-lg"><FileSpreadsheet className="w-7 h-7" /></div>
+          <div className="flex items-center gap-1">
+            <div className="bg-green-600 p-2 rounded-3xl text-white shadow-lg"><FileSpreadsheet className="w-7 h-7" /></div>
             <div>
               <h1 className="text-2xl font-black text-slate-800 tracking-tighter">Registro 2026</h1>
               <div className="flex gap-2 mt-1">
-                <select value={grado} onChange={(e) => setGrado(e.target.value)} className="bg-slate-100 border text-[10px] font-bold px-4 py-1.5 rounded-xl outline-none">
+                <select value={grado} onChange={(e) => setGrado(e.target.value)} className="bg-slate-100 border text-[10px] font-bold px-2 py-1.5 rounded-xl outline-none">
                   {["1° A", "1° B", "1° C", "2° A", "2° B", "2° C", "3° A", "3° B", "4° A", "4° B", "5° A", "5° B"].map(g => <option key={g} value={g}>{g}</option>)}
                 </select>
-                <select value={area} onChange={(e) => setArea(e.target.value)} className="bg-green-100 text-green-700 border border-green-200 text-[10px] font-bold px-2 py-1 rounded-xl outline-none">
+                <select value={area} onChange={(e) => setArea(e.target.value)} className="bg-green-100 text-green-700 border border-green-200 text-[9px] md:text-[10px] font-bold px-3 py-2 md:px-2 md:py-2 rounded-xl outline-none">
                   {Object.keys(CONFIG_AREAS).map(a => <option key={a} value={a}>{a}</option>)}
                 </select>
               </div>
@@ -210,14 +210,14 @@ const RegistroCompetencias = ({ userProfile }) => {
           <div className="flex flex-wrap items-center gap-3">
             <div className="flex bg-gray-200/70 p-1.5 rounded-[1.25rem]">
               {[1, 2, 3, 4].map(n => (
-                <button key={n} onClick={() => setBimestre(n)} className={`px-4 py-1.5 rounded-xl text-[10px] font-black transition-all ${bimestre === n ? 'bg-green-500 text-white shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>{n}° BIM</button>
+                <button key={n} onClick={() => setBimestre(n)} className={`px-3 py-1.5 rounded-xl text-[10px] font-black transition-all ${bimestre === n ? 'bg-green-500 text-white shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>{n}° BIM</button>
               ))}
             </div>
             {/* Restaurado: Botón Excel */}
             <button onClick={exportarExcel} className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-xl text-[10px] font-black flex items-center gap-2 transition-colors">
               <Download className="w-4 h-4" /> EXCEL
             </button>
-            <button onClick={() => setShowConfirm(true)} disabled={loading} className="bg-slate-900 hover:bg-slate-800 text-white px-8 py-3.5 rounded-xl text-[10px] font-black flex items-center gap-2">
+            <button onClick={() => setShowConfirm(true)} disabled={loading} className="bg-slate-900 hover:bg-slate-700 text-white px-7 py-4 rounded-xl text-[10px] font-black flex items-center gap-2">
               {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4 text-green-400" />} GUARDAR
             </button>
           </div>

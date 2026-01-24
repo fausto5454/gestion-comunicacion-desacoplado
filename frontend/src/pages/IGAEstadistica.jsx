@@ -3,18 +3,17 @@ import { supabase } from '../config/supabaseClient';
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
-import { FileDown, RefreshCcw, LayoutDashboard, PieChart as PieIcon, MapPin } from 'lucide-react';
-import { toPng } from 'html-to-image'; // Asegúrate de instalar esta librería: npm install html-to-image
+import { FileDown, RefreshCcw, LayoutDashboard, PieChart as PieIcon } from 'lucide-react';
+import { toPng } from 'html-to-image';
 
 const IGAEstadistica = () => {
     const [allData, setAllData] = useState([]);
     const [loading, setLoading] = useState(true);
-    const chartRef = useRef(null); // Referencia para capturar el gráfico
+    const chartRef = useRef(null);
     const [filtros, setFiltros] = useState({
         bimestre: '1', grado: '1°', seccion: 'A', area: 'MATEMÁTICA'
     });
 
-    // 1. CONEXIÓN REALTIME CON SUPABASE
     useEffect(() => {
         const fetchDatos = async () => {
             setLoading(true);
@@ -31,7 +30,6 @@ const IGAEstadistica = () => {
         return () => supabase.removeChannel(channel);
     }, []);
 
-    // 2. LÓGICA DE DATOS Y COLORES SOLICITADOS
     const stats = useMemo(() => {
         const filtered = allData.filter(d => 
             d.bimestre.toString() === filtros.bimestre && d.grado === filtros.grado &&
@@ -41,10 +39,10 @@ const IGAEstadistica = () => {
         const total = filtered.length;
 
         const dataArr = [
-            { name: 'DESTACADO (AD)', cant: count('AD'), color: '#16a34a' }, // Verde
-            { name: 'LOGRADO (A)', cant: count('A'), color: '#2563eb' },    // Azul
-            { name: 'PROCESO (B)', cant: count('B'), color: '#eab308' },    // Amarillo
-            { name: 'INICIO (C)', cant: count('C'), color: '#dc2626' }      // Rojo
+            { name: 'DESTACADO (AD)', cant: count('AD'), color: '#16a34a' },
+            { name: 'LOGRADO (A)', cant: count('A'), color: '#2563eb' },
+            { name: 'PROCESO (B)', cant: count('B'), color: '#eab308' },
+            { name: 'INICIO (C)', cant: count('C'), color: '#dc2626' }
         ];
 
         return {
@@ -55,7 +53,6 @@ const IGAEstadistica = () => {
         };
     }, [allData, filtros]);
 
-    // Función auxiliar para renderizar el porcentaje dentro del gráfico
     const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }) => {
         const RADIAN = Math.PI / 180;
         const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
@@ -69,56 +66,139 @@ const IGAEstadistica = () => {
         ) : null;
     };
 
-    // 3. EXPORTACIÓN A EXCEL CON BORDES, RESUMEN Y GRÁFICO INTEGRADO
+    // 3. EXPORTACIÓN A EXCEL CORREGIDA (GÉNERO COMBINADO Y ESTILOS)
     const exportarExcelCompleto = async () => {
         const workbook = new ExcelJS.Workbook();
         const worksheet = workbook.addWorksheet('Reporte IGA');
 
-        worksheet.addRow(['REPORTE CONSOLIDADO IGA 2026']).font = { bold: true, size: 14 };
-        worksheet.addRow([`ÁREA: ${filtros.area}`, `GRADO: ${filtros.grado}`, `SECCIÓN: ${filtros.seccion}`, `BIMESTRE: ${filtros.bimestre}`]);
-        worksheet.addRow([]);
+        // TÍTULO PRINCIPAL (A1 a I1)
+        worksheet.mergeCells('A1:I1'); 
+        const titleCell = worksheet.getCell('A1');
+        titleCell.value = 'REPORTE CONSOLIDADO IGA 2026';
+        titleCell.font = { bold: true, size: 14 };
+        titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
 
-        const headerRow = worksheet.addRow(['N°', 'ESTUDIANTE', 'AD', 'A', 'B', 'C', 'LOGRO']);
-        headerRow.eachCell(c => {
-            c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF16A34A' } };
-            c.font = { color: { argb: 'FFFFFFFF' }, bold: true };
-            c.border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
-        });
+        // FILA DE FILTROS (Fila 2)
+        worksheet.addRow([`ÁREA: ${filtros.area}`, `GRADO: ${filtros.grado}`, ``, `SECCIÓN: ${filtros.seccion}`, ``, `BIMESTRE: ${filtros.bimestre}`]);
+        worksheet.addRow([]); // Espacio
+
+        // --- RESTAURACIÓN DEL ENCABEZADO GÉNERO ---
+        const h1 = worksheet.getRow(4);
+        h1.values = ['N°', 'ESTUDIANTE', 'GÉNERO', '', 'AD', 'A', 'B', 'C', 'LOGRO'];
+        
+        const h2 = worksheet.getRow(5);
+        h2.values = ['', '', 'H', 'M', '', '', '', '', ''];
+
+        // Aplicar Estilo Verde Institucional y Bordes
+        for (let i = 1; i <= 9; i++) {
+            [h1, h2].forEach(row => {
+                const cell = row.getCell(i);
+                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF16A34A' } };
+                cell.font = { color: { argb: 'FFFFFFFF' }, bold: true };
+                cell.alignment = { horizontal: 'center', vertical: 'middle' };
+                cell.border = { 
+                    top: {style:'thin'}, left: {style:'thin'}, 
+                    bottom: {style:'thin'}, right: {style:'thin'} 
+                };
+            });
+        }
+
+        // Combinaciones de celdas (Importante: GÉNERO C4:D4)
+        worksheet.mergeCells('A4:A5'); // N°
+        worksheet.mergeCells('B4:B5'); // ESTUDIANTE
+        worksheet.mergeCells('C4:D4'); // GÉNERO (Celda combinada única)
+        worksheet.mergeCells('E4:E5'); // AD
+        worksheet.mergeCells('F4:F5'); // A
+        worksheet.mergeCells('G4:G5'); // B
+        worksheet.mergeCells('H4:H5'); // C
+        worksheet.mergeCells('I4:I5'); // LOGRO
+
+        // --- LÓGICA DE DATOS CON GÉNERO DE SUPABASE ---
+        let countH = 0;
+        let countM = 0;
 
         stats.estudiantes.forEach((est, i) => {
-            const row = worksheet.addRow([i + 1, est.nombre_estudiante, 
-                est.logro_bimestral === 'AD' ? 'X' : '', est.logro_bimestral === 'A' ? 'X' : '',
-                est.logro_bimestral === 'B' ? 'X' : '', est.logro_bimestral === 'C' ? 'X' : '',
+            // Leemos el valor 'H' o 'M' que ahora envía Supabase
+            const genero = est.genero?.toUpperCase(); 
+            const isM = genero === 'M';
+            const isH = genero === 'H';
+
+            if (isM) countM++;
+            if (isH) countH++;
+
+            const row = worksheet.addRow([
+                i + 1, 
+                est.nombre_estudiante, 
+                isH ? 'X' : '', // Columna H
+                isM ? 'X' : '', // Columna M
+                est.logro_bimestral === 'AD' ? 'X' : '', 
+                est.logro_bimestral === 'A' ? 'X' : '',
+                est.logro_bimestral === 'B' ? 'X' : '', 
+                est.logro_bimestral === 'C' ? 'X' : '',
                 est.logro_bimestral
             ]);
-            row.eachCell(c => c.border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} });
+
+            // Bordes y alineación para los datos
+            row.eachCell((c, colNum) => {
+                c.border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
+                if (colNum !== 2) c.alignment = { horizontal: 'center' };
+            });
         });
 
-        worksheet.addRow([]);
-        const rTitle = worksheet.addRow(['RESUMEN', 'CANTIDAD', 'PORCENTAJE']);
-        rTitle.eachCell(c => { c.font = { bold: true }; c.border = { bottom: {style:'medium'} }; });
+        // --- FILA TOTAL AMARILLA ---
+        const totalRowIndex = worksheet.lastRow.number + 1;
+        worksheet.mergeCells(`A${totalRowIndex}:B${totalRowIndex}`);
+        const totalRow = worksheet.getRow(totalRowIndex);
         
+        totalRow.values = [
+            'TOTAL', 
+            '', 
+            countH, 
+            countM, 
+            stats.estudiantes.filter(e => e.logro_bimestral === 'AD').length,
+            stats.estudiantes.filter(e => e.logro_bimestral === 'A').length,
+            stats.estudiantes.filter(e => e.logro_bimestral === 'B').length,
+            stats.estudiantes.filter(e => e.logro_bimestral === 'C').length,
+            stats.estudiantes.length // Total general (10 en tu imagen)
+        ];
+
+        totalRow.eachCell((c) => {
+            c.font = { bold: true };
+            c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFC000' } };
+            c.border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
+            c.alignment = { horizontal: 'center' };
+        });
+
+        // 5. RESUMEN Y GRÁFICO (Restaurados)
+        worksheet.addRow([]);
+        const resHeader = worksheet.addRow(['RESUMEN', 'CANTIDAD', 'PORCENTAJE']);
+        resHeader.eachCell(c => { c.font = { bold: true }; c.alignment = { horizontal: 'center' }; });
+
         stats.resumen.forEach(r => {
             const row = worksheet.addRow([r.name, r.cant, `${r.percent}%`]);
-            row.eachCell(c => c.border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} });
+            const cleanColor = r.color.replace('#', 'FF').toUpperCase();
+            row.eachCell((c, colNum) => {
+                c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: cleanColor } };
+                c.font = { color: { argb: 'FFFFFFFF' }, bold: true };
+                c.border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
+                c.alignment = { horizontal: colNum === 1 ? 'left' : 'center' };
+            });
         });
 
-        worksheet.getColumn(2).width = 30;
+        // Configuración de anchos y Gráfico
+        worksheet.getColumn(2).width = 35;
+        worksheet.getColumn(3).width = 6;
+        worksheet.getColumn(4).width = 6;
 
         if (chartRef.current) {
             try {
                 const dataUrl = await toPng(chartRef.current, { backgroundColor: '#ffffff', pixelRatio: 2 });
-                const imageId = workbook.addImage({
-                    base64: dataUrl,
-                    extension: 'png',
-                });
+                const imageId = workbook.addImage({ base64: dataUrl, extension: 'png' });
                 worksheet.addImage(imageId, {
-                    tl: { col: 0, row: worksheet.rowCount + 1 },
-                    ext: { width: 500, height: 350 }
+                    tl: { col: 0, row: worksheet.rowCount + 2 },
+                    ext: { width: 500, height: 300 }
                 });
-            } catch (error) {
-                console.error("No se pudo generar el gráfico para el Excel", error);
-            }
+            } catch (e) { console.error(e); }
         }
 
         const buffer = await workbook.xlsx.writeBuffer();
@@ -127,7 +207,6 @@ const IGAEstadistica = () => {
 
     return (
         <div className="p-6 bg-slate-50 min-h-screen space-y-6">
-            {/* SELECTORES DINÁMICOS */}
             <div className="bg-green-200 p-6 rounded-[2rem] shadow-sm border border-slate-200 grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
                 <div className="space-y-2">
                     <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Área Curricular</label>
@@ -164,7 +243,7 @@ const IGAEstadistica = () => {
                         </select>
                     </div>
                 </div>
-                <button onClick={exportarExcelCompleto} className="bg-slate-900 text-white p-3 rounded-xl font-black text-xs flex items-center justify-center gap-2 hover:bg-green-600 transition-all shadow-lg">
+                <button onClick={exportarExcelCompleto} className="bg-slate-900 text-white p-2 rounded-xl font-black text-xs flex items-center justify-center gap-2 hover:bg-green-600 transition-all shadow-lg">
                     <FileDown size={18} /> EXPORTAR EXCEL + GRÁFICO
                 </button>
                 <div className="flex items-center gap-2 text-[10px] font-bold text-slate-400 p-3">
@@ -172,7 +251,6 @@ const IGAEstadistica = () => {
                 </div>
             </div>
 
-            {/* RESUMEN ESTADÍSTICO EN INTERFAZ */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 {stats.resumen.map((item, i) => (
                     <div key={i} className="bg-white p-5 rounded-[2rem] border border-slate-100 shadow-sm">
@@ -185,7 +263,6 @@ const IGAEstadistica = () => {
                 ))}
             </div>
 
-            {/* GRÁFICOS PIECHART Y BARCHART */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <div className="bg-white p-8 rounded-[3rem] shadow-sm border border-slate-100 h-[380px]">
                     <h3 className="text-[10px] font-black text-slate-400 uppercase mb-6 flex items-center gap-2 tracking-widest">

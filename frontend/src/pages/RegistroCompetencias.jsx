@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { Save, FileSpreadsheet, CheckCircle2, Loader2, Download, AlertCircle } from 'lucide-react';
 import { supabase } from '../config/supabaseClient'; 
-import * as XLSX from 'xlsx';
+import XLSX from 'xlsx-js-style';
 
 const escala = { "AD": 4, "A": 3, "B": 2, "C": 1, "": 0 };
 const inversa = { 4: "AD", 3: "A", 2: "B", 1: "C", 0: "-" };
@@ -122,54 +122,251 @@ const RegistroCompetencias = ({ userProfile }) => {
     return contComp === 0 ? "-" : inversa[Math.round(sumaLetras / contComp)] || "-";
   };
 
-  // Restaurado: Función Excel
+  // Restaurado y Mejorado: Función Excel Profesional
   const exportarExcel = () => {
-    const data = alumnosOrdenados.filter(a => a.nombre).map(({ nombre }, idx) => {
-      const idEst = normalizarID(nombre);
-      return {
-        "N°": idx + 1,
-        "GEN": generos[idEst] || "",
-        "ESTUDIANTE": nombre.toUpperCase(),
-        "LOGRO BIMESTRAL": calcularLogroBimestral(nombre)
-      };
+    const alumnosValidos = alumnosOrdenados.filter(a => a.nombre && a.nombre.trim() !== "");
+    if (alumnosValidos.length === 0) return;
+
+    // 1. Cálculos Estadísticos
+    const nFinales = alumnosValidos.map(a => calcularLogroBimestral(a.nombre));
+    const totalAlumnos = nFinales.length;
+    const stats = {
+        AD: nFinales.filter(n => n === 'AD').length,
+        A: nFinales.filter(n => n === 'A').length,
+        B: nFinales.filter(n => n === 'B').length,
+        C: nFinales.filter(n => n === 'C').length
+    };
+
+    // 2. ESTILOS DE ALTA PRECISIÓN (TODO FUENTE 8)
+    const borderThin = { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } };
+    const estiloBase = { font: { sz: 8 }, border: borderThin, alignment: { vertical: "center", horizontal: "center" } };
+    
+    const estiloVerdeOscuro = { 
+        ...estiloBase, 
+        font: { bold: true, color: { rgb: "FFFFFF" }, sz: 8 }, 
+        fill: { fgColor: { rgb: "00A859" } }, 
+        alignment: { horizontal: "center", vertical: "center", wrapText: true } 
+    };
+
+    // Estilo Naranja Logro Final (Corregido para una sola celda)
+    const estiloNaranjaLogro = { 
+        ...estiloBase, 
+        font: { bold: true, color: { rgb: "FFFFFF" }, sz: 8 }, 
+        fill: { fgColor: { rgb: "C2410C" } }, 
+        alignment: { horizontal: "center", vertical: "center", wrapText: true } 
+    };
+
+    const estiloAzulResumen = { 
+        ...estiloBase, 
+        font: { bold: true, color: { rgb: "FFFFFF" }, sz: 8 }, 
+        fill: { fgColor: { rgb: "1E293B" } },
+        alignment: { horizontal: "center", vertical: "center" }
+    };
+
+    const rows = [];
+    // La columna Logro Final es la inmediatamente posterior a las competencias
+    const colLogroIdx = 3 + (competencias.length * 5); 
+
+    // FILA 1: TÍTULO PRINCIPAL
+    rows.push([{ v: "REGISTRO AUXILIAR 2026", s: { font: { bold: true, sz: 12 }, alignment: { horizontal: "center" } } }]);
+
+    // FILA 2: CABECERA DE INFORMACIÓN (Ajustada para máxima visibilidad)
+    const filaInfo = Array(colLogroIdx + 6).fill({ v: "", s: {} });
+    filaInfo[0] = { v: `ÁREA: ${area.toUpperCase()}`, s: { font: { bold: true, sz: 8 } } };
+    filaInfo[8] = { v: `GRADO: ${grado}`, s: { font: { bold: true, sz: 8 }, alignment: { horizontal: "lefft" } } };
+    filaInfo[colLogroIdx - 2] = { v: `DOCENTE: ${userProfile?.full_name || "................................."}`, s: { font: { bold: true, sz: 8 }, alignment: { horizontal: "lefft" } } };
+    rows.push(filaInfo);
+    rows.push([]); 
+
+    // FILA 4: ENCABEZADO SUPERIOR
+    const h1 = [
+        { v: "N°", s: estiloVerdeOscuro }, 
+        { v: "SEXO", s: estiloVerdeOscuro }, 
+        { v: "APELLIDOS Y NOMBRES", s: estiloVerdeOscuro }
+    ];
+    competencias.forEach(c => {
+        h1.push({ v: c.toUpperCase(), s: estiloVerdeOscuro }, "", "", "", "");
     });
-    const ws = XLSX.utils.json_to_sheet(data);
+    h1.push({ v: "LOGRO FINAL", s: estiloNaranjaLogro }); // Solo ocupa una columna
+    h1.push({ v: "", s: {} }); // Celda de separación vacía
+    h1.push({ v: "RESUMEN ESTADÍSTICO", s: estiloAzulResumen }, "", "", "");
+    rows.push(h1);
+
+    // FILA 5: ENCABEZADO INFERIOR (Sub-cabeceras)
+    const h2 = [{ v: "", s: estiloVerdeOscuro }, { v: "", s: estiloVerdeOscuro }, { v: "", s: estiloVerdeOscuro }];
+    competencias.forEach(() => ["D1", "D2", "D3", "D4", "PROM"].forEach(t => h2.push({ v: t, s: estiloVerdeOscuro })));
+    h2.push({ v: "", s: estiloNaranjaLogro }); // Merge vertical con la fila superior
+    h2.push({ v: "", s: {} });
+    h2.push({ v: "NIVELES", s: estiloAzulResumen }, { v: "NOTAS", s: estiloAzulResumen }, { v: "CANT.", s: estiloAzulResumen }, { v: "%", s: estiloAzulResumen });
+    rows.push(h2);
+
+    // 3. CUERPO DE DATOS
+    alumnosValidos.forEach((alumno, idx) => {
+        const idEst = normalizarID(alumno.nombre);
+        const row = [
+            { v: idx + 1, s: estiloBase },
+            { v: generos[idEst] || "-", s: estiloBase },
+            { v: alumno.nombre.toUpperCase(), s: { ...estiloBase, alignment: { horizontal: "left" } } }
+        ];
+
+        // Notas y Promedios
+        competencias.forEach((_, cIdx) => {
+            [1, 2, 3, 4].forEach(d => {
+                const val = notas[`${idEst}-${cIdx}-${d}`] || "-";
+                row.push({ v: val, s: { ...estiloBase, font: { sz: 8, color: { rgb: val === 'C' ? "FF0000" : "000000" } } } });
+            });
+            const p = calcularPromedio(alumno.nombre, cIdx);
+            row.push({ v: p, s: { ...estiloBase, fill: { fgColor: { rgb: "DCFCE7" } }, font: { bold: true, sz: 8 } } });
+        });
+
+        // Celda Logro Final (Fondo amarillo como en la imagen)
+        const lf = calcularLogroBimestral(alumno.nombre);
+        row.push({ v: lf, s: { ...estiloBase, fill: { fgColor: { rgb: "FEF08A" } }, font: { bold: true, sz: 8 } } });
+        row.push({ v: "", s: {} }); // Separador
+
+        // Resumen Estadístico Lateral
+        if (idx < 4) {
+        const item = [
+            { n: "DESTACADO", k: "AD", c: "4ADE80" },
+            { n: "LOGRADO", k: "A", c: "2563EB" },
+            { n: "EN PROCESO", k: "B", c: "FDE047" },
+            { n: "EN INICIO", k: "C", c: "EF4444" }
+        ][idx];
+        
+        row.push(
+            { v: item.n, s: { ...estiloBase, fill: { fgColor: { rgb: item.c } }, font: { bold: true, sz: 8 } } },
+            { v: item.k, s: { ...estiloBase, font: { bold: true, sz: 8 } } },
+            { v: stats[item.k] || 0, s: estiloBase },
+            { v: totalAlumnos > 0 ? `${((stats[item.k]/totalAlumnos)*100).toFixed(0)}%` : "0%", s: estiloBase }
+          );
+        } else if (idx === 4) {
+         // FILA TOTAL CORREGIDA: Combinamos visualmente las dos primeras celdas
+        const estiloTotal = { ...estiloBase, font: { bold: true, sz: 8 }, fill: { fgColor: { rgb: "E0F2FE" } } };
+        row.push(
+            { v: "TOTAL", s: estiloTotal }, 
+            { v: "", s: estiloTotal }, // Esta celda se ocultará tras el merge
+            { v: totalAlumnos, s: estiloTotal },
+            { v: "100%", s: estiloTotal }
+        );
+      }
+    rows.push(row);
+    });
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+
+    // 4. MERGES ESTRATÉGICOS (PARA EVITAR DATOS OCULTOS)
+    ws['!merges'] = [
+        { s: { r: 0, c: 0 }, e: { r: 0, c: colLogroIdx + 5 } }, // Título Principal
+        { s: { r: 1, c: 0 }, e: { r: 1, c: 5 } },             // ÁREA (Visible)
+        { s: { r: 1, c: 8 }, e: { r: 1, c: 13 } },            // GRADO (Visible)
+        { s: { r: 1, c: colLogroIdx - 2 }, e: { r: 1, c: colLogroIdx + 5 } }, // DOCENTE (Visible)
+        { s: { r: 3, c: 0 }, e: { r: 4, c: 0 } },             // N°
+        { s: { r: 3, c: 1 }, e: { r: 4, c: 1 } },             // SEXO
+        { s: { r: 3, c: 2 }, e: { r: 4, c: 2 } },             // APELLIDOS Y NOMBRES
+        { s: { r: 3, c: colLogroIdx }, e: { r: 4, c: colLogroIdx } }, // LOGRO FINAL (Vertical Única)
+        { s: { r: 3, c: colLogroIdx + 2 }, e: { r: 3, c: colLogroIdx + 5 } } // RESUMEN ESTADÍSTICO (Título)
+    ];
+
+    // Merge para los títulos de cada competencia
+    let currCol = 3;
+    competencias.forEach(() => {
+        ws['!merges'].push({ s: { r: 3, c: currCol }, e: { r: 3, c: currCol + 4 } });
+        currCol += 5;
+    });
+
+    // MEJORA: Merge dinámico para la fila TOTAL del Resumen Estadístico
+    // El resumen estadístico empieza en la fila index 5. El TOTAL está en el index 9.
+    const colResumenStart = colLogroIdx + 2; 
+    ws['!merges'].push({ 
+        s: { r: 9, c: colResumenStart },     // Inicio: Celda "TOTAL"
+        e: { r: 9, c: colResumenStart + 1 } // Fin: Combina con la siguiente celda (Notas)
+    });
+
+    // 5. AJUSTE DE ANCHOS DE COLUMNA (Fuente 8)
+    ws['!cols'] = [
+        { wch: 4 }, { wch: 6 }, { wch: 40 }, // Datos personales
+        ...Array(competencias.length * 5).fill({ wch: 4.2 }), // D1 a PROM
+        { wch: 6 },    // LOGRO FINAL (Estrecho similar a PROM)
+        { wch: 2 },    // Separador
+        { wch: 15 },   // NIVELES (Resumen)
+        { wch: 6 },    // NOTAS (Resumen)
+        { wch: 6 },    // CANT. (Resumen)
+        { wch: 6 }     // % (Resumen)
+    ];
+
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Calificaciones");
-    XLSX.writeFile(wb, `Registro_${grado}_${area}_Bim${bimestre}.xlsx`);
+    XLSX.utils.book_append_sheet(wb, ws, "REGISTRO");
+    XLSX.writeFile(wb, `Registro_Auxiliar_2026.xlsx`);
   };
 
   const handleGuardarTodo = async () => {
-    setLoading(true);
-    try {
-      const [numGrado, letraSeccion] = grado.split(" ");
-      const filasParaGuardar = alumnos
-        .filter(nombre => nombre && nombre.trim() !== "")
-        .map(nombre => {
-          const idEst = normalizarID(nombre);
-          const reg = {
-            nombre_estudiante: nombre.trim().toUpperCase(),
-            grado: numGrado,
-            seccion: letraSeccion || "A",
-            area: area,
-            bimestre: parseInt(bimestre),
-            genero: generos[idEst] || "",
-            logro_bimestral: calcularLogroBimestral(nombre)
-          };
-          for (let c = 0; c < 4; c++) {
-            for (let d = 1; d <= 4; d++) {
-              const val = notas[`${idEst}-${c}-${d}`];
-              if (val) reg[`c${c+1}_d${d}`] = val;
-            }
-          }
-          return reg;
-        });
+  setLoading(true);
+  try {
+    const [numGrado, letraSeccion] = grado.split(" ");
+    
+    const filasParaGuardar = alumnos
+      .filter(nombre => nombre && nombre.trim() !== "")
+      .map(nombre => {
+        const idEst = normalizarID(nombre);
+        const nombreTrim = nombre.trim().toUpperCase();
+        
+        // Creamos el registro incluyendo los promedios que mencionas
+        const reg = {
+          nombre_estudiante: nombreTrim,
+          grado: numGrado,
+          seccion: letraSeccion || "A",
+          area: area,
+          bimestre: parseInt(bimestre),
+          genero: generos[idEst] || "",
+          // Incluimos los promedios por competencia
+          promedio_c1: calcularPromedio(nombre, 0),
+          promedio_c2: calcularPromedio(nombre, 1),
+          promedio_c3: calcularPromedio(nombre, 2),
+          promedio_c4: calcularPromedio(nombre, 3),
+          logro_bimestral: calcularLogroBimestral(nombre),
+          conclusion_descriptiva: conclusiones[idEst] || ""
+        };
 
-      await supabase.from('calificaciones').upsert(filasParaGuardar, { onConflict: 'nombre_estudiante,grado,seccion,area,bimestre' });
-      setMensaje({ texto: "¡DATOS GUARDADOS!" });
-      setTimeout(() => setMensaje(null), 3000);
-    } catch (err) { alert(err.message); }
-    finally { setLoading(false); setShowConfirm(false); }
+        // Mapeo de los calificadores individuales (D1, D2, etc.)
+        for (let c = 0; c < 4; c++) {
+          for (let d = 1; d <= 4; d++) {
+            const val = notas[`${idEst}-${c}-${d}`];
+            if (val) reg[`c${c+1}_d${d}`] = val;
+          }
+        }
+        return reg;
+      });
+
+    if (filasParaGuardar.length === 0) {
+      setMensaje({ texto: "SIN DATOS PARA GUARDAR", tipo: 'error' });
+      return;
+    }
+
+    // EJECUCIÓN: Capturamos 'error' para validar el RLS
+    const { error } = await supabase
+      .from('calificaciones')
+      .upsert(filasParaGuardar, { 
+        onConflict: 'nombre_estudiante,grado,seccion,area,bimestre' 
+      });
+
+    if (error) {
+      // Si Supabase devuelve error (por ejemplo, Wendy en otra área)
+      console.error("Error de permisos (RLS):", error.message);
+      setMensaje({ 
+        texto: "ERROR: NO TIENE PERMISO PARA ESTA ÁREA/GRADO", 
+        tipo: 'error' 
+      });
+    } else {
+      // Si no hay error, confirmamos el guardado
+      setMensaje({ texto: "¡DATOS GUARDADOS EN SUPABASE!", tipo: 'success' });
+    }
+
+  } catch (err) {
+    setMensaje({ texto: "ERROR DE CONEXIÓN", tipo: 'error' });
+  } finally {
+    setLoading(false);
+    setShowConfirm(false);
+    setTimeout(() => setMensaje(null), 4000);
+  }
   };
 
   const getColorNota = (nota) => {
@@ -218,7 +415,7 @@ const RegistroCompetencias = ({ userProfile }) => {
               <Download className="w-4 h-4" /> EXCEL
             </button>
             <button onClick={() => setShowConfirm(true)} disabled={loading} className="bg-slate-900 hover:bg-slate-700 text-white px-7 py-4 rounded-xl text-[10px] font-black flex items-center gap-2">
-              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4 text-green-400" />} GUARDAR
+              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4 text-green-400" />} GUARDAR 
             </button>
           </div>
         </div>

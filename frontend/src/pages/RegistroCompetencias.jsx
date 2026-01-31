@@ -3,13 +3,27 @@ import { Save, FileSpreadsheet, CheckCircle2, Loader2, Download, AlertCircle } f
 import { supabase } from '../config/supabaseClient'; 
 import XLSX from 'xlsx-js-style';
 
+const areasConfig = {
+    "MATEMÁTICA": ["RESUELVE PROBLEMAS DE CANTIDAD", "RESUELVE PROBLEMAS DE REGULARIDAD", "FORMA Y MOVIMIENTO", "GESTIÓN DE DATOS"],
+    "COMUNICACIÓN": ["SE COMUNICA ORALMENTE", "LEE TEXTOS ESCRITOS", "ESCRIBE TEXTOS"],
+    "CIENCIA Y TECNOLOGÍA": ["INDAGA MEDIANTE MÉTODOS", "EXPLICA EL MUNDO FÍSICO", "DISEÑA SOLUCIONES"],
+    "PERSONAL SOCIAL": ["CONSTRUYE SU IDENTIDAD", "CONVIVE Y PARTICIPA", "CONSTRUYE INTERPRETACIONES HISTÓRICAS", "GESTIONA EL ESPACIO", "GESTIONA RECURSOS ECONÓMICOS"],
+    "DPCC": ["CONSTRUYE SU IDENTIDAD", "CONVIVE Y PARTICIPA DEMOCRÁTICAMENTE"],
+    "ARTE Y CULTURA": ["APRECIA MANIFESTACIONES", "CREA PROYECTOS DESDE LENGUAJES"],
+    "EDUCACION FÍSICA": ["SE DESENVUELVE DE MANERA AUTÓNOMA", "ASUME UNA VIDA SALUDABLE", "INTERACTÚA A TRAVÉS DE HABILIDADES"],
+    "EPT": ["GESTIONA PROYECTOS DE EMPRENDIMIENTO ECONÓMICO O SOCIAL"],
+    "RELIGIÓN": ["CONSTRUYE SU IDENTIDAD COMO PERSONA DIGNA", "ASUME LA EXPERIENCIA DEL ENCUENTRO"],
+    "INGLÉS": ["SE COMUNICA ORALMENTE", "LEE TEXTOS ESCRITOS", "ESCRIBE TEXTOS"]
+  };
+
+
 const escala = { "AD": 4, "A": 3, "B": 2, "C": 1, "": 0 };
 const inversa = { 4: "AD", 3: "A", 2: "B", 1: "C", 0: "-" };
 const normalizarID = (t) => t ? String(t).trim().toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") : "";
 
-const RegistroCompetencias = ({ userProfile }) => {
-  const [grado, setGrado] = useState("1° A");
-  const [area, setArea] = useState("MATEMÁTICA");
+const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion }) => {
+  const [grado, setGrado] = useState(perfilUsuario?.grado ? `${perfilUsuario.grado} ${perfilUsuario.seccion}` : "1° A");
+  const [area, setArea] = useState(perfilUsuario?.area || "MATEMÁTICA");
   const [bimestre, setBimestre] = useState(1);
   const [alumnos, setAlumnos] = useState([]); 
   const [notas, setNotas] = useState({});
@@ -18,6 +32,12 @@ const RegistroCompetencias = ({ userProfile }) => {
   const [loading, setLoading] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [conclusiones, setConclusiones] = useState({});
+ 
+  const competencias = areasConfig[area] || [];
+  const rolActual = perfilUsuario?.rol_id || session?.user?.user_metadata?.rol_id;
+  const esEstudiante = Number(rolActual) === 6; 
+  const esDocente = Number(rolActual) === 3;
+  const esAdmin = Number(rolActual) === 1;
 
   const cargarDatos = useCallback(async () => {
     if (!grado || !area || !bimestre) return;
@@ -38,26 +58,48 @@ const RegistroCompetencias = ({ userProfile }) => {
       if (error) throw error;
 
       if (data) {
-        if (data.length === 0) {
-          setAlumnos(Array(35).fill(""));
-          setGeneros({});
-          return;
-        }
-
-        const nombresDeBD = data.map(reg => String(reg.nombre_estudiante || "").trim());
-        const listaCompleta = [...nombresDeBD];
-        while (listaCompleta.length < 35) listaCompleta.push("");
-        setAlumnos(listaCompleta);
+      if (data.length === 0) {
+      if (esEstudiante) {
+       setAlumnos([perfilUsuario?.nombre_completo || ""]);
+     } else {
+      // IMPORTANTE: Aquí deberías cargar la lista de alumnos matriculados.
+      // Si no tienes esa tabla, al menos inicializa con un mensaje o estructura válida.
+      setAlumnos(Array(38).fill("")); 
+    }
+     setGeneros({});
+     setLoading(false);
+     return;
+    }
+      // CASO B: Sí hay datos en la base de datos
+      const nombresDeBD = data.map(reg => String(reg.nombre_estudiante || "").trim());
+  
+      if (esEstudiante) {
+         // Para el estudiante, solo cargamos los nombres que vienen de la DB
+        // (El filtro del renderizado se encargará de mostrar solo el suyo)
+               setAlumnos(nombresDeBD);
+        } else {
+       // Para la docente, mantenemos el formato de 38 filas
+            const listaCompleta = [...nombresDeBD];
+            while (listaCompleta.length < 38) listaCompleta.push("");
+               setAlumnos(listaCompleta);
+       }
 
         const nuevasNotas = {};
         const nuevosGeneros = {};
-        data.forEach((reg) => {
-          const idEst = normalizarID(String(reg.nombre_estudiante || ""));
-          nuevosGeneros[idEst] = reg.genero || ""; 
-          for (let c = 1; c <= 4; c++) {
-            for (let d = 1; d <= 4; d++) {
-              const valor = reg[`c${c}_d${d}`];
-              if (valor !== null && valor !== "") {
+
+       data.forEach((reg) => {
+       const nombreEst = String(reg.nombre_estudiante || "").trim();
+       const idEst = normalizarID(nombreEst);
+  
+       // Guardamos el Sexo/Género
+       nuevosGeneros[idEst] = reg.genero || ""; 
+
+       // Cargamos las notas usando el nombre exacto de columna de Supabase
+       for (let c = 1; c <= 4; c++) {
+          for (let d = 1; d <= 4; d++) {
+            const valor = reg[`c${c}_d${d}`]; // Usa guion bajo: c1_d1
+              if (valor) {
+                // Esta llave debe ser IGUAL a la que usas en el renderizado
                 nuevasNotas[`${idEst}-${c-1}-${d}`] = valor;
               }
             }
@@ -71,25 +113,9 @@ const RegistroCompetencias = ({ userProfile }) => {
     } finally {
       setLoading(false);
     }
-  }, [grado, area, bimestre]);
+   }, [grado, area, bimestre]);
 
   useEffect(() => { cargarDatos(); }, [cargarDatos]);
-
-  const CONFIG_AREAS = {
-    "MATEMÁTICA": ["RESUELVE PROBLEMAS DE CANTIDAD", "RESUELVE PROBLEMAS DE REGULARIDAD", "FORMA Y MOVIMIENTO", "GESTIÓN DE DATOS"],
-    "COMUNICACIÓN": ["SE COMUNICA ORALMENTE", "LEE TEXTOS ESCRITOS", "ESCRIBE TEXTOS"],
-    "CIENCIA Y TECNOLOGÍA": ["INDAGA MEDIANTE MÉTODOS", "EXPLICA EL MUNDO FÍSICO", "DISEÑA SOLUCIONES"],
-    "PERSONAL SOCIAL": ["CONSTRUYE SU IDENTIDAD", "CONVIVE Y PARTICIPA", "CONSTRUYE INTERPRETACIONES HISTÓRICAS", "GESTIONA EL ESPACIO", "GESTIONA RECURSOS ECONÓMICOS"],
-    "DPCC": ["CONSTRUYE SU IDENTIDAD", "CONVIVE Y PARTICIPA DEMOCRÁTICAMENTE"],
-    "ARTE Y CULTURA": ["APRECIA MANIFESTACIONES", "CREA PROYECTOS DESDE LENGUAJES"],
-    "EDUCACION FÍSICA": ["SE DESENVUELVE DE MANERA AUTÓNOMA", "ASUME UNA VIDA SALUDABLE", "INTERACTÚA A TRAVÉS DE HABILIDADES"],
-    "EPT": ["GESTIONA PROYECTOS DE EMPRENDIMIENTO ECONÓMICO O SOCIAL"],
-    "RELIGIÓN": ["CONSTRUYE SU IDENTIDAD COMO PERSONA DIGNA", "ASUME LA EXPERIENCIA DEL ENCUENTRO"],
-    "INGLÉS": ["SE COMUNICA ORALMENTE", "LEE TEXTOS ESCRITOS", "ESCRIBE TEXTOS"]
-  };
-
-  const competencias = CONFIG_AREAS[area] || [];
-  const tienePermisoEscritura = true; // Simplificado para el ejemplo
 
   const alumnosOrdenados = useMemo(() => {
     return [...alumnos].map((nombre, originalIdx) => ({ nombre, originalIdx }))
@@ -124,179 +150,181 @@ const RegistroCompetencias = ({ userProfile }) => {
 
   // Restaurado y Mejorado: Función Excel Profesional
   const exportarExcel = () => {
-    const alumnosValidos = alumnosOrdenados.filter(a => a.nombre && a.nombre.trim() !== "");
-    if (alumnosValidos.length === 0) return;
-
-    // 1. Cálculos Estadísticos
-    const nFinales = alumnosValidos.map(a => calcularLogroBimestral(a.nombre));
-    const totalAlumnos = nFinales.length;
-    const stats = {
-        AD: nFinales.filter(n => n === 'AD').length,
-        A: nFinales.filter(n => n === 'A').length,
-        B: nFinales.filter(n => n === 'B').length,
-        C: nFinales.filter(n => n === 'C').length
-    };
-
-    // 2. ESTILOS DE ALTA PRECISIÓN (TODO FUENTE 8)
-    const borderThin = { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } };
-    const estiloBase = { font: { sz: 8 }, border: borderThin, alignment: { vertical: "center", horizontal: "center" } };
-    
-    const estiloVerdeOscuro = { 
-        ...estiloBase, 
-        font: { bold: true, color: { rgb: "FFFFFF" }, sz: 8 }, 
-        fill: { fgColor: { rgb: "00A859" } }, 
-        alignment: { horizontal: "center", vertical: "center", wrapText: true } 
-    };
-
-    // Estilo Naranja Logro Final (Corregido para una sola celda)
-    const estiloNaranjaLogro = { 
-        ...estiloBase, 
-        font: { bold: true, color: { rgb: "FFFFFF" }, sz: 8 }, 
-        fill: { fgColor: { rgb: "C2410C" } }, 
-        alignment: { horizontal: "center", vertical: "center", wrapText: true } 
-    };
-
-    const estiloAzulResumen = { 
-        ...estiloBase, 
-        font: { bold: true, color: { rgb: "FFFFFF" }, sz: 8 }, 
-        fill: { fgColor: { rgb: "1E293B" } },
-        alignment: { horizontal: "center", vertical: "center" }
-    };
-
-    const rows = [];
-    // La columna Logro Final es la inmediatamente posterior a las competencias
-    const colLogroIdx = 3 + (competencias.length * 5); 
-
-    // FILA 1: TÍTULO PRINCIPAL
-    rows.push([{ v: "REGISTRO AUXILIAR 2026", s: { font: { bold: true, sz: 12 }, alignment: { horizontal: "center" } } }]);
-
-    // FILA 2: CABECERA DE INFORMACIÓN (Ajustada para máxima visibilidad)
-    const filaInfo = Array(colLogroIdx + 6).fill({ v: "", s: {} });
-    filaInfo[0] = { v: `ÁREA: ${area.toUpperCase()}`, s: { font: { bold: true, sz: 8 } } };
-    filaInfo[8] = { v: `GRADO: ${grado}`, s: { font: { bold: true, sz: 8 }, alignment: { horizontal: "lefft" } } };
-    filaInfo[colLogroIdx - 2] = { v: `DOCENTE: ${userProfile?.full_name || "................................."}`, s: { font: { bold: true, sz: 8 }, alignment: { horizontal: "lefft" } } };
-    rows.push(filaInfo);
-    rows.push([]); 
-
-    // FILA 4: ENCABEZADO SUPERIOR
-    const h1 = [
-        { v: "N°", s: estiloVerdeOscuro }, 
-        { v: "SEXO", s: estiloVerdeOscuro }, 
-        { v: "APELLIDOS Y NOMBRES", s: estiloVerdeOscuro }
-    ];
-    competencias.forEach(c => {
-        h1.push({ v: c.toUpperCase(), s: estiloVerdeOscuro }, "", "", "", "");
-    });
-    h1.push({ v: "LOGRO FINAL", s: estiloNaranjaLogro }); // Solo ocupa una columna
-    h1.push({ v: "", s: {} }); // Celda de separación vacía
-    h1.push({ v: "RESUMEN ESTADÍSTICO", s: estiloAzulResumen }, "", "", "");
-    rows.push(h1);
-
-    // FILA 5: ENCABEZADO INFERIOR (Sub-cabeceras)
-    const h2 = [{ v: "", s: estiloVerdeOscuro }, { v: "", s: estiloVerdeOscuro }, { v: "", s: estiloVerdeOscuro }];
-    competencias.forEach(() => ["D1", "D2", "D3", "D4", "PROM"].forEach(t => h2.push({ v: t, s: estiloVerdeOscuro })));
-    h2.push({ v: "", s: estiloNaranjaLogro }); // Merge vertical con la fila superior
-    h2.push({ v: "", s: {} });
-    h2.push({ v: "NIVELES", s: estiloAzulResumen }, { v: "NOTAS", s: estiloAzulResumen }, { v: "CANT.", s: estiloAzulResumen }, { v: "%", s: estiloAzulResumen });
-    rows.push(h2);
-
-    // 3. CUERPO DE DATOS
-    alumnosValidos.forEach((alumno, idx) => {
-        const idEst = normalizarID(alumno.nombre);
-        const row = [
-            { v: idx + 1, s: estiloBase },
-            { v: generos[idEst] || "-", s: estiloBase },
-            { v: alumno.nombre.toUpperCase(), s: { ...estiloBase, alignment: { horizontal: "left" } } }
-        ];
-
-        // Notas y Promedios
-        competencias.forEach((_, cIdx) => {
-            [1, 2, 3, 4].forEach(d => {
-                const val = notas[`${idEst}-${cIdx}-${d}`] || "-";
-                row.push({ v: val, s: { ...estiloBase, font: { sz: 8, color: { rgb: val === 'C' ? "FF0000" : "000000" } } } });
-            });
-            const p = calcularPromedio(alumno.nombre, cIdx);
-            row.push({ v: p, s: { ...estiloBase, fill: { fgColor: { rgb: "DCFCE7" } }, font: { bold: true, sz: 8 } } });
-        });
-
-        // Celda Logro Final (Fondo amarillo como en la imagen)
-        const lf = calcularLogroBimestral(alumno.nombre);
-        row.push({ v: lf, s: { ...estiloBase, fill: { fgColor: { rgb: "FEF08A" } }, font: { bold: true, sz: 8 } } });
-        row.push({ v: "", s: {} }); // Separador
-
-        // Resumen Estadístico Lateral
-        if (idx < 4) {
-        const item = [
-            { n: "DESTACADO", k: "AD", c: "4ADE80" },
-            { n: "LOGRADO", k: "A", c: "2563EB" },
-            { n: "EN PROCESO", k: "B", c: "FDE047" },
-            { n: "EN INICIO", k: "C", c: "EF4444" }
-        ][idx];
-        
-        row.push(
-            { v: item.n, s: { ...estiloBase, fill: { fgColor: { rgb: item.c } }, font: { bold: true, sz: 8 } } },
-            { v: item.k, s: { ...estiloBase, font: { bold: true, sz: 8 } } },
-            { v: stats[item.k] || 0, s: estiloBase },
-            { v: totalAlumnos > 0 ? `${((stats[item.k]/totalAlumnos)*100).toFixed(0)}%` : "0%", s: estiloBase }
+      const alumnosValidos = alumnosOrdenados.filter(a => a.nombre && a.nombre.trim() !== "");
+      if (alumnosValidos.length === 0) return;
+  
+      // 1. Cálculos Estadísticos
+      const nFinales = alumnosValidos.map(a => calcularLogroBimestral(a.nombre));
+      const totalAlumnos = nFinales.length;
+      const stats = {
+          AD: nFinales.filter(n => n === 'AD').length,
+          A: nFinales.filter(n => n === 'A').length,
+          B: nFinales.filter(n => n === 'B').length,
+          C: nFinales.filter(n => n === 'C').length
+      };
+  
+      // 2. ESTILOS DE ALTA PRECISIÓN (TODO FUENTE 8)
+      const borderThin = { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } };
+      const estiloBase = { font: { sz: 8 }, border: borderThin, alignment: { vertical: "center", horizontal: "center" } };
+      
+      const estiloVerdeOscuro = { 
+          ...estiloBase, 
+          font: { bold: true, color: { rgb: "FFFFFF" }, sz: 8 }, 
+          fill: { fgColor: { rgb: "00A859" } }, 
+          alignment: { horizontal: "center", vertical: "center", wrapText: true } 
+      };
+  
+      // Estilo Naranja Logro Final (Corregido para una sola celda)
+      const estiloNaranjaLogro = { 
+          ...estiloBase, 
+          font: { bold: true, color: { rgb: "FFFFFF" }, sz: 8 }, 
+          fill: { fgColor: { rgb: "F4A300" } }, 
+          alignment: { horizontal: "center", vertical: "center", wrapText: true } 
+      };
+  
+      const estiloAzulResumen = { 
+          ...estiloBase, 
+          font: { bold: true, color: { rgb: "FFFFFF" }, sz: 8 }, 
+          fill: { fgColor: { rgb: "64740B" } },
+          alignment: { horizontal: "center", vertical: "center" }
+      };
+  
+      const rows = [];
+      // La columna Logro Final es la inmediatamente posterior a las competencias
+      const colLogroIdx = 3 + (competencias.length * 5); 
+  
+      // FILA 1: TÍTULO PRINCIPAL
+      rows.push([{ v: "REGISTRO AUXILIAR 2026", s: { font: { bold: true, sz: 12 }, alignment: { horizontal: "center" } } }]);
+  
+      // FILA 2: CABECERA DE INFORMACIÓN (Ajustada para máxima visibilidad)
+       const filaInfo = Array(colLogroIdx + 6).fill({ v: "", s: {} });
+      filaInfo[0] = { v: `ÁREA: ${area.toUpperCase()}`, s: { font: { bold: true, sz: 8 } } };
+      filaInfo[8] = { v: `GRADO: ${grado}`, s: { font: { bold: true, sz: 8 } } };
+      const nombreDocente = perfilUsuario?.full_name ? perfilUsuario.full_name.toUpperCase() : "DOCENTE NO IDENTIFICADO";
+      filaInfo[colLogroIdx - 4] = { v: `DOCENTE: ${nombreDocente}`, s: { font: { bold: true, sz: 8 }, alignment: { horizontal: "center" } } };
+      
+      rows.push(filaInfo);
+      rows.push([]); 
+  
+      // FILA 4: ENCABEZADO SUPERIOR
+      const h1 = [
+          { v: "N°", s: estiloVerdeOscuro }, 
+          { v: "SEXO", s: estiloVerdeOscuro }, 
+          { v: "APELLIDOS Y NOMBRES", s: estiloVerdeOscuro }
+      ];
+      competencias.forEach(c => {
+          h1.push({ v: c.toUpperCase(), s: estiloVerdeOscuro }, "", "", "", "");
+      });
+      h1.push({ v: "LOGRO FINAL", s: estiloNaranjaLogro }); // Solo ocupa una columna
+      h1.push({ v: "", s: {} }); // Celda de separación vacía
+      h1.push({ v: "RESUMEN ESTADÍSTICO", s: estiloAzulResumen }, "", "", "");
+      rows.push(h1);
+  
+      // FILA 5: ENCABEZADO INFERIOR (Sub-cabeceras)
+      const h2 = [{ v: "", s: estiloVerdeOscuro }, { v: "", s: estiloVerdeOscuro }, { v: "", s: estiloVerdeOscuro }];
+      competencias.forEach(() => ["D1", "D2", "D3", "D4", "PROM"].forEach(t => h2.push({ v: t, s: estiloVerdeOscuro })));
+      h2.push({ v: "", s: estiloNaranjaLogro }); // Merge vertical con la fila superior
+      h2.push({ v: "", s: {} });
+      h2.push({ v: "NIVELES", s: estiloAzulResumen }, { v: "NOTAS", s: estiloAzulResumen }, { v: "CANT.", s: estiloAzulResumen }, { v: "%", s: estiloAzulResumen });
+      rows.push(h2);
+  
+      // 3. CUERPO DE DATOS
+      alumnosValidos.forEach((alumno, idx) => {
+          const idEst = normalizarID(alumno.nombre);
+          const row = [
+              { v: idx + 1, s: estiloBase },
+              { v: generos[idEst] || "-", s: estiloBase },
+              { v: alumno.nombre.toUpperCase(), s: { ...estiloBase, alignment: { horizontal: "left" } } }
+          ];
+  
+          // Notas y Promedios
+          competencias.forEach((_, cIdx) => {
+              [1, 2, 3, 4].forEach(d => {
+                  const val = notas[`${idEst}-${cIdx}-${d}`] || "-";
+                  row.push({ v: val, s: { ...estiloBase, font: { sz: 8, color: { rgb: val === 'C' ? "FF0000" : "000000" } } } });
+              });
+              const p = calcularPromedio(alumno.nombre, cIdx);
+              row.push({ v: p, s: { ...estiloBase, fill: { fgColor: { rgb: "DCFCE7" } }, font: { bold: true, sz: 8 } } });
+          });
+  
+          // Celda Logro Final (Fondo amarillo como en la imagen)
+          const lf = calcularLogroBimestral(alumno.nombre);
+          row.push({ v: lf, s: { ...estiloBase, fill: { fgColor: { rgb: "FEF08A" } }, font: { bold: true, sz: 8 } } });
+          row.push({ v: "", s: {} }); // Separador
+  
+          // Resumen Estadístico Lateral
+          if (idx < 4) {
+          const item = [
+              { n: "DESTACADO", k: "AD", c: "4ADE80" },
+              { n: "LOGRADO", k: "A", c: "2563EB" },
+              { n: "EN PROCESO", k: "B", c: "FDE047" },
+              { n: "EN INICIO", k: "C", c: "EF4444" }
+          ][idx];
+          
+          row.push(
+              { v: item.n, s: { ...estiloBase, fill: { fgColor: { rgb: item.c } }, font: { bold: true, sz: 8 } } },
+              { v: item.k, s: { ...estiloBase, font: { bold: true, sz: 8 } } },
+              { v: stats[item.k] || 0, s: estiloBase },
+              { v: totalAlumnos > 0 ? `${((stats[item.k]/totalAlumnos)*100).toFixed(0)}%` : "0%", s: estiloBase }
+            );
+          } else if (idx === 4) {
+           // FILA TOTAL CORREGIDA: Combinamos visualmente las dos primeras celdas
+          const estiloTotal = { ...estiloBase, font: { bold: true, sz: 8 }, fill: { fgColor: { rgb: "E0F2FE" } } };
+          row.push(
+              { v: "TOTAL", s: estiloTotal }, 
+              { v: "", s: estiloTotal }, // Esta celda se ocultará tras el merge
+              { v: totalAlumnos, s: estiloTotal },
+              { v: "100%", s: estiloTotal }
           );
-        } else if (idx === 4) {
-         // FILA TOTAL CORREGIDA: Combinamos visualmente las dos primeras celdas
-        const estiloTotal = { ...estiloBase, font: { bold: true, sz: 8 }, fill: { fgColor: { rgb: "E0F2FE" } } };
-        row.push(
-            { v: "TOTAL", s: estiloTotal }, 
-            { v: "", s: estiloTotal }, // Esta celda se ocultará tras el merge
-            { v: totalAlumnos, s: estiloTotal },
-            { v: "100%", s: estiloTotal }
-        );
-      }
-    rows.push(row);
-    });
-    const ws = XLSX.utils.aoa_to_sheet(rows);
-
-    // 4. MERGES ESTRATÉGICOS (PARA EVITAR DATOS OCULTOS)
-    ws['!merges'] = [
-        { s: { r: 0, c: 0 }, e: { r: 0, c: colLogroIdx + 5 } }, // Título Principal
-        { s: { r: 1, c: 0 }, e: { r: 1, c: 5 } },             // ÁREA (Visible)
-        { s: { r: 1, c: 8 }, e: { r: 1, c: 13 } },            // GRADO (Visible)
-        { s: { r: 1, c: colLogroIdx - 2 }, e: { r: 1, c: colLogroIdx + 5 } }, // DOCENTE (Visible)
-        { s: { r: 3, c: 0 }, e: { r: 4, c: 0 } },             // N°
-        { s: { r: 3, c: 1 }, e: { r: 4, c: 1 } },             // SEXO
-        { s: { r: 3, c: 2 }, e: { r: 4, c: 2 } },             // APELLIDOS Y NOMBRES
-        { s: { r: 3, c: colLogroIdx }, e: { r: 4, c: colLogroIdx } }, // LOGRO FINAL (Vertical Única)
-        { s: { r: 3, c: colLogroIdx + 2 }, e: { r: 3, c: colLogroIdx + 5 } } // RESUMEN ESTADÍSTICO (Título)
-    ];
-
-    // Merge para los títulos de cada competencia
-    let currCol = 3;
-    competencias.forEach(() => {
-        ws['!merges'].push({ s: { r: 3, c: currCol }, e: { r: 3, c: currCol + 4 } });
-        currCol += 5;
-    });
-
-    // MEJORA: Merge dinámico para la fila TOTAL del Resumen Estadístico
-    // El resumen estadístico empieza en la fila index 5. El TOTAL está en el index 9.
-    const colResumenStart = colLogroIdx + 2; 
-    ws['!merges'].push({ 
-        s: { r: 9, c: colResumenStart },     // Inicio: Celda "TOTAL"
-        e: { r: 9, c: colResumenStart + 1 } // Fin: Combina con la siguiente celda (Notas)
-    });
-
-    // 5. AJUSTE DE ANCHOS DE COLUMNA (Fuente 8)
-    ws['!cols'] = [
-        { wch: 4 }, { wch: 6 }, { wch: 40 }, // Datos personales
-        ...Array(competencias.length * 5).fill({ wch: 4.2 }), // D1 a PROM
-        { wch: 6 },    // LOGRO FINAL (Estrecho similar a PROM)
-        { wch: 2 },    // Separador
-        { wch: 15 },   // NIVELES (Resumen)
-        { wch: 6 },    // NOTAS (Resumen)
-        { wch: 6 },    // CANT. (Resumen)
-        { wch: 6 }     // % (Resumen)
-    ];
-
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "REGISTRO");
-    XLSX.writeFile(wb, `Registro_Auxiliar_2026.xlsx`);
-  };
+        }
+      rows.push(row);
+      });
+      const ws = XLSX.utils.aoa_to_sheet(rows);
+  
+      // 4. MERGES ESTRATÉGICOS (PARA EVITAR DATOS OCULTOS)
+      ws['!merges'] = [
+          { s: { r: 0, c: 0 }, e: { r: 0, c: colLogroIdx + 5 } }, // Título Principal
+          { s: { r: 1, c: 0 }, e: { r: 1, c: 5 } },             // ÁREA (Visible)
+          { s: { r: 1, c: 8 }, e: { r: 1, c: 13 } },            // GRADO (Visible)
+          { s: { r: 1, c: colLogroIdx - 4 }, e: { r: 1, c: colLogroIdx + 1 } }, // DOCENTE (Visible)
+          { s: { r: 3, c: 0 }, e: { r: 4, c: 0 } },             // N°
+          { s: { r: 3, c: 1 }, e: { r: 4, c: 1 } },             // SEXO
+          { s: { r: 3, c: 2 }, e: { r: 4, c: 2 } },             // APELLIDOS Y NOMBRES
+          { s: { r: 3, c: colLogroIdx }, e: { r: 4, c: colLogroIdx } }, // LOGRO FINAL (Vertical Única)
+          { s: { r: 3, c: colLogroIdx + 2 }, e: { r: 3, c: colLogroIdx + 5 } } // RESUMEN ESTADÍSTICO (Título)
+      ];
+  
+      // Merge para los títulos de cada competencia
+      let currCol = 3;
+      competencias.forEach(() => {
+          ws['!merges'].push({ s: { r: 3, c: currCol }, e: { r: 3, c: currCol + 4 } });
+          currCol += 5;
+      });
+  
+      // MEJORA: Merge dinámico para la fila TOTAL del Resumen Estadístico
+      // El resumen estadístico empieza en la fila index 5. El TOTAL está en el index 9.
+      const colResumenStart = colLogroIdx + 2; 
+      ws['!merges'].push({ 
+          s: { r: 9, c: colResumenStart },     // Inicio: Celda "TOTAL"
+          e: { r: 9, c: colResumenStart + 1 } // Fin: Combina con la siguiente celda (Notas)
+      });
+  
+      // 5. AJUSTE DE ANCHOS DE COLUMNA (Fuente 8)
+      ws['!cols'] = [
+          { wch: 4 }, { wch: 6 }, { wch: 40 }, // Datos personales
+          ...Array(competencias.length * 5).fill({ wch: 4.2 }), // D1 a PROM
+          { wch: 6 },    // LOGRO FINAL (Estrecho similar a PROM)
+          { wch: 2 },    // Separador
+          { wch: 15 },   // NIVELES (Resumen)
+          { wch: 6 },    // NOTAS (Resumen)
+          { wch: 6 },    // CANT. (Resumen)
+          { wch: 6 }     // % (Resumen)
+      ];
+  
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "REGISTRO");
+      XLSX.writeFile(wb, `Registro_Auxiliar_2026.xlsx`);
+    };
 
   const handleGuardarTodo = async () => {
   setLoading(true);
@@ -387,40 +415,87 @@ const RegistroCompetencias = ({ userProfile }) => {
       )}
 
       {/* HEADER */}
-      <div className="bg-white border-b rounded-b-[2.5rem] p-4 shadow-sm z-40">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          <div className="flex items-center gap-1">
-            <div className="bg-green-600 p-2 rounded-3xl text-white shadow-lg"><FileSpreadsheet className="w-7 h-7" /></div>
-            <div>
-              <h1 className="text-2xl font-black text-slate-800 tracking-tighter">Registro 2026</h1>
-              <div className="flex gap-2 mt-1">
-                <select value={grado} onChange={(e) => setGrado(e.target.value)} className="bg-slate-100 border text-[10px] font-bold px-2 py-1.5 rounded-xl outline-none">
-                  {["1° A", "1° B", "1° C", "2° A", "2° B", "2° C", "3° A", "3° B", "4° A", "4° B", "5° A", "5° B"].map(g => <option key={g} value={g}>{g}</option>)}
-                </select>
-                <select value={area} onChange={(e) => setArea(e.target.value)} className="bg-green-100 text-green-700 border border-green-200 text-[9px] md:text-[10px] font-bold px-3 py-2 md:px-2 md:py-2 rounded-xl outline-none">
-                  {Object.keys(CONFIG_AREAS).map(a => <option key={a} value={a}>{a}</option>)}
-                </select>
-              </div>
-            </div>
-          </div>
-          
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="flex bg-gray-200/70 p-1.5 rounded-[1.25rem]">
-              {[1, 2, 3, 4].map(n => (
-                <button key={n} onClick={() => setBimestre(n)} className={`px-3 py-1.5 rounded-xl text-[10px] font-black transition-all ${bimestre === n ? 'bg-green-500 text-white shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>{n}° BIM</button>
-              ))}
-            </div>
-            {/* Restaurado: Botón Excel */}
-            <button onClick={exportarExcel} className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-xl text-[10px] font-black flex items-center gap-2 transition-colors">
-              <Download className="w-4 h-4" /> EXCEL
-            </button>
-            <button onClick={() => setShowConfirm(true)} disabled={loading} className="bg-slate-900 hover:bg-slate-700 text-white px-7 py-4 rounded-xl text-[10px] font-black flex items-center gap-2">
-              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4 text-green-400" />} GUARDAR 
-            </button>
-          </div>
+      <div className="bg-white border-b rounded-b-[2.5rem] p-4 md:p-6 shadow-sm z-40">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+     {/* SECCIÓN IZQUIERDA: Ícono, Título y Selectores */}
+     <div className="flex items-start md:items-center gap-4">
+      {/* Contenedor del ícono con más espacio (padding mejorado) */}
+      <div className="bg-green-600 p-3.5 rounded-[1.5rem] text-white shadow-lg shadow-green-100 flex-shrink-0">
+        <FileSpreadsheet className="w-7 h-7" />
+        </div>
+
+        <div className="flex flex-col gap-2">
+        <h1 className="text-2xl md:text-3xl font-black text-slate-800 tracking-tighter leading-none">
+          Registro 2026
+        </h1>
+        
+        {/* Selectores con mejor espaciado y responsividad */}
+        <div className="flex flex-wrap gap-2">
+          <select 
+            value={grado} 
+            onChange={(e) => setGrado(e.target.value)} 
+            disabled={esDocente || esEstudiante} 
+            className="bg-slate-200/80 border-slate-200 text-[10px] font-bold px-3 py-2 rounded-xl outline-none focus:ring-2 focus:ring-green-500 transition-all disabled:opacity-60"
+          >
+            {["1° A", "1° B", "1° C", "2° A", "2° B", "2° C", "3° A", "3° B", "4° A", "4° B", "5° A", "5° B"].map(g => (
+              <option key={g} value={g}>{g}</option>
+            ))}
+          </select>
+
+          <select 
+            value={area} 
+            onChange={(e) => setArea(e.target.value)} 
+            disabled={esDocente || esEstudiante} 
+            className="bg-green-200/80 text-green-700 border border-green-200 text-[10px] font-bold px-3 py-2 rounded-xl outline-none focus:ring-2 focus:ring-green-500 transition-all disabled:opacity-60"
+          >
+            {Object.keys(areasConfig).map(a => (
+              <option key={a} value={a}>{a}</option>
+            ))}
+          </select>
         </div>
       </div>
-
+    </div>
+    {/* SECCIÓN DERECHA: Bimestres y Acciones */}
+    <div className="flex flex-wrap items-center gap-3">
+      {/* Selector de Bimestres (Scroll horizontal en móvil para evitar saltos de línea) */}
+      <div className="flex bg-gray-100/80 p-1.5 rounded-[1.25rem] overflow-x-auto">
+        {[1, 2, 3, 4].map(n => (
+          <button 
+            key={n} 
+            onClick={() => setBimestre(n)} 
+            className={`px-4 py-2 rounded-xl text-[10px] font-black whitespace-nowrap transition-all ${
+              bimestre === n ? 'bg-green-500 text-white shadow-md' : 'text-slate-400 hover:text-slate-600'
+            }`}
+          >
+            {n}° BIM
+          </button>
+        ))}
+      </div>
+      {/* Botones de Acción con mejor tamaño en móvil */}
+      <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+        {!esEstudiante && ( //Ocultar el botón Excel para estudiantes.
+        <button 
+          onClick={exportarExcel} 
+          className="bg-green-500 hover:bg-green-600 text-white px-5 py-2.5 rounded-xl text-[10px] font-black flex items-center gap-2 transition-all active:scale-95 shadow-lg shadow-green-100"
+        >
+          <Download className="w-4 h-4" /> 
+          <span className="hidden sm:inline">EXCEL</span>
+        </button>
+        )}
+        {!esEstudiante && (
+          <button 
+            onClick={() => setShowConfirm(true)} 
+            disabled={loading} 
+            className="bg-slate-900 hover:bg-slate-800 text-white px-7 py-4 rounded-xl text-[10px] font-black flex items-center gap-2 transition-all active:scale-95 shadow-xl shadow-slate-200 disabled:bg-slate-400"
+          >
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4 text-green-400" />} 
+            GUARDAR 
+          </button>
+          )}
+        </div>
+      </div>
+     </div>
+    </div>
       {/* TABLA: SOLUCIÓN AL DESPLAZAMIENTO */}
       <div className="p-6 flex-1">
         <div className="bg-white border border-slate-200 shadow-2xl rounded-[1.5rem] overflow-hidden">
@@ -432,7 +507,7 @@ const RegistroCompetencias = ({ userProfile }) => {
                   {/* Celdas STICKY: Se quedan quietas horizontalmente pero se mueven verticalmente con la página */}
                   <th rowSpan="2" className="p-2.5 w-12 sticky left-0 z-30 bg-green-600 border-r border-b border-green-400">N°</th>
                   <th rowSpan="2" className="p-2.5 w-12 sticky left-5 z-30 bg-green-600 border-r border-b border-green-400">SEXO</th>
-                  <th rowSpan="2" className="p-4 w-64 sticky left-10 z-30 bg-green-600 border-r-2 border-b border-green-400 text-center">APELLIDOS Y NOMBRES</th>
+                  <th rowSpan="2" className="p-4 w-64 sticky left-10 z-30 bg-green-600 border-r border-b border-green-400 text-center">APELLIDOS Y NOMBRES</th>
                   
                   {competencias.map((c, i) => (
                     <th key={i} colSpan="5" className="p-2 border-r border-b border-green-500 bg-green-700/30 text-center min-w-[140px]">{c}</th>
@@ -452,26 +527,43 @@ const RegistroCompetencias = ({ userProfile }) => {
                   ))}
                 </tr>
               </thead>
-              <tbody className="text-[10px]">
-                {alumnosOrdenados.map(({ nombre, originalIdx }, displayIdx) => {
-                  const idUnico = normalizarID(nombre);
-                  return (
-                    <tr key={originalIdx} className="border-b border-slate-200 hover:bg-green-50/50 h-10">
-                      <td className="text-center sticky left-0 z-20 bg-green-200 font-bold border-r border-slate-300 text-gray-600">{displayIdx + 1}</td>
-                      <td className="p-0 sticky left-7 z-20 bg-white border-r border-slate-300">
-                        <select 
+              <tbody className={`text-[10px] ${perfilUsuario?.rol_id === 6 ? 'pointer-events-none' : ''}`}>
+               {alumnosOrdenados
+               .filter(({ nombre }) => {
+                const rolUsuario = perfilUsuario?.rol_id;
+                const esDocente = rolUsuario === 3; // Wendy
+                const esAdmin = rolUsuario === 1;
+                if (esDocente || esAdmin) return true;
+                 const idFila = normalizarID(nombre);
+                 const idUsuario = normalizarID(perfilUsuario?.nombre_completo);
+                 return idFila.includes(idUsuario) || idUsuario.includes(idFila);
+                 return idFila === idUsuario;
+                  })
+                  .map(({ nombre, originalIdx }, displayIdx) => {
+                   const nombreFinal = nombre || (perfilUsuario?.rol_id !== 6 ? `ESTUDIANTE ${displayIdx + 1}` : "");
+                    const idUnico = normalizarID(nombreFinal);
+                    const esWendy = perfilUsuario?.rol_id === 3;
+                    return (
+                     <tr key={originalIdx} className="border-b border-slate-200 hover:bg-green-50/50 h-10">
+                      <td className="text-center sticky left-0 z-20 bg-green-200 font-bold border-r border-slate-300 text-gray-600">
+                       {displayIdx + 1}</td>
+                        <td className="p-0 sticky left-7 z-20 bg-white border-r border-slate-300">
+                         <select 
+                          disabled={esEstudiante}
                           value={generos[idUnico] || ""}
                           onChange={(e) => setGeneros(prev => ({ ...prev, [idUnico]: e.target.value }))}
                           className="w-full h-10 text-center font-bold outline-none bg-gray-200 appearance-none text-blue-700"
-                        >
+                          >
                           <option value="">-</option><option value="M">M</option><option value="H">H</option>
                         </select>
                       </td>
-                      <td className="p-0 sticky left-10 z-20 bg-white border-r-2 border-slate-300">
+                      <td className="p-0 sticky left-10 z-20 bg-white border-r-1 border-slate-200">
                         <input
                           type="text" 
-                          value={nombre || ""}
-                          onChange={(e) => {
+                           readOnly={esEstudiante} //El estudiante no puede editar su nombre.
+                            value={nombre || ""}
+                            onChange={(e) => {
+                            if (esEstudiante) return;
                             const next = [...alumnos];
                             next[originalIdx] = e.target.value;
                             setAlumnos(next);
@@ -485,6 +577,7 @@ const RegistroCompetencias = ({ userProfile }) => {
                           {[1, 2, 3, 4].map(dIdx => (
                             <td key={dIdx} className="p-0 border-r border-slate-200">
                               <select 
+                               disabled={esEstudiante}
                                 value={notas[`${idUnico}-${cIdx}-${dIdx}`] || ""}
                                 onChange={(e) => setNotas(prev => ({ ...prev, [`${idUnico}-${cIdx}-${dIdx}`]: e.target.value }))}
                                 className={`w-full h-10 text-center font-bold outline-none appearance-none bg-green-50/50 ${getColorNota(notas[`${idUnico}-${cIdx}-${dIdx}`])}`}

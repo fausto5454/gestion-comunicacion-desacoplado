@@ -17,8 +17,8 @@ const Sidebar = ({ rol_id, userName, userEmail, onLogout, currentView, setCurren
         { name: 'Mis Calificaciones', view: 'calificaciones', icon: GraduationCap, roles: [1, 3, 5, 6] },
         // Item Integrado Correctamente
         { name: 'IGA-Estadistica', view: 'iga-estadistica', icon: BarChart, roles: [1, 2, 3, 5] },
-        { name: 'Mi Asistencia', view: 'asistencia_estudiante', icon: CalendarCheck, roles: [1, 3, 5, 6] },
-        { name: 'Comunicados', view: 'comunicados_estudiante', icon: Bell, roles: [1, 6] },
+        { name: 'Mi Asistencia', view: 'asistencia', icon: CalendarCheck, roles: [1, 3, 5, 6] },
+        { name: 'Comunicados', view: 'comunicados', icon: Bell, roles: [1, 6] },
         { name: 'Documentos', view: 'documentos', icon: FileText, roles: [1, 2, 3, 4, 5] },
         { name: 'Reportes', view: 'reportes', icon: BarChart, roles: [1, 2] },
         { name: 'Auditoría de Sistema', view: 'auditoria', icon: ShieldCheck, roles: [1] },

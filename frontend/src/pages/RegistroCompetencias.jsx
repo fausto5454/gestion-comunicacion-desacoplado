@@ -476,21 +476,24 @@ const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion
         {!esEstudiante && ( //Ocultar el botón Excel para estudiantes.
         <button 
           onClick={exportarExcel} 
-          className="bg-green-500 hover:bg-green-600 text-white px-5 py-2.5 rounded-xl text-[10px] font-black flex items-center gap-2 transition-all active:scale-95 shadow-lg shadow-green-100"
-        >
+          className="bg-green-500 hover:bg-green-600 text-white px-5 py-2.5 rounded-xl text-[10px] font-black flex items-center justify-center gap-2 transition-all active:scale-95 shadow-lg shadow-green-100 flex-1 sm:flex-none">
           <Download className="w-4 h-4" /> 
           <span className="hidden sm:inline">EXCEL</span>
-        </button>
+       </button>
         )}
         {!esEstudiante && (
           <button 
             onClick={() => setShowConfirm(true)} 
             disabled={loading} 
-            className="bg-slate-900 hover:bg-slate-800 text-white px-7 py-4 rounded-xl text-[10px] font-black flex items-center gap-2 transition-all active:scale-95 shadow-xl shadow-slate-200 disabled:bg-slate-400"
+            className="bg-slate-900 hover:bg-slate-800 text-white px-7 py-4 rounded-xl text-[10px] font-black flex items-center justify-center gap-2 transition-all active:scale-95 shadow-xl shadow-slate-200 disabled:bg-slate-400 flex-1 sm:flex-none"
           >
-            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4 text-green-400" />} 
-            GUARDAR 
-          </button>
+            {loading ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+           <Save className="w-4 h-4 text-green-400" />
+            )} 
+            <span>GUARDAR</span>
+         </button>
           )}
         </div>
       </div>
@@ -528,32 +531,42 @@ const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion
                 </tr>
               </thead>
               <tbody className={`text-[10px] ${perfilUsuario?.rol_id === 6 ? 'pointer-events-none' : ''}`}>
-               {alumnosOrdenados
-               .filter(({ nombre }) => {
-                const rolUsuario = perfilUsuario?.rol_id;
+              {alumnosOrdenados
+              .filter(({ nombre }) => {
+               const rolUsuario = perfilUsuario?.rol_id;
                 const esDocente = rolUsuario === 3; // Wendy
-                const esAdmin = rolUsuario === 1;
-                if (esDocente || esAdmin) return true;
-                 const idFila = normalizarID(nombre);
-                 const idUsuario = normalizarID(perfilUsuario?.nombre_completo);
-                 return idFila.includes(idUsuario) || idUsuario.includes(idFila);
-                 return idFila === idUsuario;
-                  })
-                  .map(({ nombre, originalIdx }, displayIdx) => {
-                   const nombreFinal = nombre || (perfilUsuario?.rol_id !== 6 ? `ESTUDIANTE ${displayIdx + 1}` : "");
-                    const idUnico = normalizarID(nombreFinal);
-                    const esWendy = perfilUsuario?.rol_id === 3;
-                    return (
-                     <tr key={originalIdx} className="border-b border-slate-200 hover:bg-green-50/50 h-10">
-                      <td className="text-center sticky left-0 z-20 bg-green-200 font-bold border-r border-slate-300 text-gray-600">
-                       {displayIdx + 1}</td>
-                        <td className="p-0 sticky left-7 z-20 bg-white border-r border-slate-300">
-                         <select 
-                          disabled={esEstudiante}
-                          value={generos[idUnico] || ""}
-                          onChange={(e) => setGeneros(prev => ({ ...prev, [idUnico]: e.target.value }))}
-                          className="w-full h-10 text-center font-bold outline-none bg-gray-200 appearance-none text-blue-700"
-                          >
+                 const esAdmin = rolUsuario === 1;
+
+                 // Si es Admin o Docente, ve a todos los estudiantes
+                   if (esDocente || esAdmin) return true;
+
+                    // Lógica de privacidad para Estudiantes:
+                    // Solo ve la fila si su nombre coincide con el del perfil
+                     const idFila = normalizarID(nombre);
+                      const idUsuario = normalizarID(perfilUsuario?.nombre_completo);
+      
+                       return idFila.includes(idUsuario) || idUsuario.includes(idFila);
+                        })
+                        .map(({ nombre, originalIdx }, displayIdx) => {
+                         // Si el nombre no existe, ponemos un genérico (excepto si es estudiante con restricciones)
+                          const nombreFinal = nombre || (perfilUsuario?.rol_id !== 6 ? `ESTUDIANTE ${displayIdx + 1}` : "");
+      
+                          // Mantenemos tus constantes por si las usas en las celdas de abajo
+                           const idUnico = normalizarID(nombreFinal);
+                           const esWendy = perfilUsuario?.rol_id === 3;
+
+                            return (
+                            <tr key={originalIdx} className="border-b border-slate-200 hover:bg-green-50/50 h-10">
+                            {/* NÚMERO DE ORDEN - Fijo a la izquierda */}
+                            <td className="text-center sticky left-0 z-20 bg-green-200 font-bold border-r border-slate-300 text-gray-600 w-7">
+                            {displayIdx + 1}</td>
+                             <td className="p-0 sticky left-7 z-20 bg-white border-r border-slate-300">
+                             <select 
+                             disabled={esEstudiante}
+                             value={generos[idUnico] || ""}
+                             onChange={(e) => setGeneros(prev => ({ ...prev, [idUnico]: e.target.value }))}
+                             className="w-full h-10 text-center font-bold outline-none bg-gray-200 appearance-none text-blue-700"
+                            >
                           <option value="">-</option><option value="M">M</option><option value="H">H</option>
                         </select>
                       </td>

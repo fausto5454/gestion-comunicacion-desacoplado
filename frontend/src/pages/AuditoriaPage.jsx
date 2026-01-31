@@ -222,18 +222,18 @@ const AuditoriaPage = () => {
                 </div>
 
                 {/* VISTA ESCRITORIO (TABLA) */}
-                <div className="hidden md:block overflow-x-auto">
-                    <table className="w-full text-left">
+                <div className="overflow-x-auto shadow-2xl rounded-3xl border border-slate-100">
+                    <table className="w-full table-fixed min-w-[800px] bg-white">
                         <thead>
-                            <tr className="bg-red-500 border-b border-gray-100">
-                                <th className="p-4 text-[10px] font-black uppercase text-white">Fecha y Hora</th>
-                                <th className="p-4 text-[10px] font-black uppercase text-white">Responsable</th>
-                                <th className="p-4 text-[10px] font-black uppercase text-white">Acción</th>
-                                <th className="p-4 text-[10px] font-black uppercase text-white text-center">Descripción</th>
-                                <th className="p-4 text-[10px] font-black uppercase text-white text-right">Velocidad</th>
-                            </tr>
+                           <tr className="bg-red-500 text-white">
+                             <th className="w-[20%] p-4 text-[10px] font-black uppercase tracking-wider">Fecha</th>
+                             <th className="w-[25%] p-4 text-[10px] font-black uppercase tracking-wider text-center">Usuario</th>
+                             <th className="w-[15%] p-4 text-[10px] font-black uppercase tracking-wider">Acción</th>
+                             <th className="w-[40%] p-4 text-[10px] font-black uppercase tracking-wider text-center">Descripción</th>
+                             <th className="w-[15%] p-4 text-[10px] font-black uppercase tracking-wider text-center">Velocidad</th>
+                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-gray-50">
+                           <tbody className="divide-y divide-slate-100">
                             {!loading && logsFiltrados.map((log) => (
                                 <tr key={log.id_auditoria || log.id} className="hover:bg-blue-50/30 transition-colors group">
                                     <td className="p-4 text-xs text-gray-600 font-medium">{new Date(log.fecha_hora).toLocaleString()}</td>
@@ -241,8 +241,8 @@ const AuditoriaPage = () => {
                                     <td className="p-4 text-center">
                                         <span className="text-[9px] bg-amber-50 text-amber-600 px-2 py-1 rounded-lg font-black group-hover:bg-amber-100 transition-colors">{log.accion}</span>
                                     </td>
-                                    <td className="p-4 text-xs text-gray-500 max-w-xs truncate" title={log.descripcion}>{log.descripcion}</td>
-                                    <td className="p-4 text-xs text-right font-mono text-gray-400">{log.duracion_ms || 0}ms</td>
+                                    <td className="p-4 text-xs text-gray-500 text-center max-w-xs truncate" title={log.descripcion}>{log.descripcion}</td>
+                                    <td className="p-4 text-xs text-center font-mono text-gray-400">{log.duracion_ms || 0}ms</td>
                                 </tr>
                             ))}
                         </tbody>

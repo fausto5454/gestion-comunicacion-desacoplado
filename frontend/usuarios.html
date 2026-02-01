@@ -1,0 +1,668 @@
+<!-- 
+Archivo: usuarios.html
+Descripción: Página de gestión de usuarios (CRUD) con Supabase Auth y tabla 'usuarios'. 
+
+========================================================================================
+!!! INSTRUCCIÓN CRÍTICA DE SOLUCIÓN DE ERROR RLS (Recurrencia/Roles) !!!
+========================================================================================
+Este error es causado por dos problemas de configuración de Row Level Security (RLS) 
+en tu base de datos Supabase, NO por el código JavaScript.
+
+1.  ERROR DE RECURSIÓN INFINITA EN 'USUARIOS':
+    * Este error se genera cuando la política RLS de SELECT en la tabla 'usuarios' 
+        utiliza una expresión (USING) que consulta de vuelta la misma tabla 'usuarios' 
+        (ej: una función que verifica el rol para dar permiso).
+    * SOLUCIÓN: Ve a la política SELECT en 'usuarios' y simplifica la expresión 
+        "USING" a una simple verificación de autenticación, como:
+        (auth.uid() IS NOT NULL)
+        
+2.  ERROR DE 0 FILAS EN 'ROLES':
+    * Tu política SELECT en 'roles' solo está aplicada a 'authenticated'.
+    * SOLUCIÓN: Modifica esa política para que se aplique a los roles **'authenticated', 'anon'**.
+        Esto asegura que los datos estáticos de roles se carguen incluso durante transiciones de sesión.
+========================================================================================
+-->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestión de Usuarios | IE 2079 Admin</title>
+    <!-- Tailwind CSS para diseño -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons para iconos bonitos (Carga global del UMD) -->
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+    
+    <style>
+        /* Estilos personalizados para la fuente y la base */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6; /* Fondo gris claro */
+        }
+        /* Definición de colores base */
+        .bg-ie-green { background-color: #10B981; } /* Verde Esmeralda (Principal) */
+        .text-ie-green { color: #10B981; }
+        .border-ie-green { border-color: #10B981; }
+        .bg-secundary-red { background-color: #EF4444; } /* Rojo (Secundario/Alerta) */
+        .text-secundary-red { color: #EF4444; }
+        .bg-ie-yellow { background-color: #FBBF24; } /* Amarillo (Énfasis) */
+        .text-ie-yellow { color: #FBBF24; }
+        
+        /* Estilos para el sidebar fijo */
+        .sidebar {
+            width: 256px; /* 64 * 4 = 256px */
+            transition: transform 0.3s ease-in-out;
+        }
+        .content {
+            margin-left: 256px;
+        }
+        /* Estilos para el modal */
+        .modal-overlay {
+            background-color: rgba(0, 0, 0, 0.7);
+        }
+    </style>
+    <!-- Firebase/Supabase JS - Usaremos Supabase -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body class="flex min-h-screen">
+
+    <!-- Sidebar / Menú de Navegación -->
+    <aside id="sidebar" class="sidebar bg-ie-green h-screen flex flex-col fixed shadow-2xl">
+        <div class="p-6 text-white text-2xl font-bold tracking-wider border-b border-green-700">
+            COMUNICACIÓN IE
+        </div>
+        <nav class="flex-grow py-4">
+            <!-- Item: Dashboard -->
+            <a href="#" class="w-full flex items-center p-4 transition duration-150 ease-in-out text-gray-200 hover:bg-green-700" data-view="dashboard">
+                <i data-lucide="bar-chart" class="w-5 h-5"></i>
+                <span class="ml-3">Dashboard</span>
+            </a>
+            <!-- Item: Gestión de Usuarios (Activo) -->
+            <a href="#" class="w-full flex items-center p-4 transition duration-150 ease-in-out bg-ie-yellow/20 text-ie-yellow border-l-4 border-ie-yellow font-semibold" data-view="usuarios">
+                <i data-lucide="users" class="w-5 h-5"></i>
+                <span class="ml-3">Gestión de Usuarios</span>
+            </a>
+            <!-- Otros Items de Menú (Placeholders) -->
+            <a href="#" class="w-full flex items-center p-4 transition duration-150 ease-in-out text-gray-200 hover:bg-green-700" data-view="comunicaciones">
+                <i data-lucide="message-square" class="w-5 h-5"></i>
+                <span class="ml-3">Enviar Mensaje</span>
+            </a>
+            <a href="#" class="w-full flex items-center p-4 transition duration-150 ease-in-out text-gray-200 hover:bg-green-700" data-view="documentos">
+                <i data-lucide="book-open" class="w-5 h-5"></i>
+                <span class="ml-3">Documentos</span>
+            </a>
+            <a href="#" class="w-full flex items-center p-4 transition duration-150 ease-in-out text-gray-200 hover:bg-green-700" data-view="reportes">
+                <i data-lucide="bar-chart" class="w-5 h-5"></i>
+                <span class="ml-3">Reportes</span>
+            </a>
+            <a href="#" class="w-full flex items-center p-4 transition duration-150 ease-in-out text-gray-200 hover:bg-green-700" data-view="auditoria">
+                <i data-lucide="book-open" class="w-5 h-5"></i>
+                <span class="ml-3">Auditoría</span>
+            </button>
+            </a>
+        </nav>
+        
+        <!-- Botón de Cerrar Sesión (simulado) -->
+        <div class="p-4 border-t border-green-700">
+            <button id="logoutButton" class="w-full flex items-center justify-center p-3 bg-secundary-red hover:bg-red-700 text-white rounded-lg transition duration-200">
+                <i data-lucide="log-out" class="w-5 h-5"></i>
+                <span class="ml-2">Cerrar Sesión</span>
+            </button>
+            <div id="userInfo" class="text-xs text-center text-gray-300 mt-2"></div>
+        </div>
+    </aside>
+
+    <!-- Contenido Principal -->
+    <main class="content flex-1 p-8">
+        <!-- Header Superior -->
+        <header class="bg-white p-4 mb-6 rounded-lg shadow-md flex justify-between items-center sticky top-0 z-10">
+            <h1 class="text-2xl font-semibold text-gray-700">
+                Gestión de Usuarios
+            </h1>
+            <span id="headerUserEmail" class="text-sm text-gray-500">
+                Conectado como: <strong class="text-ie-green">Cargando...</strong>
+            </span>
+        </header>
+
+        <!-- Área de Gestión de Usuarios -->
+        <section class="bg-white rounded-lg shadow-md min-h-[80vh] p-6">
+            <div class="flex justify-between items-center mb-6 border-b pb-4">
+                <h2 class="text-3xl font-bold text-gray-800 flex items-center">
+                    <i data-lucide="users" class="w-7 h-7"></i>
+                    <span class="ml-3">Gestión de Usuarios (CRUD)</span>
+                </h2>
+                <!-- Botón de Crear Nuevo Usuario (inicialmente deshabilitado) -->
+                <button id="createUserButton" disabled
+                    class="flex items-center bg-ie-green text-white font-semibold py-2 px-4 rounded-lg transition duration-200 shadow-md opacity-50 cursor-not-allowed">
+                    <i data-lucide="user-plus" class="w-5 h-5"></i>
+                    <span class="ml-2">Crear Nuevo Usuario</span>
+                </button>
+            </div>
+
+            <!-- Mensajes de Alerta y Error -->
+            <div id="statusMessage" class="hidden p-4 rounded-lg mb-4" role="alert"></div>
+            <!-- Mensaje de estado de Roles (Error de Conexión/RLS) -->
+            <div id="rolesStatusMessage" class="hidden p-4 rounded-lg mb-4 text-sm bg-red-100 border border-red-400 text-secundary-red" role="alert"></div>
+
+            <!-- Tabla de Usuarios -->
+            <div id="usersTableContainer" class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID Usuario</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nombre Completo</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Correo Electrónico</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rol</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="usersTableBody" class="bg-white divide-y divide-gray-200">
+                        <!-- Filas de usuarios se insertarán aquí por JS -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Mensaje de "No hay usuarios" -->
+            <div id="noUsersMessage" class="p-4 bg-yellow-100 border border-yellow-400 text-yellow-700 rounded-lg mt-4 hidden">
+                No hay usuarios registrados.
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Modal de Creación/Edición de Usuario -->
+    <div id="userModal" class="fixed inset-0 z-50 hidden items-center justify-center modal-overlay transition-opacity duration-300">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg p-6 transform transition-transform duration-300 scale-95">
+            <div class="flex justify-between items-center border-b pb-3 mb-4">
+                <h3 id="modalTitle" class="text-2xl font-bold text-gray-800">Crear Nuevo Usuario</h3>
+                <button id="closeModalButton" class="text-gray-400 hover:text-gray-700 transition">
+                    <i data-lucide="x" class="w-6 h-6"></i>
+                </button>
+            </div>
+            
+            <form id="userForm" class="space-y-4">
+                <!-- Campo oculto para el ID de usuario (edición) -->
+                <input type="hidden" id="userId" name="id_usuario">
+
+                <!-- Nombre Completo -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1" for="nombre_completo">Nombre Completo</label>
+                    <input type="text" id="nombre_completo" name="nombre_completo" required
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-ie-green focus:border-ie-green">
+                </div>
+
+                <!-- Correo Electrónico (Solo para creación) -->
+                <div id="emailField">
+                    <label class="block text-sm font-medium text-gray-700 mb-1" for="correo_electronico">Correo Electrónico</label>
+                    <input type="email" id="correo_electronico" name="correo_electronico" required
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-ie-green focus:border-ie-green">
+                </div>
+
+                <!-- Contraseña (Solo para creación) -->
+                <div id="passwordField">
+                    <label class="block text-sm font-medium text-gray-700 mb-1" for="password">Contraseña</label>
+                    <input type="password" id="password" name="password" required
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-ie-green focus:border-ie-green">
+                </div>
+
+                <!-- Rol -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1" for="rol_id">Rol</label>
+                    <select id="rol_id" name="rol_id" required
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-ie-green focus:border-ie-green bg-white">
+                        <!-- Opciones de rol se llenarán dinámicamente -->
+                    </select>
+                </div>
+                
+                <!-- Botón de Guardar -->
+                <button type="submit" id="saveUserButton"
+                    class="w-full flex items-center justify-center bg-ie-green text-white font-semibold py-2 px-4 rounded-lg transition duration-200 shadow-md hover:bg-green-700">
+                    <i data-lucide="save" class="w-5 h-5"></i>
+                    <span class="ml-2">Guardar Usuario</span>
+                </button>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Script de Inicialización y Lógica de Supabase -->
+    <script>
+        // =========================================================
+        // 1. CONFIGURACIÓN E INICIALIZACIÓN DE SUPABASE
+        // =========================================================
+        // CLAVES DE SUPABASE INSERTADAS
+        const SUPABASE_URL = 'https://obbzgmvrykhlfcziqttj.supabase.co'; 
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9iYnpnbXZyeWtobGZjemlxdHRqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjIxMTEwMDUsImV4cCI6MjA3NzY4NzAwNX0.O-8TJ0BPn_3A-WIaOFNf4ekQxUrDkxItuWoz0pXl7rM'; 
+
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        // roles ahora almacenará objetos con { id_rol, nombre_rol }
+        let roles = []; // Almacén global para los roles (array de {id_rol, nombre_rol})
+        
+        // =========================================================
+        // 2. UTILIDADES DE UI
+        // =========================================================
+
+        /** Muestra un mensaje de estado (éxito o error). */
+        function showStatus(message, isError = false) {
+            const statusDiv = document.getElementById('statusMessage');
+            statusDiv.textContent = message;
+            statusDiv.classList.remove('hidden', 'bg-green-100', 'border-green-400', 'text-green-700', 'bg-red-100', 'border-red-400', 'text-secundary-red');
+            
+            if (isError) {
+                statusDiv.classList.add('bg-red-100', 'border-red-400', 'text-secundary-red', 'border');
+            } else {
+                statusDiv.classList.add('bg-green-100', 'border-green-400', 'text-green-700', 'border');
+            }
+
+            setTimeout(() => {
+                statusDiv.classList.add('hidden');
+            }, 5000);
+        }
+
+        /** Muestra el modal de Creación/Edición. */
+        function openModal(user = null) {
+            console.log("Intentando abrir modal. Roles disponibles:", roles.length);
+            
+            if (roles.length === 0) {
+                // El error de roles vacíos ahora debería manejarse en fetchRoles()
+                // Pero dejamos esta alerta como fallback
+                showStatus('Error: Los roles no han sido cargados. Recargue la página o revise la conexión con la tabla "roles".', true);
+                return;
+            }
+
+            const modal = document.getElementById('userModal');
+            const form = document.getElementById('userForm');
+            const modalTitle = document.getElementById('modalTitle');
+            const emailField = document.getElementById('emailField');
+            const passwordField = document.getElementById('passwordField');
+
+            // Limpiar formulario
+            form.reset();
+            document.getElementById('userId').value = '';
+
+            // Llenar opciones de Roles
+            const rolSelect = document.getElementById('rol_id');
+            rolSelect.innerHTML = '<option value="" disabled selected>Seleccione un rol</option>'; 
+            roles.forEach(role => {
+                const option = document.createElement('option');
+                // IMPORTANTE: Usamos role.id_rol
+                option.value = role.id_rol; 
+                option.textContent = role.nombre_rol;
+                rolSelect.appendChild(option);
+            });
+
+            if (user) {
+                // Modo Edición
+                modalTitle.textContent = 'Editar Usuario';
+                document.getElementById('userId').value = user.id_usuario;
+                document.getElementById('nombre_completo').value = user.nombre_completo;
+                
+                // Asegurar que el select se seleccione con el rol_id correcto (si no es null)
+                if (user.rol_id) {
+                     // user.rol_id es la FK, la comparamos con el valor de la opción (id_rol)
+                     document.getElementById('rol_id').value = user.rol_id;
+                }
+                
+                // Ocultar email y password en modo edición
+                emailField.classList.add('hidden');
+                passwordField.classList.add('hidden');
+                document.getElementById('correo_electronico').removeAttribute('required');
+                document.getElementById('password').removeAttribute('required');
+            } else {
+                // Modo Creación
+                modalTitle.textContent = 'Crear Nuevo Usuario';
+                emailField.classList.remove('hidden');
+                passwordField.classList.remove('hidden');
+                document.getElementById('correo_electronico').setAttribute('required', 'required');
+                document.getElementById('password').setAttribute('required', 'required');
+            }
+
+            modal.classList.add('flex');
+            modal.classList.remove('hidden');
+        }
+
+        /** Oculta el modal. */
+        function closeModal() {
+            const modal = document.getElementById('userModal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        // =========================================================
+        // 3. LÓGICA DE DATOS: ROLES (Precarga al inicio)
+        // =========================================================
+
+        /**
+         * Carga los roles disponibles desde la tabla 'roles'.
+         * Esto se llama una vez al inicio.
+         */
+        async function fetchRoles() {
+            const rolesStatusDiv = document.getElementById('rolesStatusMessage');
+            const button = document.getElementById('createUserButton');
+            
+            try {
+                const { data, error } = await supabase
+                    .from('roles')
+                    .select('id_rol, nombre_rol');
+
+                if (error) throw error;
+                
+                roles = data; // roles ahora contiene { id_rol, nombre_rol }
+                
+                // --- DEBUG RLS AÑADIDO PARA LA CORRECCIÓN DE ESTE ERROR ---
+                console.warn(`[DEBUG RLS] Roles cargados: ${roles.length} filas.`); 
+                // --------------------------------------------------------
+                
+                if (roles.length === 0) {
+                    throw new Error("La tabla 'roles' existe, pero la consulta retornó 0 filas. Revisa la política RLS de SELECT en 'roles' (debe incluir anon y authenticated).");
+                }
+                
+                // Éxito: Habilitar el botón
+                button.disabled = false;
+                button.classList.remove('opacity-50', 'cursor-not-allowed');
+                button.classList.add('hover:bg-green-700');
+                rolesStatusDiv.classList.add('hidden');
+                
+                return true;
+
+            } catch (error) {
+                console.error('Error al cargar roles:', error.message);
+                
+                // Error: Mantener el botón deshabilitado y mostrar mensaje
+                button.disabled = true;
+                button.classList.add('opacity-50', 'cursor-not-allowed');
+                button.classList.remove('hover:bg-green-700');
+                
+                rolesStatusDiv.textContent = `ERROR CRÍTICO (RLS/ROLES): No se pudo cargar los roles.
+                    Verifica la tabla 'roles' y, crucialmente, la política RLS de SELECT.
+                    Detalle: ${error.message}`;
+                rolesStatusDiv.classList.remove('hidden');
+                return false;
+            }
+        }
+
+        // =========================================================
+        // 4. LÓGICA DE DATOS: USUARIOS
+        // =========================================================
+
+        /**
+         * Carga la lista de usuarios y actualiza la tabla.
+         */
+        async function fetchUsers() {
+            const usersTableBody = document.getElementById('usersTableBody');
+            const noUsersMessage = document.getElementById('noUsersMessage');
+            usersTableBody.innerHTML = ''; // Limpiar tabla
+            noUsersMessage.classList.add('hidden');
+            
+            try {
+                // Consulta con el JOIN. Usamos 'id_rol' en el select anidado para el JOIN.
+                // Esta consulta es la que provoca el error de 'infinite recursion' si la RLS 
+                // de 'usuarios' es compleja.
+                let { data: users, error } = await supabase
+                    .from('usuarios')
+                    .select(`
+                        id_usuario, 
+                        nombre_completo, 
+                        correo_electronico, 
+                        rol_id, 
+                        roles!inner (id_rol, nombre_rol)
+                    `)
+                    .order('nombre_completo', { ascending: true });
+
+                if (error) throw error;
+                
+                if (users.length === 0) {
+                    noUsersMessage.classList.remove('hidden');
+                    noUsersMessage.textContent = "No hay usuarios registrados. Verifica tu tabla 'usuarios' y las políticas RLS.";
+                } else {
+                    users.forEach(user => {
+                        // Obtener el nombre del rol del objeto anidado
+                        const rolNombre = user.roles && user.roles.nombre_rol 
+                                            ? user.roles.nombre_rol 
+                                            : (roles.find(r => r.id_rol === user.rol_id)?.nombre_rol || 'Rol Desconocido');
+
+                        const userJson = JSON.stringify(user).replace(/"/g, '&quot;');
+                        
+                        const row = `
+                            <tr class="hover:bg-gray-50 transition duration-150">
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${user.id_usuario ? user.id_usuario.substring(0, 8) + '...' : 'N/A'}</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${user.nombre_completo}</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${user.correo_electronico}</td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-ie-green/10 text-ie-green">
+                                        ${rolNombre}
+                                    </span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                    <button onclick="openModal(${userJson})" 
+                                            class="text-blue-600 hover:text-blue-900 mr-3 transition">
+                                        <i data-lucide="edit" class="w-4 h-4"></i>
+                                    </button>
+                                    <button onclick="deleteUser('${user.id_usuario}')" 
+                                            class="text-secundary-red hover:text-red-900 transition">
+                                        <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        `;
+                        usersTableBody.innerHTML += row;
+                    });
+                    // Re-renderizar iconos de Lucide después de insertar el HTML
+                    if (typeof lucide !== 'undefined' && lucide.createIcons) {
+                        lucide.createIcons();
+                    }
+                }
+
+            } catch (error) {
+                console.error('Error al cargar usuarios:', error);
+                
+                let message = `Error al cargar la lista de usuarios: ${error.message}.`;
+                if (error.message.includes('infinite recursion')) {
+                    message = `ERROR CRÍTICO: Se detectó "Recursión Infinita" en la política RLS de SELECT en la tabla 'usuarios'. Debes simplificar la expresión USING a algo como (auth.uid() IS NOT NULL).`;
+                }
+                
+                showStatus(message, true);
+                noUsersMessage.classList.remove('hidden');
+                noUsersMessage.innerHTML = `<strong class="text-secundary-red">¡Error de Configuración RLS!</strong><br>
+                    No se pudo cargar la lista. El error es probablemente la "Recursión Infinita" en la política SELECT de 'usuarios'.
+                    Detalle del error: ${error.message}`;
+            }
+        }
+        
+        /**
+         * Configura el listener de tiempo real (Realtime) para la tabla 'usuarios'.
+         */
+        function setupUsersListener() {
+             supabase
+                .from('usuarios')
+                .select('*') 
+                .realtime()
+                .on('UPDATE', payload => { fetchUsers(); })
+                .on('INSERT', payload => { fetchUsers(); })
+                .on('DELETE', payload => { fetchUsers(); })
+                .subscribe(); 
+
+            // Llamar a fetchUsers la primera vez para cargar los datos iniciales
+            fetchUsers();
+        }
+
+        // =========================================================
+        // 5. MANEJO DE FORMULARIO (CRUD)
+        // =========================================================
+
+        async function handleFormSubmit(e) {
+            e.preventDefault();
+            const form = e.target;
+            const userId = form.userId.value;
+            const isEditing = !!userId;
+            document.getElementById('saveUserButton').disabled = true; // Deshabilitar para evitar doble click
+
+            const userDetails = {
+                nombre_completo: form.nombre_completo.value,
+                // rol_id ya está como un número debido al select
+                rol_id: parseInt(form.rol_id.value), 
+                correo_electronico: form.correo_electronico.value,
+            };
+
+            try {
+                if (isEditing) {
+                    // --- Operación: EDITAR ---
+                    const { error } = await supabase
+                        .from('usuarios')
+                        .update({ 
+                            nombre_completo: userDetails.nombre_completo, 
+                            rol_id: userDetails.rol_id 
+                        })
+                        .eq('id_usuario', userId);
+
+                    if (error) throw error;
+                    showStatus('Usuario actualizado con éxito.');
+
+                } else {
+                    // --- Operación: CREAR (Auth + Tabla 'usuarios') ---
+                    const password = form.password.value;
+                    
+                    // 1. Crear usuario en Supabase Auth
+                    const { data: authData, error: authError } = await supabase.auth.signUp({
+                        email: userDetails.correo_electronico,
+                        password: password,
+                    });
+
+                    if (authError) throw authError;
+                    
+                    const newUserId = authData.user.id;
+                    
+                    // 2. Insertar detalles en la tabla 'usuarios'
+                    const { error: insertError } = await supabase
+                        .from('usuarios')
+                        .insert({
+                            id_usuario: newUserId,
+                            nombre_completo: userDetails.nombre_completo,
+                            correo_electronico: userDetails.correo_electronico,
+                            rol_id: userDetails.rol_id,
+                            // Omitimos contrasena_hash, esperando que Supabase lo maneje o sea NULLABLE
+                        });
+
+                    if (insertError) {
+                        console.error("Error al insertar en 'usuarios'. El usuario de Auth fue creado, pero no el perfil.", insertError);
+                        // Opcional: Borrar el usuario de Auth si falla la inserción del perfil
+                        // await supabase.auth.admin.deleteUser(newUserId); 
+                        throw new Error(`Perfil no creado: ${insertError.message}. El usuario de Auth existe.`);
+                    }
+                    showStatus('Nuevo usuario creado y registrado con éxito. ¡Verifica el email para confirmación!');
+                }
+
+                closeModal();
+                fetchUsers(); 
+
+            } catch (error) {
+                console.error('Error en la operación de usuario:', error);
+                let message = 'Error desconocido al guardar el usuario.';
+                if (error.message.includes('duplicate key value')) {
+                    message = 'El correo electrónico ya está registrado.';
+                } else if (error.message) {
+                    message = error.message;
+                }
+                showStatus(message, true);
+            } finally {
+                document.getElementById('saveUserButton').disabled = false;
+            }
+        }
+
+        /**
+         * Maneja la eliminación de un usuario.
+         */
+        async function deleteUser(userId) {
+            console.warn(`[ACCIÓN REQUERIDA] Se ha solicitado eliminar el usuario con ID: ${userId}.`);
+            const confirmation = prompt('Por favor, escribe "ELIMINAR" para confirmar la eliminación del usuario ' + userId + '.');
+            
+            if (confirmation !== 'ELIMINAR') {
+                showStatus('Eliminación cancelada.', false);
+                return;
+            }
+
+            try {
+                // 1. Eliminar el registro de la tabla 'usuarios'
+                // NOTA: Para eliminar el usuario de Supabase Auth también se necesitaría un trigger 
+                // o usar la API de administración, lo cual está fuera del scope del anon key.
+                const { error: deleteUserError } = await supabase
+                    .from('usuarios')
+                    .delete()
+                    .eq('id_usuario', userId);
+                
+                if (deleteUserError) throw deleteUserError;
+
+                showStatus('Usuario eliminado con éxito de la tabla de detalles.');
+                fetchUsers(); // Actualizar la lista
+
+            } catch (error) {
+                console.error('Error al eliminar usuario:', error);
+                showStatus(`Error al eliminar usuario: ${error.message}. (La cuenta de Auth sigue activa).`, true);
+            }
+        }
+
+        // Exponer funciones al scope global
+        window.deleteUser = deleteUser;
+        window.openModal = openModal;
+
+        // =========================================================
+        // 6. MANEJO DE EVENTOS Y Carga Inicial
+        // =========================================================
+
+        document.addEventListener('DOMContentLoaded', () => {
+            // Asignar handlers del modal
+            document.getElementById('createUserButton').addEventListener('click', () => openModal());
+            document.getElementById('closeModalButton').addEventListener('click', closeModal);
+            document.getElementById('userModal').addEventListener('click', (e) => {
+                if (e.target.id === 'userModal') closeModal();
+            });
+            document.getElementById('userForm').addEventListener('submit', handleFormSubmit);
+
+            // Asignar handler de logout (simulado)
+            document.getElementById('logoutButton').addEventListener('click', async () => {
+                const { error } = await supabase.auth.signOut();
+                if (error) {
+                    showStatus('Error al cerrar sesión: ' + error.message, true);
+                } else {
+                    // Simulación de redirección a Login o recarga
+                    showStatus('Sesión cerrada. Recarga para continuar.', false);
+                }
+            });
+
+            // Listener de Autenticación
+            supabase.auth.onAuthStateChange((event, session) => {
+                const headerEmail = document.getElementById('headerUserEmail').querySelector('strong');
+                const userInfoDiv = document.getElementById('userInfo');
+
+                if (session) {
+                    const email = session.user.email;
+                    headerEmail.textContent = email;
+                    userInfoDiv.textContent = `Sesión: ${email}`;
+                    
+                    // CRÍTICO: Una vez autenticado, cargar roles y usuarios
+                    fetchRoles().then(success => {
+                        if (success) {
+                            setupUsersListener(); 
+                        }
+                    }); 
+                } else {
+                    // Si no hay sesión activa, intenta cargar de todas formas
+                    headerEmail.textContent = 'Desconectado';
+                    userInfoDiv.textContent = 'Inicie Sesión';
+                    
+                    fetchRoles().then(success => {
+                        if (success) {
+                            setupUsersListener();
+                        }
+                    });
+                }
+            });
+
+            // Inicialización de Lucide Icons (debe estar al final)
+            if (typeof lucide !== 'undefined' && lucide.createIcons) {
+                lucide.createIcons();
+            }
+        });
+    </script>
+</body>
+</html>

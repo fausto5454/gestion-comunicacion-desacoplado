@@ -8,6 +8,7 @@ export default defineConfig({
     react(),
     tailwindcss(),
     nodePolyfills({
+      // Esto inyecta los polyfills directamente sin necesidad de imports externos
       globals: {
         Buffer: true,
         global: true,
@@ -15,9 +16,5 @@ export default defineConfig({
       },
     }),
   ],
-  build: {
-    rollupOptions: {
-      external: ['vite-plugin-node-polyfills/shims/global'],
-    },
-  },
+  // ELIMINAMOS build.rollupOptions.external para que el error de consola desaparezca
 })

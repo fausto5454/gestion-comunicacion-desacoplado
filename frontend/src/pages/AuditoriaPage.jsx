@@ -159,11 +159,11 @@ const AuditoriaPage = () => {
     );
 
     return (
-        <div className="flex flex-col gap-6 p-4 md:p-8 max-w-7xl mx-auto w-full animate-in fade-in duration-500">
+        <div className="flex flex-col gap-4 p-2 md:p-8 max-w-7xl mx-auto w-full animate-in fade-in duration-500">
             
             {/* PANEL DE ESTADÍSTICAS COMPACTO */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="bg-yellow-300/60 p-5 rounded-3xl border border-yellow-200 shadow-sm flex items-center justify-between">
+                <div className="bg-yellow-300/60 p-4 md:p-5 rounded-3xl border border-yellow-200 shadow-sm flex items-center justify-between">
                     <div>
                         <p className="text-[10px] font-black uppercase text-yellow-700 tracking-wider">Acciones Hoy</p>
                         <h3 className="text-2xl font-black text-blue-600">{logs.filter(l => new Date(l.fecha_hora).toDateString() === new Date().toDateString()).length}</h3>
@@ -196,7 +196,7 @@ const AuditoriaPage = () => {
                     <input 
                         type="text" 
                         placeholder="Buscar..."
-                        className="w-full pl-11 pr-4 py-2.5 bg-white border-none rounded-2xl text-sm focus:ring-2 focus:ring-yellow-400 shadow-inner"
+                        className="w-full pl-11 py-2 md:py-2.5 bg-white border-none rounded-2xl text-sm focus:ring-2 focus:ring-yellow-400 shadow-inner"
                         value={filtro}
                         onChange={(e) => setFiltro(e.target.value)}
                     />
@@ -210,26 +210,26 @@ const AuditoriaPage = () => {
                     {loading ? (
                         <div className="p-10 text-center animate-pulse text-gray-400 font-bold">Cargando registros...</div>
                     ) : logsFiltrados.map((log) => (
-                        <div key={log.id_auditoria || log.id} className="p-5 flex flex-col gap-2 hover:bg-gray-50 transition-colors">
+                        <div key={log.id_auditoria || log.id} className="p-3 flex flex-col gap-1 hover:bg-gray-50 transition-colors">
                             <div className="flex justify-between items-start">
                                 <span className="text-[10px] font-bold text-gray-400">{new Date(log.fecha_hora).toLocaleString()}</span>
                                 <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-[9px] font-black rounded-md uppercase">{log.accion}</span>
                             </div>
-                            <p className="text-sm font-black text-gray-800 break-all">{log.usuario_responsable}</p>
-                            <p className="text-xs text-gray-500 italic">{log.descripcion}</p>
+                            <p className="text-xs leading-tight font-black text-gray-800 break-all">{log.usuario_responsable}</p>
+                            <p className="leading-tight text-gray-500 italic">{log.descripcion}</p>
                         </div>
                     ))}
                 </div>
 
                 {/* VISTA ESCRITORIO (TABLA) */}
                 <div className="overflow-x-auto shadow-2xl rounded-3xl border border-slate-100">
-                    <table className="w-full table-fixed min-w-[800px] bg-white">
+                    <table className="w-full  table-auto min-w-[800px] bg-white">
                         <thead>
                            <tr className="bg-red-500 text-white">
                              <th className="w-[20%] p-4 text-[10px] font-black uppercase tracking-wider">Fecha</th>
-                             <th className="w-[25%] p-4 text-[10px] font-black uppercase tracking-wider text-center">Usuario</th>
+                             <th className="w-[20%] p-4 text-[10px] font-black uppercase tracking-wider text-center">Usuario</th>
                              <th className="w-[15%] p-4 text-[10px] font-black uppercase tracking-wider">Acción</th>
-                             <th className="w-[40%] p-4 text-[10px] font-black uppercase tracking-wider text-center">Descripción</th>
+                             <th className="w-[30%] p-4 text-[10px] font-black uppercase tracking-wider text-center">Descripción</th>
                              <th className="w-[15%] p-4 text-[10px] font-black uppercase tracking-wider text-center">Velocidad</th>
                            </tr>
                         </thead>
@@ -241,7 +241,7 @@ const AuditoriaPage = () => {
                                     <td className="p-4 text-center">
                                         <span className="text-[9px] bg-amber-50 text-amber-600 px-2 py-1 rounded-lg font-black group-hover:bg-amber-100 transition-colors">{log.accion}</span>
                                     </td>
-                                    <td className="p-4 text-xs text-gray-500 text-center max-w-xs truncate" title={log.descripcion}>{log.descripcion}</td>
+                                    <td className="p-4 text-xs text-gray-500 text-center max-w-xs break-words" title={log.descripcion}>{log.descripcion}</td>
                                     <td className="p-4 text-xs text-center font-mono text-gray-400">{log.duracion_ms || 0}ms</td>
                                 </tr>
                             ))}
@@ -250,7 +250,7 @@ const AuditoriaPage = () => {
                 </div>
 
                 {/* PAGINACIÓN COMPACTA */}
-                <div className="p-4 bg-sky-200/50 border-t border-gray-100 flex justify-between items-center">
+                <div className="p-2 md:p-3 bg-sky-200/50 border-t border-gray-100 flex justify-between items-center">
                 <button onClick={() => setPagina(p => Math.max(0, p - 1))} disabled={pagina === 0 || loading} className="flex items-center gap-1 px-4 py-1 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-50 transition-all">
                 <ChevronLeft size={16} /> Anterior
                     </button>

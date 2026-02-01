@@ -12,15 +12,22 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [
+      nodePolyfills({
+        globals: { Buffer: true, global: true, process: true },
+      }),
       react(),
       tailwindcss(),
-      nodePolyfills({
-        globals: {
-          Buffer: true,
-          global: true,
-          process: true,
-        },
-      }),
     ],
+    // --- ESTA SECCIÓN ES LA QUE DESBLOQUEA EL ERROR DE VERCEL ---
+    build: {
+      rollupOptions: {
+        onwarn(warning, warn) {
+          // Ignora errores de dependencia circular que rompen el build en Vercel
+          if (warning.code === 'CIRCULAR_DEPENDENCY') return;
+          warn(warning);
+        },
+      },
+    },
+    // -----------------------------------------------------------
   }
 })

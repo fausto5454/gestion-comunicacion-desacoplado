@@ -8,17 +8,22 @@ export default defineConfig(({ mode }) => {
   
   return {
     plugins: [
-      nodePolyfills({
-        globals: { Buffer: true, global: true, process: true },
-      }),
       react(),
       tailwindcss(),
+      nodePolyfills({
+        // Esto soluciona el error "failed to resolve import" de tus logs
+        include: ['buffer', 'process', 'util', 'stream'],
+        globals: {
+          Buffer: true,
+          global: true,
+          process: true,
+        },
+      }),
     ],
-    // ESTE BLOQUE ELIMINA EL ERROR "EXITED WITH 1"
     build: {
       rollupOptions: {
         onwarn(warning, warn) {
-          // Ignora el error de dependencia circular que aparece en tus logs
+          // Esto evita el fallo por "Circular Dependency" visto en tus logs
           if (warning.code === 'CIRCULAR_DEPENDENCY') return;
           warn(warning);
         },

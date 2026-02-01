@@ -1,16 +1,20 @@
 {
   "dependencies": {
-    "docx": "^9.5.1",
-    "file-saver": "^2.0.5",
-    "jspdf": "^3.0.4",
-    "jspdf-autotable": "^5.0.2",
-    "lucide-react": "^0.552.0",
-    "recharts": "^3.7.0",
-    "sonner": "^2.0.7",
-    "xlsx": "^0.18.5",
-    "vite-plugin-node-polyfills": "^0.22.0",
-    "exceljs": "^4.4.0",
-   "@tailwindcss/vite": "^4.0.0",
-  "tailwindcss": "^4.0.0"
+    "@supabase/supabase-js": "^2.48.1",
+  "@tailwindcss/vite": "^4.0.0",
+  "clsx": "^2.1.1",
+  "docx": "^9.5.1",
+  "exceljs": "^4.4.0",
+  "file-saver": "^2.0.5",
+  "jspdf": "^3.0.4",
+  "jspdf-autotable": "^5.0.2",
+  "lucide-react": "^0.552.0",
+  "prop-types": "^15.8.1",
+  "recharts": "^2.15.1",
+  "sonner": "^2.0.1",
+  "tailwind-merge": "^3.0.1",
+  "tailwindcss": "^4.0.0",
+  "vite-plugin-node-polyfills": "^0.22.0",
+  "xlsx": "^0.18.5"
   }
 }

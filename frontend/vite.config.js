@@ -15,20 +15,7 @@ export default defineConfig({
       },
     }),
   ],
-  resolve: {
-    alias: {
-      // Forzamos la ruta al archivo que los logs dicen que no encuentran
-      'vite-plugin-node-polyfills/shims/global': 'vite-plugin-node-polyfills/dist/shims/global.js',
-    },
-  },
-  build: {
-    rollupOptions: {
-      // Instrucción recomendada por el log de Vercel para este error específico
-      external: ['vite-plugin-node-polyfills/shims/global'],
-      onwarn(warning, warn) {
-        if (warning.code === 'CIRCULAR_DEPENDENCY') return;
-        warn(warning);
-      },
-    },
-  },
+  optimizeDeps: {
+    include: ['docx'] // Fuerza a Vite a pre-procesar esta librería
+  }
 })

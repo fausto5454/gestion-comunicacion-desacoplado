@@ -8,18 +8,22 @@ export default defineConfig({
     react(),
     tailwindcss(),
     nodePolyfills({
-      // Habilita explícitamente los shims necesarios para evitar el error de los logs
       globals: {
         Buffer: true,
         global: true,
         process: true,
       },
-      protocolImports: true,
     }),
   ],
+  resolve: {
+    alias: {
+      // Forzamos la ruta al archivo que los logs dicen que falta
+      'vite-plugin-node-polyfills/shims/global': 'vite-plugin-node-polyfills/dist/shims/global.js',
+    },
+  },
   build: {
     rollupOptions: {
-      // Esto soluciona el error "[vite]: Rollup failed to resolve import" de tus capturas
+      // Esto es lo que sugieren tus logs para evitar que se rompa el build
       external: ['vite-plugin-node-polyfills/shims/global'],
       onwarn(warning, warn) {
         if (warning.code === 'CIRCULAR_DEPENDENCY') return;
@@ -27,10 +31,4 @@ export default defineConfig({
       },
     },
   },
-  resolve: {
-    alias: {
-      // Redirección manual para asegurar que encuentre el polyfill
-      'vite-plugin-node-polyfills/shims/global': 'vite-plugin-node-polyfills/dist/shims/global.js'
-    }
-  }
 })

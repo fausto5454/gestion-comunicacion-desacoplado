@@ -17,13 +17,13 @@ export default defineConfig({
   ],
   resolve: {
     alias: {
-      // Forzamos la ruta al archivo que los logs dicen que falta
+      // Forzamos la ruta al archivo que los logs dicen que no encuentran
       'vite-plugin-node-polyfills/shims/global': 'vite-plugin-node-polyfills/dist/shims/global.js',
     },
   },
   build: {
     rollupOptions: {
-      // Esto es lo que sugieren tus logs para evitar que se rompa el build
+      // Instrucción recomendada por el log de Vercel para este error específico
       external: ['vite-plugin-node-polyfills/shims/global'],
       onwarn(warning, warn) {
         if (warning.code === 'CIRCULAR_DEPENDENCY') return;

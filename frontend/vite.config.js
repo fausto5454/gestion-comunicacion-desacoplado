@@ -14,10 +14,11 @@ export default defineConfig(({ mode }) => {
       react(),
       tailwindcss(),
     ],
+    // ESTE BLOQUE ELIMINA EL ERROR "EXITED WITH 1"
     build: {
       rollupOptions: {
         onwarn(warning, warn) {
-          // Esto evita que el build se detenga por las dependencias circulares de los polyfills
+          // Ignora el error de dependencia circular que aparece en tus logs
           if (warning.code === 'CIRCULAR_DEPENDENCY') return;
           warn(warning);
         },

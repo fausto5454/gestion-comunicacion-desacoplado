@@ -2,6 +2,7 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { nodePolyfills } from 'vite-plugin-node-polyfills'
+
 export default defineConfig({
   plugins: [
     react(),
@@ -14,13 +15,8 @@ export default defineConfig({
       },
     }),
   ],
-  optimizeDeps: {
-    include: ['docx'] // Fuerza a Vite a pre-procesar esta librería
-    }
-  })
-build: {
+  build: {
     rollupOptions: {
-      // Esto le dice a Vite: "Si no encuentras este archivo interno, no te detengas"
       external: ['vite-plugin-node-polyfills/shims/global'],
     },
   },

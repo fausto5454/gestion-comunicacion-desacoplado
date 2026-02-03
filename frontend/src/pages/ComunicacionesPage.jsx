@@ -274,18 +274,19 @@ const ComunicacionesPage = ({ session }) => {
             </div>
 
             {userRol !== 6 && (
-                <form onSubmit={handleEnviar} className="bg-white p-6 md:p-8 rounded-[2rem] border shadow-sm relative">
+                <form onSubmit={handleEnviar} className="bg-gray-600 p-6 md:p-8 rounded-[2rem] border shadow-sm relative">
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                         <Select ref={selectRef} options={opcionesSelect} styles={customStyles} placeholder="🔍 Buscar destinatario..." isSearchable onChange={(opt) => setForm({...form, destinatario_id: opt?.value || ''})} />
                         <input className="p-3 bg-gray-50 border rounded-2xl text-sm" placeholder="Asunto..." value={form.titulo} onChange={e => setForm({...form, titulo: e.target.value})} required />
                         <select className="p-3 bg-gray-50 border rounded-2xl text-sm font-bold" value={form.prioridad} onChange={e => setForm({...form, prioridad: e.target.value})}>
+                            <option value="Ninguno">Prioridad Ninguno</option>
                             <option value="Normal">Prioridad Normal</option>
                             <option value="Urgente">Prioridad Urgente 🚨</option>
                         </select>
                     </div>
                     <textarea className="w-full p-4 bg-gray-50 border rounded-2xl text-sm mb-4 min-h-[100px]" placeholder="Escriba el mensaje aquí..." value={form.mensaje} onChange={e => setForm({...form, mensaje: e.target.value})} required />
                     <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-                        <button type="button" onClick={() => fileInputRef.current.click()} className="px-5 py-3 rounded-2xl border-2 border-dashed text-[10px] font-black text-gray-500 uppercase">{archivo ? `✅ ${archivo.name}` : 'Adjuntar Archivo'}</button>
+                        <button type="button" onClick={() => fileInputRef.current.click()} className="px-5 py-3 rounded-2xl border-2 border-dashed text-[10px] font-black text-white bg-green-600 uppercase">{archivo ? `✅ ${archivo.name}` : 'Adjuntar Archivo'}</button>
                         <input type="file" ref={fileInputRef} hidden onChange={e => setArchivo(e.target.files[0])} />
                         <button disabled={loading} className="w-full md:w-64 py-4 bg-green-600 text-white rounded-2xl font-black text-[11px] uppercase tracking-widest shadow-lg hover:bg-green-700 transition-colors disabled:bg-gray-400">
                             {loading ? "Enviando..." : "Enviar Ahora"}

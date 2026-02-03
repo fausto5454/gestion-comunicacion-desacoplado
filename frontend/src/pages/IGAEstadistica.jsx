@@ -67,109 +67,171 @@ const IGAEstadistica = () => {
     };
 
     // 3. EXPORTACIÓN A EXCEL CORREGIDA (GÉNERO COMBINADO Y ESTILOS)
-    const exportarExcelCompleto = async () => {
+   const exportarExcelCompleto = async () => {
+    try {
         const workbook = new ExcelJS.Workbook();
         const worksheet = workbook.addWorksheet('Reporte IGA');
 
-        // TÍTULO PRINCIPAL (A1 a I1)
-        worksheet.mergeCells('A1:I1'); 
-        const titleCell = worksheet.getCell('A1');
+        // 1. TÍTULO PRINCIPAL (B1 a J1)
+        worksheet.mergeCells('B1:J1'); 
+        const titleCell = worksheet.getCell('B1');
         titleCell.value = 'REPORTE CONSOLIDADO IGA 2026';
-        titleCell.font = { bold: true, size: 14 };
+        titleCell.font = { bold: true, size: 14, name: 'Calibri' };
         titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
 
-        // FILA DE FILTROS (Fila 2)
-        worksheet.addRow([`ÁREA: ${filtros.area}`, `GRADO: ${filtros.grado}`, ``, `SECCIÓN: ${filtros.seccion}`, ``, `BIMESTRE: ${filtros.bimestre}`]);
-        worksheet.addRow([]); // Espacio
+        // 2. FILA DE FILTROS (Fila 2)
+        worksheet.mergeCells('B2:C2');
+        worksheet.getCell('B2').value = `ÁREA: ${filtros?.area || ''}`;
+        worksheet.mergeCells('D2:E2');
+        worksheet.getCell('D2').value = `GRADO: ${filtros?.grado || ''}`;
+        worksheet.getCell('G2').value = `SECCIÓN: ${filtros?.seccion || ''}`;
+        worksheet.mergeCells('I2:J2');
+        worksheet.getCell('J2').value = `BIMESTRE: ${filtros?.bimestre || ''}`;
 
-        // --- RESTAURACIÓN DEL ENCABEZADO GÉNERO ---
+        worksheet.getRow(2).eachCell(c => {
+            c.font = { size: 10, bold: true, name: 'Calibri' };
+            c.alignment = { horizontal: 'left' };
+        });
+
+        worksheet.addRow([]); // Espacio (Fila 3)
+
+        // 3. ENCABEZADOS DE TABLA (Fila 4 y 5)
         const h1 = worksheet.getRow(4);
-        h1.values = ['N°', 'ESTUDIANTE', 'GÉNERO', '', 'AD', 'A', 'B', 'C', 'LOGRO'];
-        
+        h1.values = [null, 'N°', 'ESTUDIANTE', 'GÉNERO', null, 'AD', 'A', 'B', 'C', 'LOGRO'];
         const h2 = worksheet.getRow(5);
-        h2.values = ['', '', 'H', 'M', '', '', '', '', ''];
+        h2.values = [null, null, null, 'H', 'M', null, null, null, null, null];
 
-        // Aplicar Estilo Verde Institucional y Bordes
-        for (let i = 1; i <= 9; i++) {
+        for (let i = 2; i <= 10; i++) {
             [h1, h2].forEach(row => {
                 const cell = row.getCell(i);
                 cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF16A34A' } };
-                cell.font = { color: { argb: 'FFFFFFFF' }, bold: true };
+                cell.font = { color: { argb: 'FFFFFFFF' }, size: 10, bold: true };
                 cell.alignment = { horizontal: 'center', vertical: 'middle' };
-                cell.border = { 
-                    top: {style:'thin'}, left: {style:'thin'}, 
-                    bottom: {style:'thin'}, right: {style:'thin'} 
-                };
+                cell.border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
             });
         }
 
-        // Combinaciones de celdas (Importante: GÉNERO C4:D4)
-        worksheet.mergeCells('A4:A5'); // N°
-        worksheet.mergeCells('B4:B5'); // ESTUDIANTE
-        worksheet.mergeCells('C4:D4'); // GÉNERO (Celda combinada única)
-        worksheet.mergeCells('E4:E5'); // AD
-        worksheet.mergeCells('F4:F5'); // A
-        worksheet.mergeCells('G4:G5'); // B
-        worksheet.mergeCells('H4:H5'); // C
-        worksheet.mergeCells('I4:I5'); // LOGRO
+        worksheet.mergeCells('B4:B5'); // N°
+        worksheet.mergeCells('C4:C5'); // ESTUDIANTE
+        worksheet.mergeCells('D4:E4'); // GÉNERO
+        worksheet.mergeCells('F4:F5'); // AD
+        worksheet.mergeCells('G4:G5'); // A
+        worksheet.mergeCells('H4:H5'); // B
+        worksheet.mergeCells('I4:I5'); // C
+        worksheet.mergeCells('J4:J5'); // LOGRO
 
-        // --- LÓGICA DE DATOS CON GÉNERO DE SUPABASE ---
-        let countH = 0;
-        let countM = 0;
-
-        stats.estudiantes.forEach((est, i) => {
-            // Leemos el valor 'H' o 'M' que ahora envía Supabase
+        // 4. DATOS
+        let countH = 0; let countM = 0;
+        (stats?.estudiantes || []).forEach((est, i) => {
             const genero = est.genero?.toUpperCase(); 
-            const isM = genero === 'M';
-            const isH = genero === 'H';
-
-            if (isM) countM++;
-            if (isH) countH++;
+            if (genero === 'M') countM++; if (genero === 'H') countH++;
 
             const row = worksheet.addRow([
-                i + 1, 
-                est.nombre_estudiante, 
-                isH ? 'X' : '', // Columna H
-                isM ? 'X' : '', // Columna M
-                est.logro_bimestral === 'AD' ? 'X' : '', 
-                est.logro_bimestral === 'A' ? 'X' : '',
-                est.logro_bimestral === 'B' ? 'X' : '', 
-                est.logro_bimestral === 'C' ? 'X' : '',
+                null, i + 1, est.nombre_estudiante, 
+                genero === 'H' ? '1' : '', genero === 'M' ? '1' : '', 
+                est.logro_bimestral === 'AD' ? '1' : '', est.logro_bimestral === 'A' ? '1' : '',
+                est.logro_bimestral === 'B' ? '1' : '', est.logro_bimestral === 'C' ? '1' : '',
                 est.logro_bimestral
             ]);
 
-            // Bordes y alineación para los datos
             row.eachCell((c, colNum) => {
-                c.border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
-                if (colNum !== 2) c.alignment = { horizontal: 'center' };
+                if (colNum >= 2) {
+                    c.font = { size: 10, name: 'Calibri' };
+                    c.border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
+                    c.alignment = { horizontal: colNum === 3 ? 'left' : 'center' };
+                }
             });
         });
 
-        // --- FILA TOTAL AMARILLA ---
+        // 5. FILA TOTAL (AJUSTE: Combinación B y C corregida)
         const totalRowIndex = worksheet.lastRow.number + 1;
-        worksheet.mergeCells(`A${totalRowIndex}:B${totalRowIndex}`);
+        worksheet.mergeCells(`B${totalRowIndex}:C${totalRowIndex}`); // Aquí se combinan B y C
         const totalRow = worksheet.getRow(totalRowIndex);
         
-        totalRow.values = [
-            'TOTAL', 
-            '', 
-            countH, 
-            countM, 
-            stats.estudiantes.filter(e => e.logro_bimestral === 'AD').length,
-            stats.estudiantes.filter(e => e.logro_bimestral === 'A').length,
-            stats.estudiantes.filter(e => e.logro_bimestral === 'B').length,
-            stats.estudiantes.filter(e => e.logro_bimestral === 'C').length,
-            stats.estudiantes.length // Total general (10 en tu imagen)
-        ];
+        // Asignamos el valor 'TOTAL' a la celda B (que ahora abarca B y C)
+        totalRow.getCell(2).value = 'TOTAL';
+        totalRow.getCell(4).value = countH;
+        totalRow.getCell(5).value = countM;
+        totalRow.getCell(6).value = stats.estudiantes.filter(e => e.logro_bimestral === 'AD').length;
+        totalRow.getCell(7).value = stats.estudiantes.filter(e => e.logro_bimestral === 'A').length;
+        totalRow.getCell(8).value = stats.estudiantes.filter(e => e.logro_bimestral === 'B').length;
+        totalRow.getCell(9).value = stats.estudiantes.filter(e => e.logro_bimestral === 'C').length;
+        totalRow.getCell(10).value = stats.estudiantes.length;
 
-        totalRow.eachCell((c) => {
-            c.font = { bold: true };
-            c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFC000' } };
-            c.border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
-            c.alignment = { horizontal: 'center' };
+        totalRow.eachCell((c, colNum) => {
+            if (colNum >= 2) {
+                c.font = { bold: true, size: 10 };
+                c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFC000' } };
+                c.border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
+                c.alignment = { horizontal: 'center' };
+            }
         });
 
-        // 5. RESUMEN Y GRÁFICO (Restaurados)
+        // 6. RESUMEN (Alineado con las columnas combinadas)
+        worksheet.addRow([]);
+        const resRowIdx = worksheet.lastRow.number + 1;
+        
+        worksheet.mergeCells(`B${resRowIdx}:C${resRowIdx}`);
+        worksheet.getCell(`B${resRowIdx}`).value = 'RESUMEN';
+        worksheet.mergeCells(`D${resRowIdx}:E${resRowIdx}`);
+        worksheet.getCell(`D${resRowIdx}`).value = 'CANTIDAD';
+        worksheet.mergeCells(`F${resRowIdx}:H${resRowIdx}`);
+        worksheet.getCell(`F${resRowIdx}`).value = 'PORCENTAJE';
+
+        worksheet.getRow(resRowIdx).eachCell(c => {
+            if (c.value) {
+                c.font = { bold: true, size: 10 };
+                c.alignment = { horizontal: 'center' };
+            }
+        });
+
+        (stats?.resumen || []).forEach(r => {
+            const rIdx = worksheet.lastRow.number + 1;
+            worksheet.mergeCells(`B${rIdx}:C${rIdx}`);
+            worksheet.getCell(`B${rIdx}`).value = r.name;
+            worksheet.mergeCells(`D${rIdx}:E${rIdx}`);
+            worksheet.getCell(`D${rIdx}`).value = r.cant;
+            worksheet.mergeCells(`F${rIdx}:H${rIdx}`);
+            worksheet.getCell(`F${rIdx}`).value = `${r.percent}%`;
+
+            const colorHex = r.color?.replace('#', 'FF').toUpperCase() || 'FFCCCCCC';
+            [`B${rIdx}`, `E${rIdx}`, `G${rIdx}`].forEach(ref => {
+                const cell = worksheet.getCell(ref);
+                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: colorHex } };
+                cell.font = { color: { argb: 'FFFFFFFF' }, bold: true, size: 10 };
+                cell.border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
+                cell.alignment = { horizontal: 'center' };
+            });
+        });
+
+        // 7. GRÁFICO
+        if (chartRef.current) {
+            try {
+                const dataUrl = await toPng(chartRef.current, { backgroundColor: '#ffffff', pixelRatio: 2 });
+                const imageId = workbook.addImage({ base64: dataUrl, extension: 'png' });
+                worksheet.addImage(imageId, {
+                    tl: { col: 2, row: worksheet.lastRow.number + 2 },
+                    ext: { width: 450, height: 250 }
+                });
+            } catch (e) { console.error("Error gráfico:", e); }
+        }
+
+        // --- AJUSTE DE ANCHOS (Reducción de columna C) ---
+        worksheet.getColumn(1).width = 2;   // Margen A
+        worksheet.getColumn(2).width = 5;   // N°
+        worksheet.getColumn(3).width = 30;  // ESTUDIANTE (Antes era 45, ahora es más estrecha)
+        worksheet.getColumn(4).width = 5;   // H
+        worksheet.getColumn(5).width = 5;   // M
+
+        const buffer = await workbook.xlsx.writeBuffer();
+        saveAs(new Blob([buffer]), `Consolidado_IGA_${filtros?.area || 'Reporte'}.xlsx`);
+
+    } catch (error) {
+        console.error("Error:", error);
+    
+   };
+
+        // 8. RESUMEN Y GRÁFICO (Restaurados)
         worksheet.addRow([]);
         const resHeader = worksheet.addRow(['RESUMEN', 'CANTIDAD', 'PORCENTAJE']);
         resHeader.eachCell(c => { c.font = { bold: true }; c.alignment = { horizontal: 'center' }; });
@@ -195,7 +257,7 @@ const IGAEstadistica = () => {
                 const dataUrl = await toPng(chartRef.current, { backgroundColor: '#ffffff', pixelRatio: 2 });
                 const imageId = workbook.addImage({ base64: dataUrl, extension: 'png' });
                 worksheet.addImage(imageId, {
-                    tl: { col: 0, row: worksheet.rowCount + 2 },
+                    tl: { col: 2, row: worksheet.rowCount + 2 },
                     ext: { width: 500, height: 300 }
                 });
             } catch (e) { console.error(e); }
@@ -203,11 +265,12 @@ const IGAEstadistica = () => {
 
         const buffer = await workbook.xlsx.writeBuffer();
         saveAs(new Blob([buffer]), `Consolidado_IGA_${filtros.area}.xlsx`);
+        
     };
 
     return (
         <div className="p-6 bg-slate-50 min-h-screen space-y-6">
-            <div className="bg-green-200 p-6 rounded-[2rem] shadow-sm border border-slate-200 grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
+            <div className="bg-yellow-200 p-6 rounded-[2rem] shadow-sm border border-slate-200 grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
                 <div className="space-y-2">
                     <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Área Curricular</label>
                     <select value={filtros.area} onChange={(e) => setFiltros({...filtros, area: e.target.value})} className="w-full bg-green-600 border-none rounded-xl text-white font-bold p-3">
@@ -253,8 +316,8 @@ const IGAEstadistica = () => {
 
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 {stats.resumen.map((item, i) => (
-                    <div key={i} className="bg-white p-5 rounded-[2rem] border border-slate-100 shadow-sm">
-                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-tighter">{item.name}</p>
+                    <div key={i} className="bg-emerald-200 p-5 rounded-[2rem] border border-slate-100 shadow-sm">
+                        <p className="text-[9px] font-black text-slate-500 uppercase tracking-tighter">{item.name}</p>
                         <div className="flex justify-between items-end mt-2">
                             <p className="text-3xl font-black text-slate-800">{item.cant}</p>
                             <p className="text-sm font-black px-2 py-1 rounded-lg bg-slate-50" style={{color: item.color}}>{item.percent}%</p>

@@ -255,24 +255,24 @@ const ConsolidadoAsistencia = () => {
       </div>
     </div>
    {/* Contenedor con scroll horizontal controlado */}
-  <div className="bg-white rounded-[1.5rem] shadow-xl border border-slate-200 overflow-hidden">
+  <div className="bg-white rounded-[1rem] shadow-xl border border-gray-300 overflow-hidden">
   <div className="overflow-x-auto">
     <table className="w-max md:w-full border-collapse borde-r table-fixed">
     <thead>
     <tr className="bg-slate-900 text-white">
     {/* N°: Siempre fijo, con ancho generoso en escritorio */}
-    <th className="sticky left-0 top-0 z-50 w-[40px] md:w-[45px] bg-emerald-700 py-3 text-[10px] md:text-[11px] font-black border-r border-emerald-800 text-center uppercase tracking-wider">
+    <th className="sticky left-0 top-0 z-50 w-[40px] md:w-[40px] bg-emerald-700 py-3 text-[10px] md:text-[11px] font-black border-r border-emerald-800 text-center uppercase tracking-wider">
       N°
       </th>
       {/* ESTUDIANTE: En escritorio le damos un padding izquierdo (pl-4) para separarlo del N° */}
-      <th className="bg-slate-900 py-3 px-4 md:pl-10 text-left border-r border-slate-800 w-[80px] md:w-[250px] text-[8px] md:text-[11px] font-black uppercase tracking-wider">
+      <th className="bg-slate-900 py-3 px-2 md:pl-10 text-left border-r border-slate-800 w-[70px] md:w-[250px] text-[8px] md:text-[11px] font-black uppercase tracking-wider">
       Apellidos y Nombres
     </th>
    {diasDelMes.map(dia => {
     const esFinde = dia.nombre === "Sáb" || dia.nombre === "Dom";
       return (
        <th key={dia.numero} 
-         className={`py-1 border-r border-slate-800 min-w-[36px] md:min-w-[42px] text-center transition-colors
+         className={`py-1 border-r border-slate-800 min-w-[34px] md:min-w-[42px] text-center transition-colors
           ${esFinde ? 'bg-emerald-900' : 'bg-emerald-900'}`}>
           <div className="flex flex-col leading-none">
             <span className={`text-[7px] font-bold uppercase ${esFinde ? 'text-red-500' : 'text-slate-400'}`}>
@@ -284,7 +284,7 @@ const ConsolidadoAsistencia = () => {
        );
      })}
     {/* FALTAS: Fija a la derecha */}
-    <th className="sticky right-0 top-0 z-40 bg-red-600 py-2 text-[8px] md:text-[11px] font-black w-[50px] md:w-[45px] text-center border-l border-slate-800 shadow-[-4px_0_10px_rgba(0,0,0,0.3)]">
+    <th className="sticky right-0 top-0 z-40 bg-red-600 py-2 text-[8px] md:text-[10px] font-black w-[50px] md:w-[45px] text-center border-l border-slate-800 shadow-[-4px_0_8px_rgba(0,0,0,0)]">
     FALTAS
     </th>
    </tr>
@@ -295,11 +295,11 @@ const ConsolidadoAsistencia = () => {
       return (
        <tr key={est.id_matricula} className="hover:bg-slate-50 transition-colors group">
         {/* N° ORDEN: Fondo sólido y texto centrado */}
-         <td className="sticky left-0 z-30 bg-emerald-100 py-2 text-center text-[8px] md:text-[12px] font-bold text-emerald-700 border-r border-slate-200">
+         <td className="sticky left-0 z-30 bg-emerald-100 py-1 text-center text-[8px] md:text-[12px] font-bold text-emerald-600 border-r border-slate-300">
            {(index + 1).toString().padStart(2, '0')}
             </td>
-             {/* NOMBRE: Ajuste de padding en escritorio (md:px-6) para vista profesional */}
-            <td className="bg-white py-2 px-3 md:px-6 text-[8px] md:text-[11px] font-semibold text-slate-700 border-r border-slate-200 uppercase truncate w-[120px] md:w-[320px]">
+             {/* NOMBRE: Ajuste de padding en escritorio (md:px-4) para vista profesional */}
+            <td className="bg-white py-1 px-3 md:px-4 text-[8px] md:text-[10px] font-semibold text-slate-700 border-r border-slate-300/80 uppercase w-[120px] md:w-[320px]">
            {est.apellido_paterno} {est.apellido_materno} {est.nombres}
           </td>
         {/* CELDAS DE ASISTENCIA (Se desplazan por debajo en móvil) */}
@@ -307,14 +307,14 @@ const ConsolidadoAsistencia = () => {
           const res = datos[est.id_matricula]?.[dia.numero] || '-';
            if (res === 'A') totalFaltas++;
             return (
-             <td key={dia.numero} className="text-center py-2 text-[11px] border-r border-slate-100 bg-white text-slate-400">
+             <td key={dia.numero} className="text-center py-2 text-[11px] border-r border-slate-300/80 bg-white text-slate-400">
               {res}
                </td>
                 );
                  })}
                  {/* FALTAS: Fija a la derecha con alerta roja */}
-                 <td className={`sticky right-0 z-30 py-2 text-center font-black text-[8px] md:text-[13px] border-l border-slate-200 shadow-[-4px_0_8px_rgba(0,0,0,0.05)]
-                ${totalFaltas > 3 ? 'bg-red-600 text-white' : 'bg-red-100 text-slate-600'}`}>
+                 <td className={`sticky right-0 z-30 py-1 text-center font-black text-[8px] md:text-[13px] border-l border-slate-200 shadow-[-4px_0_8px_rgba(0,0,0,0)]
+                ${totalFaltas > 3 ? 'bg-red-600 text-white' : 'bg-red-100 text-slate-500'}`}>
                {totalFaltas}
                </td>
              </tr>

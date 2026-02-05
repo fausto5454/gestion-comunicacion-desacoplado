@@ -272,7 +272,7 @@ const ConsolidadoAsistencia = () => {
     const esFinde = dia.nombre === "Sáb" || dia.nombre === "Dom";
       return (
        <th key={dia.numero} 
-         className={`py-1 border-r border-slate-800 min-w-[34px] md:min-w-[42px] text-center transition-colors
+         className={`py-1 border-r border-slate-800 min-w-[35px] md:min-w-[50px] text-center transition-colors
           ${esFinde ? 'bg-emerald-900' : 'bg-emerald-900'}`}>
           <div className="flex flex-col leading-none">
             <span className={`text-[7px] font-bold uppercase ${esFinde ? 'text-red-500' : 'text-slate-400'}`}>
@@ -298,8 +298,8 @@ const ConsolidadoAsistencia = () => {
          <td className="sticky left-0 z-30 bg-emerald-100 py-1 text-center text-[8px] md:text-[12px] font-bold text-emerald-600 border-r border-slate-300">
            {(index + 1).toString().padStart(2, '0')}
             </td>
-             {/* NOMBRE: Ajuste de padding en escritorio (md:px-4) para vista profesional */}
-            <td className="bg-white py-1 px-3 md:px-4 text-[8px] md:text-[10px] font-semibold text-slate-700 border-r border-slate-300/80 uppercase w-[120px] md:w-[320px]">
+             {/* NOMBRE: Ajuste de padding en escritorio (md:px-3) para vista profesional */}
+            <td className="bg-white py-1 px-3 md:px-3 text-[8px] md:text-[10px] font-semibold text-slate-700 border-r border-slate-300/80 uppercase w-[120px] md:w-[320px]">
            {est.apellido_paterno} {est.apellido_materno} {est.nombres}
           </td>
         {/* CELDAS DE ASISTENCIA (Se desplazan por debajo en móvil) */}

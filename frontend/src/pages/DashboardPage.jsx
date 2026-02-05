@@ -104,14 +104,14 @@ const DashboardPage = ({ userEmail }) => {
     return (
         <div className="flex flex-col gap-8 animate-in fade-in duration-700">
             {/* CABECERA */}
-            <div className="bg-green-300/50 p-6 rounded-3xl border border-green-200/50 shadow-sm relative overflow-hidden flex justify-between items-center">
+            <div className="bg-yellow-300/80 p-6 rounded-3xl border border-green-200/50 shadow-sm relative overflow-hidden flex justify-between items-center">
                 <div className="relative z-10">
                     <h1 className="text-2xl md:text-3xl font-black text-gray-800 leading-tight">Bienvenido al Sistema</h1>
                     <p className="text-xs md:text-sm text-green-600 font-bold tracking-widest mt-1">Panel de control • Gestión de comunicaciones</p>
                 </div>
                 <button 
                     onClick={exportarExcel}
-                    className="relative z-10 flex items-center gap-2 bg-white/80 hover:bg-white text-green-700 px-4 py-2 rounded-2xl text-xs font-black shadow-sm transition-all active:scale-95 uppercase tracking-wider"
+                    className="relative z-10 flex items-center gap-2 bg-green-600 hover:bg-white text-white px-4 py-2 rounded-2xl text-xs font-black shadow-sm transition-all active:scale-95 uppercase tracking-wider"
                 >
                     <Download size={14} /> Exportar Excel
                 </button>
@@ -121,7 +121,7 @@ const DashboardPage = ({ userEmail }) => {
             {/* STATS CARDS */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                 {stats.map((stat, index) => (
-                    <div key={index} className="bg-yellow-200/80 p-6 rounded-3xl shadow-sm border border-gray-100 flex items-center hover:shadow-md transition-all group">
+                    <div key={index} className="bg-emerald-200 p-6 rounded-3xl shadow-sm border border-gray-100 flex items-center hover:shadow-md transition-all group">
                         <div className={`${stat.color} w-14 h-14 rounded-2xl text-white flex items-center justify-center text-2xl group-hover:rotate-6 transition-transform shadow-lg shadow-gray-200`}>
                             {stat.icon}
                         </div>
@@ -132,10 +132,9 @@ const DashboardPage = ({ userEmail }) => {
                     </div>
                 ))}
             </div>
-
             {/* GRÁFICO Y SIDEBAR */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <div className="lg:col-span-2 bg-white p-6 md:p-8 rounded-3xl shadow-sm border border-gray-100">
+                <div className="lg:col-span-2 bg-sky-100 p-6 md:p-8 rounded-3xl shadow-sm border border-gray-100">
                     <div className="flex justify-between items-center mb-8">
                         <div>
                             <h2 className="text-xl font-black text-gray-800">Flujo de Actividad</h2>
@@ -163,7 +162,7 @@ const DashboardPage = ({ userEmail }) => {
                 </div>
 
                 <div className="flex flex-col gap-6">
-                    <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100 h-full">
+                    <div className="bg-sky-100 p-8 rounded-3xl shadow-sm border border-gray-100 h-full">
                         <h2 className="text-xl font-black text-gray-800 mb-6">Información</h2>
                         <div className="space-y-4">
                             <div className="bg-blue-50/50 p-5 rounded-2xl border border-blue-100 transition-hover hover:bg-blue-50">

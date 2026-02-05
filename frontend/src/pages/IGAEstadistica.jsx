@@ -272,7 +272,7 @@ const IGAEstadistica = () => {
         <div className="p-6 bg-slate-50 min-h-screen space-y-6">
             <div className="bg-yellow-200 p-6 rounded-[2rem] shadow-sm border border-slate-200 grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
                 <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Área Curricular</label>
+                    <label className="text-[10px] font-black text-gray-500 uppercase ml-2">Área Curricular</label>
                     <select value={filtros.area} onChange={(e) => setFiltros({...filtros, area: e.target.value})} className="w-full bg-green-600 border-none rounded-xl text-white font-bold p-3">
                         <option value="MATEMÁTICA">Matemática</option>
                         <option value="COMUNICACIÓN">Comunicación</option>
@@ -287,14 +287,14 @@ const IGAEstadistica = () => {
                     </select>
                 </div>
                 <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Bimestre</label>
+                    <label className="text-[10px] font-black text-gray-500 uppercase ml-2">Bimestre</label>
                     <select value={filtros.bimestre} onChange={(e) => setFiltros({...filtros, bimestre: e.target.value})} className="w-full bg-green-600 border-none rounded-xl text-white font-bold p-3">
                         <option value="1">1° Bimestre</option><option value="2">2° Bimestre</option>
                         <option value="3">3° Bimestre</option><option value="4">4° Bimestre</option>
                     </select>
                 </div>
                 <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Grado / Sección</label>
+                    <label className="text-[10px] font-black text-gray-500 uppercase ml-2">Grado / Sección</label>
                     <div className="flex gap-1">
                         <select value={filtros.grado} onChange={(e) => setFiltros({...filtros, grado: e.target.value})} className="w-full bg-green-600 border-none rounded-xl text-white text-[10px] font-bold p-3">
                             <option value="1°">1° Sec</option><option value="2°">2° Sec</option>
@@ -309,7 +309,7 @@ const IGAEstadistica = () => {
                 <button onClick={exportarExcelCompleto} className="bg-slate-900 text-white p-2 rounded-xl font-black text-xs flex items-center justify-center gap-2 hover:bg-green-600 transition-all shadow-lg">
                     <FileDown size={18} /> EXPORTAR EXCEL + GRÁFICO
                 </button>
-                <div className="flex items-center gap-2 text-[10px] font-bold text-slate-400 p-3">
+                <div className="flex items-center gap-2 text-[12px] font-bold text-sky-600 p-3">
                     <RefreshCcw size={14} className={loading ? "animate-spin text-green-500" : ""} /> {loading ? "Sincronizando..." : "Sincronizado Realtime"}
                 </div>
             </div>

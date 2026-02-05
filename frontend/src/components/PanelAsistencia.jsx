@@ -7,7 +7,7 @@ const PanelAsistencia = () => {
 
   // Definimos tus 12 secciones (ajusta según tu realidad)
   const grados = ['1', '2', '3', '4', '5'];
-  const secciones = ['A', 'B', 'C', 'D'];
+  const secciones = ['A', 'B', 'C'];
 
   return (
     <div className="space-y-6">

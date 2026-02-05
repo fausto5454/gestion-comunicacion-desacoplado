@@ -213,10 +213,10 @@ const UsuariosPage = () => {
     };
 
     return (
-        <div className="p-4 md:p-8 animate-in fade-in duration-500">
+        <div className="p-4 md:p-8 bg-gray-700 animate-in fade-in duration-500">
             {/* Cabecera con Buscador y Excel */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-                <h1 className="text-3xl font-bold text-gray-800 flex items-center">
+                <h1 className="text-3xl font-bold text-white flex items-center">
                     <Users className="w-7 h-7 mr-3 text-green-600" />
                     Gestión de Usuarios
                 </h1>
@@ -227,21 +227,21 @@ const UsuariosPage = () => {
                         <input 
                             type="text"
                             placeholder="Buscar por nombre..."
-                            className="pl-10 pr-4 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500 w-full"
+                            className="pl-10 pr-4 py-2 border border-gray-200 bg-white rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500 w-full"
                             value={searchTerm}
                             onChange={handleSearch}
                         />
                     </div>
                     <button 
                         onClick={exportToExcel}
-                        className="flex items-center px-4 py-2 bg-white border border-gray-200 text-gray-600 rounded-xl hover:bg-gray-50 transition font-bold text-sm shadow-sm"
+                        className="flex items-center px-4 py-2 bg-green-600 border border-green-600 text-white rounded-xl hover:bg-green-400 transition font-bold text-sm shadow-sm"
                     >
-                        <Download className="w-4 h-4 mr-2 text-green-600" />
+                        <Download className="w-4 h-4 mr-2 text-white" />
                         Excel
                     </button>
                     <button
                         onClick={openCreateModal}
-                        className="flex items-center justify-center px-4 py-2 bg-green-600 text-white rounded-lg shadow-lg hover:bg-green-700 transition whitespace-nowrap"
+                        className="flex items-center justify-center px-4 py-2 bg-green-600 text-white rounded-lg shadow-lg hover:bg-green-400 transition whitespace-nowrap"
                     >
                         <UserPlus className="w-4 h-4 mr-2" />
                         Nuevo Usuario
@@ -308,21 +308,21 @@ const UsuariosPage = () => {
 
                     {/* Controles de Paginación */}
                     <div className="flex flex-col md:flex-row justify-between items-center mt-6 px-4 gap-4">
-                        <span className="text-[12px] font-black text-gray-400 uppercase tracking-widest">
+                        <span className="text-[12px] font-black text-gray-100 uppercase tracking-widest">
                            Total usuarios: {totalRecords}
                         </span>
                         <div className="flex gap-2">
                             <button 
                                 disabled={currentPage === 0}
                                 onClick={() => setCurrentPage(prev => prev - 1)}
-                                className="flex items-center px-4 py-2 bg-white border border-gray-200 rounded-xl text-xs font-bold uppercase hover:bg-gray-50 disabled:opacity-50 transition-all shadow-sm"
+                                className="flex items-center px-4 py-2 bg-white border border-gray-200 rounded-xl text-xs font-bold uppercase hover:bg-gray-50 transition-all shadow-sm"
                             >
                                 <ChevronLeft className="w-4 h-4 mr-1" /> Anterior
                             </button>
                             <button 
                                 disabled={(currentPage + 1) * pageSize >= totalRecords}
                                 onClick={() => setCurrentPage(prev => prev + 1)}
-                                className="flex items-center px-4 py-2 bg-green-600 text-white rounded-xl text-xs font-bold uppercase hover:bg-green-700 disabled:opacity-50 transition-all shadow-lg"
+                                className="flex items-center px-4 py-2 bg-green-600 text-white rounded-xl text-xs font-bold uppercase hover:bg-green-700 transition-all shadow-lg"
                             >
                                 Siguiente <ChevronRight className="w-4 h-4 ml-1" />
                             </button>

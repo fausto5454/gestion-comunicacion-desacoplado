@@ -15,6 +15,7 @@ import IGAEstadistica from '../pages/IGAEstadistica';
 // ✅ 1. IMPORTACIONES FALTANTES PARA ASISTENCIA
 import AsistenciaAlumnos from './AsistenciaAlumnos';
 import PanelAsistencia from './PanelAsistencia';
+import ConsolidadoAsistencia from './ConsolidadoAsistencia';
 import Sidebar from './Sidebar';
 
 const AppLayout = ({ session, onLogout, currentView, setCurrentView, onCursoSelect, cursoActivo }) => {
@@ -79,7 +80,8 @@ const AppLayout = ({ session, onLogout, currentView, setCurrentView, onCursoSele
         calificaciones: RegistroCompetencias,
         'iga-estadistica': IGAEstadistica,
         // Agregamos asistencia (usaremos una función para decidir qué mostrar)
-        asistencia: cursoActivo ? AsistenciaAlumnos : PanelAsistencia, 
+        asistencia: cursoActivo ? AsistenciaAlumnos : PanelAsistencia,
+        consolidado: ConsolidadoAsistencia, 
     };
 
     const renderContent = () => {
@@ -124,7 +126,7 @@ const AppLayout = ({ session, onLogout, currentView, setCurrentView, onCursoSele
             {/* ... (Resto del código del Sidebar Mobile y Header igual) ... */}
             {isSidebarOpen && (
                 <div className="fixed inset-0 z-[60] md:hidden">
-                    <div className="absolute inset-0 bg-gray-700/50 backdrop-blur-sm" onClick={() => setIsSidebarOpen(false)}></div>
+                    <div className="absolute inset-0 bg-gray-500 backdrop-blur-sm" onClick={() => setIsSidebarOpen(false)}></div>
                     <div className="relative w-72 h-full">
                         <Sidebar 
                             rol_id={rolID} userName={userName} userEmail={userEmail} 

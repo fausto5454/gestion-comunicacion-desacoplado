@@ -415,7 +415,7 @@ const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion
       )}
 
       {/* HEADER */}
-      <div className="bg-white border-b rounded-b-[2.5rem] p-4 md:p-6 shadow-sm z-40">
+      <div className="bg-emerald-400 border-b border-emerald-600 rounded-b-[2.5rem] p-4 md:p-6 shadow-sm z-40">
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
      {/* SECCIÓN IZQUIERDA: Ícono, Título y Selectores */}
      <div className="flex items-start md:items-center gap-4">
@@ -435,7 +435,7 @@ const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion
             value={grado} 
             onChange={(e) => setGrado(e.target.value)} 
             disabled={esDocente || esEstudiante} 
-            className="bg-slate-200/80 border-slate-200 text-[10px] font-bold px-3 py-2 rounded-xl outline-none focus:ring-2 focus:ring-green-500 transition-all disabled:opacity-60"
+            className="bg-white border-slate-100 text-[10px] font-bold px-3 py-2 rounded-xl outline-none focus:ring-2 focus:ring-green-500 transition-all"
           >
             {["1° A", "1° B", "1° C", "2° A", "2° B", "2° C", "3° A", "3° B", "4° A", "4° B", "5° A", "5° B"].map(g => (
               <option key={g} value={g}>{g}</option>
@@ -446,7 +446,7 @@ const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion
             value={area} 
             onChange={(e) => setArea(e.target.value)} 
             disabled={esDocente || esEstudiante} 
-            className="bg-green-200/80 text-green-700 border border-green-200 text-[10px] font-bold px-3 py-2 rounded-xl outline-none focus:ring-2 focus:ring-green-500 transition-all disabled:opacity-60"
+            className="bg-green-50 text-green-700 border border-green-200 text-[10px] font-bold px-3 py-2 rounded-xl outline-none focus:ring-2 focus:ring-green-500 transition-all"
           >
             {Object.keys(areasConfig).map(a => (
               <option key={a} value={a}>{a}</option>
@@ -458,13 +458,13 @@ const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion
     {/* SECCIÓN DERECHA: Bimestres y Acciones */}
     <div className="flex flex-wrap items-center gap-3">
       {/* Selector de Bimestres (Scroll horizontal en móvil para evitar saltos de línea) */}
-      <div className="flex bg-gray-100/80 p-1.5 rounded-[1.25rem] overflow-x-auto">
+      <div className="flex bg-gray-50 p-1.5 rounded-[1.25rem] overflow-x-auto">
         {[1, 2, 3, 4].map(n => (
           <button 
             key={n} 
             onClick={() => setBimestre(n)} 
             className={`px-4 py-2 rounded-xl text-[10px] font-black whitespace-nowrap transition-all ${
-              bimestre === n ? 'bg-green-500 text-white shadow-md' : 'text-slate-400 hover:text-slate-600'
+              bimestre === n ? 'bg-green-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-600'
             }`}
           >
             {n}° BIM
@@ -476,7 +476,7 @@ const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion
         {!esEstudiante && ( //Ocultar el botón Excel para estudiantes.
         <button 
           onClick={exportarExcel} 
-          className="bg-green-500 hover:bg-green-600 text-white px-5 py-2.5 rounded-xl text-[10px] font-black flex items-center justify-center gap-2 transition-all active:scale-95 shadow-lg shadow-green-100 flex-1 sm:flex-none">
+          className="bg-green-600 hover:bg-green-600 text-white px-5 py-2.5 rounded-xl text-[10px] font-black flex items-center justify-center gap-2 transition-all active:scale-95 shadow-lg shadow-green-100 flex-1 sm:flex-none">
           <Download className="w-4 h-4" /> 
           <span className="hidden sm:inline">EXCEL</span>
        </button>

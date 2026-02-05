@@ -259,7 +259,7 @@ const AuditoriaPage = () => {
   <div className="hidden md:block overflow-x-auto">
      <table className="w-full text-left border-collapse">
         <thead>
-           <tr className="bg-red-500">
+           <tr className="bg-gray-600">
                  <th className="p-5 text-[10px] font-black text-white text-center uppercase">Fecha y Hora</th>
                  <th className="p-5 text-[10px] font-black text-white text-center uppercase">Responsable</th>
                  <th className="p-5 text-[10px] font-black text-white text-center uppercase">Acción</th>

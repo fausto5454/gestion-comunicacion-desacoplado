@@ -32,6 +32,8 @@ const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion
   const [loading, setLoading] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [conclusiones, setConclusiones] = useState({});
+  const [asistenciaReferencia, setAsistenciaReferencia] = useState({});
+  const [dnis, setDnis] = useState({});
  
   const competencias = areasConfig[area] || [];
   const rolActual = perfilUsuario?.rol_id || session?.user?.user_metadata?.rol_id;
@@ -39,84 +41,87 @@ const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion
   const esDocente = Number(rolActual) === 3;
   const esAdmin = Number(rolActual) === 1;
 
-  const cargarDatos = useCallback(async () => {
-    if (!grado || !area || !bimestre) return;
-    setLoading(true);
-    setNotas({}); 
-    
-    try {
-      const [numGrado, letraSeccion] = grado.split(" ");
-      const { data, error } = await supabase
-        .from('calificaciones')
-        .select('*')
-        .eq('grado', numGrado)
-        .eq('seccion', letraSeccion || "A")
-        .eq('area', area)
-        .eq('bimestre', parseInt(bimestre))
-        .order('nombre_estudiante', { ascending: true });
-
-      if (error) throw error;
-
-      if (data) {
-      if (data.length === 0) {
-      if (esEstudiante) {
-       setAlumnos([perfilUsuario?.nombre_completo || ""]);
-     } else {
-      // IMPORTANTE: Aquí deberías cargar la lista de alumnos matriculados.
-      // Si no tienes esa tabla, al menos inicializa con un mensaje o estructura válida.
-      setAlumnos(Array(38).fill("")); 
-    }
-     setGeneros({});
-     setLoading(false);
-     return;
-    }
-      // CASO B: Sí hay datos en la base de datos
-      const nombresDeBD = data.map(reg => String(reg.nombre_estudiante || "").trim());
+ const cargarDatos = useCallback(async () => {
+  if (!grado || !area || !bimestre) return;
+  setLoading(true);
   
-      if (esEstudiante) {
-         // Para el estudiante, solo cargamos los nombres que vienen de la DB
-        // (El filtro del renderizado se encargará de mostrar solo el suyo)
-               setAlumnos(nombresDeBD);
-        } else {
-       // Para la docente, mantenemos el formato de 38 filas
-            const listaCompleta = [...nombresDeBD];
-            while (listaCompleta.length < 38) listaCompleta.push("");
-               setAlumnos(listaCompleta);
-       }
+  try {
+    // Limpieza agresiva de filtros para evitar fallos de coincidencia
+    const partes = grado.split(" ");
+    const numGrado = partes[0].trim(); // "1°"
+    const letraSeccion = partes[1]?.trim() || "A"; // "A"
 
-        const nuevasNotas = {};
-        const nuevosGeneros = {};
+    console.log("Intentando cargar con:", { numGrado, letraSeccion }); // Debug real
 
-       data.forEach((reg) => {
-       const nombreEst = String(reg.nombre_estudiante || "").trim();
-       const idEst = normalizarID(nombreEst);
-  
-       // Guardamos el Sexo/Género
-       nuevosGeneros[idEst] = reg.genero || ""; 
+    // 1. FUENTE DE VERDAD: Matrículas
+    const { data: matriculados, error: matError } = await supabase
+      .from('matriculas')
+      .select('dni_estudiante, apellido_paterno, apellido_materno, nombres, genero')
+      .ilike('grado', `%${numGrado}%`) // Busqueda flexible para el símbolo °
+      .eq('seccion', letraSeccion)
+      .order('apellido_paterno');
 
-       // Cargamos las notas usando el nombre exacto de columna de Supabase
-       for (let c = 1; c <= 4; c++) {
+    if (matError) throw matError;
+
+    if (!matriculados || matriculados.length === 0) {
+      setAlumnos([]);
+      setMensaje({ texto: `No se hallaron alumnos en ${numGrado} ${letraSeccion}`, tipo: 'error' });
+      return;
+    }
+
+    // Procesar identidades para el frontend
+    const nombresFull = [];
+    const mapaDnis = {};
+    const dniToId = {};
+
+    matriculados.forEach(m => {
+      const nombreCompleto = `${m.apellido_paterno} ${m.apellido_materno}, ${m.nombres}`.toUpperCase();
+      const idEst = normalizarID(nombreCompleto);
+      nombresFull.push(nombreCompleto);
+      mapaDnis[idEst] = m.dni_estudiante;
+      dniToId[m.dni_estudiante] = idEst;
+    });
+
+    setAlumnos(nombresFull);
+    setDnis(mapaDnis);
+
+    // 2. CARGAR NOTAS (califData ahora está dentro del try para evitar ReferenceError)
+    const { data: califData, error: califError } = await supabase
+      .from('calificaciones')
+      .select('*')
+      .eq('grado', numGrado)
+      .eq('seccion', letraSeccion)
+      .eq('area', area)
+      .eq('bimestre', parseInt(bimestre));
+
+    if (califError) throw califError;
+
+    const nuevasNotas = {};
+    califData?.forEach(reg => {
+      const idEst = dniToId[reg.dni_estudiante] || normalizarID(reg.nombre_estudiante);
+      if (idEst) {
+        for (let c = 1; c <= 4; c++) {
           for (let d = 1; d <= 4; d++) {
-            const valor = reg[`c${c}_d${d}`]; // Usa guion bajo: c1_d1
-              if (valor) {
-                // Esta llave debe ser IGUAL a la que usas en el renderizado
-                nuevasNotas[`${idEst}-${c-1}-${d}`] = valor;
-              }
-            }
+            if (reg[`c${c}_d${d}`]) nuevasNotas[`${idEst}-${c-1}-${d}`] = reg[`c${c}_d${d}`];
           }
-        });
-        setNotas(nuevasNotas);
-        setGeneros(nuevosGeneros);
+        }
       }
-    } catch (err) {
-      console.error("Error crítico:", err.message);
-    } finally {
-      setLoading(false);
-    }
-   }, [grado, area, bimestre]);
+    });
 
-  useEffect(() => { cargarDatos(); }, [cargarDatos]);
+    setNotas(nuevasNotas);
+    setMensaje(null);
 
+  } catch (error) {
+    console.error("Fallo de carga:", error.message);
+  } finally {
+    setLoading(false);
+  }
+  }, [grado, area, bimestre]);
+     
+   useEffect(() => {
+     cargarDatos();
+  }, [cargarDatos]);
+  
   const alumnosOrdenados = useMemo(() => {
     return [...alumnos].map((nombre, originalIdx) => ({ nombre, originalIdx }))
       .sort((a, b) => {
@@ -326,74 +331,87 @@ const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion
       XLSX.writeFile(wb, `Registro_Auxiliar_2026.xlsx`);
     };
 
-  const handleGuardarTodo = async () => {
+ const handleGuardarTodo = async () => {
+  if (!grado || !area || !bimestre) return;
   setLoading(true);
+
   try {
     const [numGrado, letraSeccion] = grado.split(" ");
-    
-    const filasParaGuardar = alumnos
-      .filter(nombre => nombre && nombre.trim() !== "")
-      .map(nombre => {
-        const idEst = normalizarID(nombre);
-        const nombreTrim = nombre.trim().toUpperCase();
-        
-        // Creamos el registro incluyendo los promedios que mencionas
-        const reg = {
-          nombre_estudiante: nombreTrim,
-          grado: numGrado,
-          seccion: letraSeccion || "A",
-          area: area,
-          bimestre: parseInt(bimestre),
-          genero: generos[idEst] || "",
-          // Incluimos los promedios por competencia
-          promedio_c1: calcularPromedio(nombre, 0),
-          promedio_c2: calcularPromedio(nombre, 1),
-          promedio_c3: calcularPromedio(nombre, 2),
-          promedio_c4: calcularPromedio(nombre, 3),
-          logro_bimestral: calcularLogroBimestral(nombre),
-          conclusion_descriptiva: conclusiones[idEst] || ""
-        };
+    const seccionFinal = letraSeccion?.trim() || "A";
 
-        // Mapeo de los calificadores individuales (D1, D2, etc.)
-        for (let c = 0; c < 4; c++) {
-          for (let d = 1; d <= 4; d++) {
-            const val = notas[`${idEst}-${c}-${d}`];
-            if (val) reg[`c${c+1}_d${d}`] = val;
-          }
-        }
-        return reg;
+    const batchCalificaciones = [];
+    const batchMatriculas = [];
+    const batchAsistencia = [];
+
+    alumnos.forEach(nombre => {
+      const idEst = normalizarID(nombre);
+      const dni = dnis[idEst];
+      const gen = generos[idEst] || null;
+
+      // 1. Calificaciones (Notas y Promedios)
+      batchCalificaciones.push({
+        dni_estudiante: dni,
+        nombre_estudiante: nombre,
+        grado: numGrado,
+        seccion: seccionFinal,
+        area,
+        bimestre: parseInt(bimestre),
+        genero: gen,
+        promedio_c1: calcularPromedio(nombre, 0),
+        promedio_c2: calcularPromedio(nombre, 1),
+        promedio_c3: calcularPromedio(nombre, 2),
+        promedio_c4: calcularPromedio(nombre, 3),
+        logro_bimestral: calcularLogroBimestral(nombre),
+        ...Object.fromEntries(
+          Array.from({ length: 16 }, (_, i) => {
+            const c = Math.floor(i / 4) + 1;
+            const d = (i % 4) + 1;
+            return [`c${c}_d${d}`, notas[`${idEst}-${c-1}-${d}`] || null];
+          })
+        )
       });
 
-    if (filasParaGuardar.length === 0) {
-      setMensaje({ texto: "SIN DATOS PARA GUARDAR", tipo: 'error' });
-      return;
-    }
+      // 2. Matrícula (Sincronización de Género)
+      batchMatriculas.push({ dni_estudiante: dni, genero: gen, grado: numGrado, seccion: seccionFinal });
 
-    // EJECUCIÓN: Capturamos 'error' para validar el RLS
-    const { error } = await supabase
-      .from('calificaciones')
-      .upsert(filasParaGuardar, { 
-        onConflict: 'nombre_estudiante,grado,seccion,area,bimestre' 
+      // 3. Asistencia (Solo identidad, el estado queda en NULL para llenarse luego)
+      batchAsistencia.push({ 
+        dni_estudiante: dni, 
+        genero: gen, 
+        grado: numGrado, 
+        seccion: seccionFinal,
+        estado: null 
       });
+    });
 
-    if (error) {
-      // Si Supabase devuelve error (por ejemplo, Wendy en otra área)
-      console.error("Error de permisos (RLS):", error.message);
-      setMensaje({ 
-        texto: "ERROR: NO TIENE PERMISO PARA ESTA ÁREA/GRADO", 
-        tipo: 'error' 
-      });
-    } else {
-      // Si no hay error, confirmamos el guardado
-      setMensaje({ texto: "¡DATOS GUARDADOS EN SUPABASE!", tipo: 'success' });
-    }
+    // Envío paralelo de ráfaga de datos
+    const results = await Promise.all([
+      supabase.from('calificaciones').upsert(batchCalificaciones, { onConflict: 'dni_estudiante,grado,seccion,area,bimestre' }),
+      supabase.from('matriculas').upsert(batchMatriculas, { onConflict: 'dni_estudiante' }),
+      supabase.from('asistencia').upsert(batchAsistencia, { onConflict: 'dni_estudiante,grado,seccion' })
+    ]);
 
-  } catch (err) {
-    setMensaje({ texto: "ERROR DE CONEXIÓN", tipo: 'error' });
+    if (results.some(r => r.error)) throw results.find(r => r.error).error;
+
+    // --- ÉXITO: MOSTRAR Y LIMPIAR ---
+    setMensaje({ texto: "¡DATOS Y ESTRUCTURA DE ASISTENCIA SINCRONIZADOS!", tipo: 'success' });
+    setShowConfirm(false);
+
+    // Limpia el mensaje automáticamente después de 3 segundos
+    setTimeout(() => {
+      setMensaje(null);
+    }, 3000);
+
+  } catch (error) {
+    console.error("Fallo de guardado:", error.message);
+    setMensaje({ texto: "Error: " + error.message, tipo: 'error' });
+
+    // Limpia el mensaje de error después de 5 segundos
+    setTimeout(() => {
+      setMensaje(null);
+    }, 5000);
   } finally {
     setLoading(false);
-    setShowConfirm(false);
-    setTimeout(() => setMensaje(null), 4000);
   }
   };
 
@@ -581,8 +599,8 @@ const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion
                             next[originalIdx] = e.target.value;
                             setAlumnos(next);
                           }}
-                          className="w-full h-8 px-2 outline-none font-bold text-slate-700 uppercase bg-transparent"
-                          placeholder="Nombre..."
+                         className="w-full h-8 px-2 outline-none font-bold text-slate-700 uppercase bg-transparent cursor-default"
+                         placeholder="Nombre..."
                         />
                       </td>
                       {competencias.map((_, cIdx) => (

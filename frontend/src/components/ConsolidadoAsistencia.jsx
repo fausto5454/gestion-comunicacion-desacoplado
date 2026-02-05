@@ -272,7 +272,7 @@ const ConsolidadoAsistencia = () => {
     const esFinde = dia.nombre === "Sáb" || dia.nombre === "Dom";
       return (
        <th key={dia.numero} 
-         className={`py-1 border-r border-slate-800 min-w-[50px] md:min-w-[80px] text-center transition-colors
+         className={`py-1 border-r border-slate-800 min-w-[44px] md:min-w-[80px] text-center transition-colors
           ${esFinde ? 'bg-emerald-900' : 'bg-emerald-900'}`}>
           <div className="flex flex-col leading-none">
             <span className={`text-[7px] font-bold uppercase ${esFinde ? 'text-red-500' : 'text-slate-400'}`}>

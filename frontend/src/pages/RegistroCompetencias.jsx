@@ -534,13 +534,13 @@ const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion
         <div className="bg-white border border-slate-200 shadow-2xl rounded-[1.5rem] overflow-hidden">
           {/* Contenedor con scroll horizontal SOLAMENTE */}
           <div className="overflow-x-auto">
-            <table className="w-full border-collapse">
+            <table className="w-max md:w-full border-collapse">
               <thead>
                 <tr className="bg-green-600 text-white text-[9px] uppercase">
                   {/* Celdas STICKY: Se quedan quietas horizontalmente pero se mueven verticalmente con la página */}
-                  <th rowSpan="2" className="p-2.5 w-12 sticky left-0 z-30 bg-green-600 border-r border-b border-green-400">N°</th>
-                  <th rowSpan="2" className="p-1.5 w-12 sticky left-5 z-30 bg-green-600 border-r border-b border-green-400">SEXO</th>
-                  <th rowSpan="2" className="p-4 w-90 sticky left-10 z-30 bg-green-600 border-r border-b border-green-400 text-center">APELLIDOS Y NOMBRES</th>
+                  <th rowSpan="2" className="p-1.5 w-9 sticky left-0 z-30 bg-green-600 border-r border-b border-green-400">N°</th>
+                  <th rowSpan="2" className="p-1 w-7 sticky left-5 z-30 bg-green-600 border-r border-b border-green-400">SEXO</th>
+                  <th rowSpan="2" className="p-2 w-[80px] md:w-[370px] sticky left-10 z-30 bg-green-600 border-r border-b border-green-400 text-center">APELLIDOS Y NOMBRES</th>
                   {/* Clave: Para lograr el ancho equilibrado de Apellidos y nombres se aplicó w-90 y en competencias min-w-[80px] */}
                   {competencias.map((c, i) => (
                     <th key={i} colSpan="5" className="p-2 border-r border-b border-green-500 bg-green-700/30 text-center min-w-[80px]">{c}</th>
@@ -581,7 +581,7 @@ const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion
                       {displayIdx + 1}
                      </td>
                    {/* COLUMNA SEXO - Vinculación corregida */}
-                  <td className="p-0 sticky left-7 z-20 bg-gray-200 border-r border-slate-300 w-10">
+                  <td className="p-0 sticky left-7 z-20 bg-gray-200 border-r border-slate-300 w-8">
                   <select 
                    disabled={esEstudiante}
                    value={generoActual}

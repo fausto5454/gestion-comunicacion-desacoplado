@@ -547,7 +547,7 @@ const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion
       </th>
        {/* APELLIDOS Y NOMBRES - Desplazamiento coordinado */}
         <th rowSpan="2" className="w-[100px] md:w-[300px] sticky left-7 md:left-15 z-40 bg-green-600 border-r border-b border-green-400 text-center px-1 shadow-[3px_0_3px_-2px_rgba(0,0,0,0.3)]">
-         <div className="text-[9px] md:text-[9px] leading-tight whitespace-normal md:whitespace-nowrap flex items-center justify-center h-full">
+         <div className="text-[10px] md:text-[10px] leading-tight whitespace-normal md:whitespace-nowrap flex items-center justify-center h-full">
         APELLIDOS Y NOMBRES
       </div>
     </th>
@@ -560,15 +560,15 @@ const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion
       LOGRO
     </th>
   </tr>
-  <tr className="bg-green-700 text-white text-[9px] text-center uppercase h-6">
+  <tr className="bg-green-700 text-white text-[9px] text-center uppercase h-7">
     {competencias.map((_, i) => (
       <React.Fragment key={i}>
        {/* Columnas D1-D4 más anchas en escritorio */}
-        <th className="w-8 md:w-10 border-r border-green-600/50">D1</th>
-        <th className="w-8 md:w-10 border-r border-green-600/50">D2</th>
-        <th className="w-8 md:w-10 border-r border-green-600/50">D3</th>
-        <th className="w-8 md:w-10 border-r border-green-600/50">D4</th>
-        <th className="w-8 md:w-10 bg-green-500 font-bold border-r border-green-600">PROM</th>
+        <th className="w-8 border-r border-green-600/50">D1</th>
+        <th className="w-8 border-r border-green-600/50">D2</th>
+        <th className="w-8 border-r border-green-600/50">D3</th>
+        <th className="w-8 border-r border-green-600/50">D4</th>
+        <th className="w-8 bg-green-500 font-bold border-r border-green-600">PROM</th>
       </React.Fragment>
     ))}
   </tr>
@@ -619,7 +619,7 @@ const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion
       setAlumnos(next);
       {/* TEX TAREA: interlineado de móviles y centrado vertical de nombres en escritorio */}
      }}
-     className="w-full h-full px-1.5 md:pl-5 md:pr-2 outline-none font-bold text-slate-700 uppercase bg-transparent cursor-text overflow-hidden text-[7.5px] md:text-[9px] leading-[1.4] md:leading-normal whitespace-normal md:whitespace-nowrap flex items-center justify-start">
+     className="w-full h-full px-1.5 md:pl-5 md:pr-2 outline-none font-bold text-slate-700 uppercase bg-transparent cursor-text overflow-hidden text-[8px] md:text-[9px] leading-[1.4] md:leading-normal whitespace-normal md:whitespace-nowrap flex items-center justify-start">
     {nombre || ""}
      </div>
       </td>

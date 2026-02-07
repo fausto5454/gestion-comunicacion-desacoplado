@@ -294,7 +294,7 @@ const ConsolidadoAsistencia = () => {
             <thead>
               <tr className="bg-slate-900 text-white">
                 <th className="sticky left-0 top-0 z-50 w-[40px] md:w-[40px] bg-emerald-700 py-3 text-[10px] md:text-[11px] font-black border-r border-emerald-800 text-center uppercase tracking-wider">N°</th>
-                <th className="bg-slate-900 py-3 px-2 md:pl-10 text-left border-r border-slate-800 w-[120px] md:w-[250px] text-[8px] md:text-[11px] font-black uppercase tracking-wider">Apellidos y Nombres</th>
+                <th className="bg-slate-900 py-3 px-2 md:pl-10 text-center border-r border-slate-800 w-[120px] md:w-[250px] text-[8px] md:text-[11px] font-black uppercase tracking-wider">Apellidos y Nombres</th>
                 {diasDelMes.map(dia => {
                   const esFinde = dia.nombre === "Sáb" || dia.nombre === "Dom";
                   return (

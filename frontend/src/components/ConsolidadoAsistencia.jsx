@@ -54,36 +54,53 @@ const ConsolidadoAsistencia = () => {
   }, [seleccion.mes]);
 
   // ✅ Mejora 2: Carga de datos real desde Supabase (Filtro por Grado/Sección/Mes)
-  const cargarDatos = async () => {
+ const cargarDatos = async () => {
     setLoading(true);
     try {
-      // Cargar Nómina
-      const { data: nomina } = await supabase
+      // 1. Formatear el grado para que coincida con la DB (ej: "1°")
+      const gradoFormateado = seleccion.grado.includes('°') ? seleccion.grado : `${seleccion.grado}°`;
+      
+      // 2. Definir rango de fechas para el mes
+      const anio = 2026;
+      const mesFmt = seleccion.mes.toString().padStart(2, '0');
+      const primerDia = `${anio}-${mesFmt}-01`;
+      const ultimoDia = `${anio}-${mesFmt}-${new Date(anio, seleccion.mes, 0).getDate()}`;
+
+      // 3. Cargar Nómina
+      const { data: nomina, error: errorNomina } = await supabase
         .from('matriculas')
         .select('id_matricula, apellido_paterno, apellido_materno, nombres')
-        .eq('grado', seleccion.grado)
+        .eq('grado', gradoFormateado) // Filtro corregido
         .eq('seccion', seleccion.seccion)
+        .eq('anio_lectivo', 2026)
         .order('apellido_paterno');
 
+      if (errorNomina) throw errorNomina;
       setEstudiantes(nomina || []);
 
-      // Cargar Asistencias
-      const mesFmt = seleccion.mes.toString().padStart(2, '0');
-      const { data: asistencias } = await supabase
+      // 4. Cargar Asistencias
+      const { data: asistencias, error: errorAsistencia } = await supabase
         .from('asistencia')
         .select('id_estudiante, fecha, estado')
-        .gte('fecha', `2026-${mesFmt}-01`)
-        .lte('fecha', `2026-${mesFmt}-31`);
+        .eq('observaciones', seleccion.area)
+        .gte('fecha', primerDia)
+        .lte('fecha', ultimoDia);
+
+      if (errorAsistencia) throw errorAsistencia;
 
       const mapa = {};
       asistencias?.forEach(a => {
-        const dia = new Date(a.fecha + 'T12:00:00').getDate();
+        // Usamos split para evitar problemas de zona horaria con el objeto Date
+        const dia = parseInt(a.fecha.split('-')[2]); 
         if (!mapa[a.id_estudiante]) mapa[a.id_estudiante] = {};
-        mapa[a.id_estudiante][dia] = a.estado[0];
+        // Guardamos la inicial (P, A, T, J)
+        mapa[a.id_estudiante][dia] = a.estado[0].toUpperCase();
       });
       setDatos(mapa);
+
     } catch (error) {
-      toast.error("Error al cargar datos");
+      console.error("Error detallado:", error);
+      toast.error("Error al cargar los datos del consolidado");
     } finally {
       setLoading(false);
     }

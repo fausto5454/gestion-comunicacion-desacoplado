@@ -42,11 +42,14 @@ const AsistenciaAlumnos = ({ }) => {
     try {
       const idsMatricula = nomina.map(n => n.id_matricula);
       const { data, error } = await supabase
-        .from('asistencia')
-        .select('id_estudiante, estado')
-        .eq('fecha', fecha)
-        .eq('area', areaSeleccionada)
-        .in('id_estudiante', idsMatricula);
+          .from('matriculas')
+          .select('id_matricula, apellido_paterno, apellido_materno, nombres')
+          // IMPORTANTE: Concatenamos el símbolo ° para que coincida con la DB
+          .eq('grado', `${grado}${grado.includes('°') ? '' : '°'}`) 
+          .eq('seccion', seccion.trim())
+          .eq('anio_lectivo', 2026)
+          .eq('estado_estudiante', 'Activo')
+          .order('apellido_paterno', { ascending: true });
 
       if (error) throw error;
       if (data && data.length > 0) {
@@ -64,24 +67,34 @@ const AsistenciaAlumnos = ({ }) => {
  const fetchNomina = async () => {
     setLoading(true);
     try {
+      // Definimos el formato exacto del grado tal como está en Supabase (ej: "1°")
+      const gradoFormateado = grado.includes('°') ? grado : `${grado}°`;
+
       const { data, error } = await supabase
         .from('matriculas')
-        .select('*')
-        .eq('grado', parseInt(grado)) // Uso del estado local
-        .eq('seccion', seccion.trim()) // Uso del estado local
+        .select('id_matricula, apellido_paterno, apellido_materno, nombres, genero, grado, seccion')
+        .eq('grado', gradoFormateado) // Filtro corregido para buscar "1°" en lugar de 1
+        .eq('seccion', seccion.trim())
         .eq('anio_lectivo', 2026)
         .eq('estado_estudiante', 'Activo')
-        .order('apellido_paterno', { ascending: true });
+        .order('apellido_paterno', { ascending: true })
+        .order('apellido_materno', { ascending: true })
+        .order('nombres', { ascending: true });
 
       if (error) throw error;
+      
       if (data) {
         setEstudiantes(data);
+        // Inicializamos el estado de asistencia para los nuevos alumnos cargados
         const init = {};
         data.forEach(est => init[est.id_matricula] = 'Presente');
+        
+        // Buscamos si ya existe asistencia guardada para esta fecha/área
         await fetchAsistenciaExistente(data, init);
       }
     } catch (err) {
-      toast.error("Error al cargar nómina");
+      console.error("Error en nomina:", err);
+      toast.error("Error al cargar la lista de estudiantes");
     } finally {
       setLoading(false);
     }

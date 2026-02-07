@@ -16,7 +16,6 @@ const areasConfig = {
     "INGLÉS": ["SE COMUNICA ORALMENTE", "LEE TEXTOS ESCRITOS", "ESCRIBE TEXTOS"]
   };
 
-
 const escala = { "AD": 4, "A": 3, "B": 2, "C": 1, "": 0 };
 const inversa = { 4: "AD", 3: "A", 2: "B", 1: "C", 0: "-" };
 const normalizarID = (t) => t ? String(t).trim().toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") : "";
@@ -63,11 +62,14 @@ const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion
 
     if (matError) throw matError;
 
-    if (!matriculados || matriculados.length === 0) {
-      setAlumnos([]);
-      setMensaje({ texto: `No se hallaron alumnos en ${numGrado} ${letraSeccion}`, tipo: 'error' });
-      return;
-    }
+    if (matriculados) {
+       const mapaGeneros = {};
+       matriculados.forEach(est => {
+       const nombreCompleto = `${est.apellido_paterno} ${est.apellido_materno}, ${est.nombres}`.toUpperCase().trim();
+       mapaGeneros[nombreCompleto] = est.genero;
+       });
+      setGeneros(mapaGeneros);
+     }
 
     // Procesar identidades para el frontend
     const nombresFull = [];
@@ -178,7 +180,7 @@ const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion
           fill: { fgColor: { rgb: "00A859" } }, 
           alignment: { horizontal: "center", vertical: "center", wrapText: true } 
       };
-  
+
       // Estilo Naranja Logro Final (Corregido para una sola celda)
       const estiloNaranjaLogro = { 
           ...estiloBase, 
@@ -199,7 +201,7 @@ const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion
       const colLogroIdx = 3 + (competencias.length * 5); 
   
       // FILA 1: TÍTULO PRINCIPAL
-      rows.push([{ v: "REGISTRO AUXILIAR 2026", s: { font: { bold: true, sz: 12 }, alignment: { horizontal: "center" } } }]);
+      rows.push([{ v: "REGISTRO AUXILIAR 2026", s: { font: { bold: true, sz: 14 }, alignment: { horizontal: "center" } } }]);
   
       // FILA 2: CABECERA DE INFORMACIÓN (Ajustada para máxima visibilidad)
        const filaInfo = Array(colLogroIdx + 6).fill({ v: "", s: {} });
@@ -217,6 +219,7 @@ const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion
           { v: "SEXO", s: estiloVerdeOscuro }, 
           { v: "APELLIDOS Y NOMBRES", s: estiloVerdeOscuro }
       ];
+      
       competencias.forEach(c => {
           h1.push({ v: c.toUpperCase(), s: estiloVerdeOscuro }, "", "", "", "");
       });
@@ -260,10 +263,10 @@ const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion
           // Resumen Estadístico Lateral
           if (idx < 4) {
           const item = [
-              { n: "DESTACADO", k: "AD", c: "4ADE80" },
+              { n: "DESTACADO", k: "AD", c: "00CC00" },
               { n: "LOGRADO", k: "A", c: "2563EB" },
-              { n: "EN PROCESO", k: "B", c: "FDE047" },
-              { n: "EN INICIO", k: "C", c: "EF4444" }
+              { n: "EN PROCESO", k: "B", c: "FFFF00" },
+              { n: "EN INICIO", k: "C", c: "FF0000" }
           ][idx];
           
           row.push(
@@ -318,16 +321,27 @@ const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion
       ws['!cols'] = [
           { wch: 4 }, { wch: 6 }, { wch: 40 }, // Datos personales
           ...Array(competencias.length * 5).fill({ wch: 4.2 }), // D1 a PROM
-          { wch: 6 },    // LOGRO FINAL (Estrecho similar a PROM)
+          { wch: 5 },    // LOGRO FINAL (Estrecho similar a PROM)
           { wch: 2 },    // Separador
           { wch: 15 },   // NIVELES (Resumen)
-          { wch: 6 },    // NOTAS (Resumen)
-          { wch: 6 },    // CANT. (Resumen)
-          { wch: 6 }     // % (Resumen)
+          { wch: 4 },    // NOTAS (Resumen)
+          { wch: 4 },    // CANT. (Resumen)
+          { wch: 4 }     // % (Resumen)
       ];
-  
+
+      if (!ws["!cols"]) ws["!cols"] = [];
+      // N°
+      ws["!cols"][0] = { wch: 4 };
+      // SEXO
+      ws["!cols"][1] = { wch: 4 };
+      // APELLIDOS Y NOMBRES
+      ws["!cols"][2] = { wch: 32 };
+
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "REGISTRO");
+      ws['!rows'] = [];
+      ws['!rows'][3] = { hpt: 28 }; // A4 → altura ideal para títulos largos
+      ws['!rows'][4] = { hpt: 22 }; // A5 → subencabezados
       XLSX.writeFile(wb, `Registro_Auxiliar_2026.xlsx`);
     };
 
@@ -343,15 +357,19 @@ const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion
     const batchMatriculas = [];
     const batchAsistencia = [];
 
-    alumnos.forEach(nombre => {
-      const idEst = normalizarID(nombre);
+    alumnos.forEach((nombre) => {
+      // 1. NORMALIZACIÓN CRÍTICA: Aseguramos que la llave coincida con el estado 'generos'
+      const nombreLimpio = (nombre || "").toUpperCase().trim();
+      const idEst = normalizarID(nombreLimpio);
+      
       const dni = dnis[idEst];
-      const gen = generos[idEst] || null;
+      // Buscamos el género con el nombre limpio para que no falle el registro
+      const gen = generos[nombreLimpio] || null; 
 
-      // 1. Calificaciones (Notas y Promedios)
+      // 2. Calificaciones (Notas y Promedios)
       batchCalificaciones.push({
         dni_estudiante: dni,
-        nombre_estudiante: nombre,
+        nombre_estudiante: nombreLimpio, // Guardamos el nombre limpio
         grado: numGrado,
         seccion: seccionFinal,
         area,
@@ -366,54 +384,56 @@ const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion
           Array.from({ length: 16 }, (_, i) => {
             const c = Math.floor(i / 4) + 1;
             const d = (i % 4) + 1;
-            return [`c${c}_d${d}`, notas[`${idEst}-${c-1}-${d}`] || null];
+            // Usamos idEst (que es normalizarID) para buscar la nota en el estado
+            return [`c${c}_d${d}`, notas[`${idEst}-${c - 1}-${d}`] || null];
           })
         )
       });
 
-      // 2. Matrícula (Sincronización de Género)
-      batchMatriculas.push({ dni_estudiante: dni, genero: gen, grado: numGrado, seccion: seccionFinal });
+      // 3. Matrícula (Sincronización de Género en la tabla base)
+      if (dni) {
+        batchMatriculas.push({ 
+          dni_estudiante: dni, 
+          genero: gen, 
+          grado: numGrado, 
+          seccion: seccionFinal 
+        });
 
-      // 3. Asistencia (Solo identidad, el estado queda en NULL para llenarse luego)
-      batchAsistencia.push({ 
-        dni_estudiante: dni, 
-        genero: gen, 
-        grado: numGrado, 
-        seccion: seccionFinal,
-        estado: null 
-      });
+        // 4. Asistencia (Actualizamos identidad y género para que aparezca en el otro módulo)
+        batchAsistencia.push({ 
+          dni_estudiante: dni, 
+          genero: gen, 
+          grado: numGrado, 
+          seccion: seccionFinal,
+          // Mantenemos estado null para no sobrescribir asistencias ya marcadas si se usa upsert
+        });
+      }
     });
 
-    // Envío paralelo de ráfaga de datos
+    // Envío paralelo optimizado
     const results = await Promise.all([
       supabase.from('calificaciones').upsert(batchCalificaciones, { onConflict: 'dni_estudiante,grado,seccion,area,bimestre' }),
       supabase.from('matriculas').upsert(batchMatriculas, { onConflict: 'dni_estudiante' }),
       supabase.from('asistencia').upsert(batchAsistencia, { onConflict: 'dni_estudiante,grado,seccion' })
     ]);
 
-    if (results.some(r => r.error)) throw results.find(r => r.error).error;
+    // Verificación de errores en la ráfaga
+    const errorResult = results.find(r => r.error);
+    if (errorResult) throw errorResult.error;
 
-    // --- ÉXITO: MOSTRAR Y LIMPIAR ---
-    setMensaje({ texto: "¡DATOS Y ESTRUCTURA DE ASISTENCIA SINCRONIZADOS!", tipo: 'success' });
+    setMensaje({ texto: "¡REGISTRO ACTUALIZADO: NOTAS, SEXO Y ASISTENCIA SINCRONIZADOS!", tipo: 'success' });
     setShowConfirm(false);
-
-    // Limpia el mensaje automáticamente después de 3 segundos
-    setTimeout(() => {
-      setMensaje(null);
-    }, 3000);
+    
+    setTimeout(() => setMensaje(null), 3000);
 
   } catch (error) {
     console.error("Fallo de guardado:", error.message);
-    setMensaje({ texto: "Error: " + error.message, tipo: 'error' });
-
-    // Limpia el mensaje de error después de 5 segundos
-    setTimeout(() => {
-      setMensaje(null);
-    }, 5000);
+    setMensaje({ texto: "Error al guardar: " + error.message, tipo: 'error' });
+    setTimeout(() => setMensaje(null), 5000);
   } finally {
     setLoading(false);
   }
-  };
+ };
 
   const getColorNota = (nota) => {
     if (nota === 'C') return 'text-red-600';
@@ -428,11 +448,10 @@ const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion
       {mensaje && (
         <div className="fixed top-6 right-6 z-[100] bg-slate-900 text-white px-8 py-4 rounded-2xl shadow-2xl flex items-center gap-3">
           <CheckCircle2 className="w-5 h-5 text-green-400" />
-          <span className="text-[10px] font-black uppercase tracking-widest">{mensaje.texto}</span>
-        </div>
-      )}
-
-      {/* HEADER */}
+           <span className="text-[10px] font-black uppercase tracking-widest">{mensaje.texto}</span>
+           </div>
+          )}
+        {/* HEADER */}
       <div className="bg-emerald-400 border-b border-emerald-600 rounded-b-[2.5rem] p-4 md:p-6 shadow-sm z-40">
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
      {/* SECCIÓN IZQUIERDA: Ícono, Título y Selectores */}
@@ -441,31 +460,26 @@ const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion
       <div className="bg-green-600 p-3.5 rounded-[1.5rem] text-white shadow-lg shadow-green-100 flex-shrink-0">
         <FileSpreadsheet className="w-7 h-7" />
         </div>
-
         <div className="flex flex-col gap-2">
         <h1 className="text-2xl md:text-3xl font-black text-slate-800 tracking-tighter leading-none">
           Registro 2026
         </h1>
-        
         {/* Selectores con mejor espaciado y responsividad */}
         <div className="flex flex-wrap gap-2">
           <select 
             value={grado} 
             onChange={(e) => setGrado(e.target.value)} 
             disabled={esDocente || esEstudiante} 
-            className="bg-white border-slate-100 text-[10px] font-bold px-3 py-2 rounded-xl outline-none focus:ring-2 focus:ring-green-500 transition-all"
-          >
+            className="bg-white border-slate-100 text-[10px] font-bold px-3 py-2 rounded-xl outline-none focus:ring-2 focus:ring-green-500 transition-all">
             {["1° A", "1° B", "1° C", "2° A", "2° B", "2° C", "3° A", "3° B", "4° A", "4° B", "5° A", "5° B"].map(g => (
               <option key={g} value={g}>{g}</option>
             ))}
           </select>
-
           <select 
             value={area} 
             onChange={(e) => setArea(e.target.value)} 
             disabled={esDocente || esEstudiante} 
-            className="bg-green-50 text-green-700 border border-green-200 text-[10px] font-bold px-3 py-2 rounded-xl outline-none focus:ring-2 focus:ring-green-500 transition-all"
-          >
+            className="bg-green-50 text-green-700 border border-green-200 text-[10px] font-bold px-3 py-2 rounded-xl outline-none focus:ring-2 focus:ring-green-500 transition-all">
             {Object.keys(areasConfig).map(a => (
               <option key={a} value={a}>{a}</option>
             ))}
@@ -483,8 +497,7 @@ const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion
             onClick={() => setBimestre(n)} 
             className={`px-4 py-2 rounded-xl text-[10px] font-black whitespace-nowrap transition-all ${
               bimestre === n ? 'bg-green-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-600'
-            }`}
-          >
+            }`}>
             {n}° BIM
           </button>
         ))}
@@ -503,8 +516,7 @@ const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion
           <button 
             onClick={() => setShowConfirm(true)} 
             disabled={loading} 
-            className="bg-slate-900 hover:bg-slate-800 text-white px-7 py-4 rounded-xl text-[10px] font-black flex items-center justify-center gap-2 transition-all active:scale-95 shadow-xl shadow-slate-200 disabled:bg-slate-400 flex-1 sm:flex-none"
-          >
+            className="bg-slate-900 hover:bg-slate-800 text-white px-7 py-4 rounded-xl text-[10px] font-black flex items-center justify-center gap-2 transition-all active:scale-95 shadow-xl shadow-slate-200 disabled:bg-slate-400 flex-1 sm:flex-none">
             {loading ? (
             <Loader2 className="w-4 h-4 animate-spin" />
             ) : (
@@ -527,13 +539,12 @@ const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion
                 <tr className="bg-green-600 text-white text-[9px] uppercase">
                   {/* Celdas STICKY: Se quedan quietas horizontalmente pero se mueven verticalmente con la página */}
                   <th rowSpan="2" className="p-2.5 w-12 sticky left-0 z-30 bg-green-600 border-r border-b border-green-400">N°</th>
-                  <th rowSpan="2" className="p-2.5 w-12 sticky left-5 z-30 bg-green-600 border-r border-b border-green-400">SEXO</th>
-                  <th rowSpan="2" className="p-4 w-64 sticky left-10 z-30 bg-green-600 border-r border-b border-green-400 text-center">APELLIDOS Y NOMBRES</th>
-                  
+                  <th rowSpan="2" className="p-1.5 w-12 sticky left-5 z-30 bg-green-600 border-r border-b border-green-400">SEXO</th>
+                  <th rowSpan="2" className="p-4 w-90 sticky left-10 z-30 bg-green-600 border-r border-b border-green-400 text-center">APELLIDOS Y NOMBRES</th>
+                  {/* Clave: Para lograr el ancho equilibrado de Apellidos y nombres se aplicó w-90 y en competencias min-w-[80px] */}
                   {competencias.map((c, i) => (
-                    <th key={i} colSpan="5" className="p-2 border-r border-b border-green-500 bg-green-700/30 text-center min-w-[140px]">{c}</th>
+                    <th key={i} colSpan="5" className="p-2 border-r border-b border-green-500 bg-green-700/30 text-center min-w-[80px]">{c}</th>
                   ))}
-                  
                   <th rowSpan="2" className="p-0.5 w-12 sticky right-0 z-30 bg-yellow-400 text-slate-800 font-black border-l border-b border-yellow-500">LOGRO</th>
                 </tr>
                 <tr className="bg-green-700 text-white text-[8px] text-center uppercase">
@@ -548,45 +559,41 @@ const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion
                   ))}
                 </tr>
               </thead>
-              <tbody className={`text-[10px] ${perfilUsuario?.rol_id === 6 ? 'pointer-events-none' : ''}`}>
-              {alumnosOrdenados
-              .filter(({ nombre }) => {
-               const rolUsuario = perfilUsuario?.rol_id;
-                const esDocente = rolUsuario === 3; // Wendy
-                 const esAdmin = rolUsuario === 1;
-
-                 // Si es Admin o Docente, ve a todos los estudiantes
-                   if (esDocente || esAdmin) return true;
-
-                    // Lógica de privacidad para Estudiantes:
-                    // Solo ve la fila si su nombre coincide con el del perfil
-                     const idFila = normalizarID(nombre);
-                      const idUsuario = normalizarID(perfilUsuario?.nombre_completo);
-      
-                       return idFila.includes(idUsuario) || idUsuario.includes(idFila);
-                        })
-                        .map(({ nombre, originalIdx }, displayIdx) => {
-                         // Si el nombre no existe, ponemos un genérico (excepto si es estudiante con restricciones)
-                          const nombreFinal = nombre || (perfilUsuario?.rol_id !== 6 ? `ESTUDIANTE ${displayIdx + 1}` : "");
-      
-                          // Mantenemos tus constantes por si las usas en las celdas de abajo
-                           const idUnico = normalizarID(nombreFinal);
-                           const esWendy = perfilUsuario?.rol_id === 3;
-
-                            return (
-                            <tr key={originalIdx} className="border-b border-slate-200 hover:bg-green-50/50 h-10">
-                            {/* NÚMERO DE ORDEN - Fijo a la izquierda */}
-                            <td className="text-center sticky left-0 z-20 bg-green-200 font-bold border-r border-slate-300 text-gray-600 w-7">
-                            {displayIdx + 1}</td>
-                             <td className="p-0 sticky left-7 z-20 bg-white border-r border-slate-300">
-                             <select 
-                             disabled={esEstudiante}
-                             value={generos[idUnico] || ""}
-                             onChange={(e) => setGeneros(prev => ({ ...prev, [idUnico]: e.target.value }))}
-                             className="w-full h-10 text-center font-bold outline-none bg-gray-200 appearance-none text-blue-700"
-                            >
-                          <option value="">-</option><option value="M">M</option><option value="H">H</option>
-                        </select>
+             <tbody className={`text-[10px] ${perfilUsuario?.rol_id === 6 ? 'pointer-events-none' : ''}`}>
+            {alumnosOrdenados
+            .filter(({ nombre }) => {
+             const rolUsuario = perfilUsuario?.rol_id;
+              if (rolUsuario === 1 || rolUsuario === 3) return true;
+                const idFila = normalizarID(nombre);
+                 const idUsuario = normalizarID(perfilUsuario?.nombre_completo);
+                  return idFila.includes(idUsuario) || idUsuario.includes(idFila);
+                  })
+                  .map(({ nombre, originalIdx }, displayIdx) => {
+                   // 1. Normalización estricta para asegurar el 'match' con Supabase
+                   const nombreEst = (nombre || "").toUpperCase().trim();
+                    const idUnico = normalizarID(nombreEst);
+                     // 2. Recuperamos el género usando el nombre normalizado
+                      const generoActual = generos[nombreEst] || "";
+                        return (
+                         <tr key={originalIdx} className="border-b border-slate-200 hover:bg-green-50/50 h-10">
+                         {/* NÚMERO DE ORDEN - Fijo a la izquierda */}
+                        <td className="text-center sticky left-0 z-20 bg-green-200 font-bold border-r border-slate-300 text-gray-600 w-7">
+                      {displayIdx + 1}
+                     </td>
+                   {/* COLUMNA SEXO - Vinculación corregida */}
+                  <td className="p-0 sticky left-7 z-20 bg-gray-200 border-r border-slate-300 w-10">
+                  <select 
+                   disabled={esEstudiante}
+                   value={generoActual}
+                   onChange={(e) => setGeneros(prev => ({ ...prev, [nombreEst]: e.target.value }))}
+                    className={`w-full h-10 text-center font-bold outline-none appearance-none bg-transparent ${
+                       generoActual === 'H' ? 'text-blue-600' : 
+                       generoActual === 'M' ? 'text-pink-500' : 'text-gray-400'
+                        }`}>
+                        <option value="">-</option>
+                        <option value="M">M</option>
+                        <option value="H">H</option>
+                         </select>
                       </td>
                       <td className="p-0 sticky left-10 z-20 bg-white border-r-1 border-slate-200">
                         <input
@@ -600,8 +607,7 @@ const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion
                             setAlumnos(next);
                           }}
                          className="w-full h-8 px-2 outline-none font-bold text-slate-700 uppercase bg-transparent cursor-default"
-                         placeholder="Nombre..."
-                        />
+                         placeholder="Nombre..."/>
                       </td>
                       {competencias.map((_, cIdx) => (
                         <React.Fragment key={cIdx}>
@@ -611,18 +617,17 @@ const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion
                                disabled={esEstudiante}
                                 value={notas[`${idUnico}-${cIdx}-${dIdx}`] || ""}
                                 onChange={(e) => setNotas(prev => ({ ...prev, [`${idUnico}-${cIdx}-${dIdx}`]: e.target.value }))}
-                                className={`w-full h-10 text-center font-bold outline-none appearance-none bg-green-50/50 ${getColorNota(notas[`${idUnico}-${cIdx}-${dIdx}`])}`}
-                              >
-                                <option value="">-</option><option value="AD">AD</option><option value="A">A</option><option value="B">B</option><option value="C">C</option>
-                              </select>
-                            </td>
-                          ))}
-                          <td className={`text-center font-black bg-green-100 border-r border-slate-200 ${getColorNota(calcularPromedio(nombre, cIdx))}`}>
-                            {calcularPromedio(nombre, cIdx)}
-                          </td>
-                        </React.Fragment>
-                      ))}
-                      <td className={`text-center font-black bg-yellow-200 sticky right-0 z-20 border-l border-yellow-200 ${getColorNota(calcularLogroBimestral(nombre))}`}>
+                                className={`w-full h-10 text-center font-bold outline-none appearance-none bg-green-50/50 ${getColorNota(notas[`${idUnico}-${cIdx}-${dIdx}`])}`}>
+                            <option value="">-</option><option value="AD">AD</option><option value="A">A</option><option value="B">B</option><option value="C">C</option>
+                        </select>
+                     </td>
+                    ))}
+                    <td className={`text-center font-black bg-green-100 border-r border-slate-200 ${getColorNota(calcularPromedio(nombre, cIdx))}`}>
+                      {calcularPromedio(nombre, cIdx)}
+                      </td>
+                      </React.Fragment>
+                        ))}
+                        <td className={`text-center font-black bg-yellow-200 sticky right-0 z-20 border-l border-yellow-200 ${getColorNota(calcularLogroBimestral(nombre))}`}>
                         {calcularLogroBimestral(nombre)}
                       </td>
                     </tr>
@@ -633,7 +638,6 @@ const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion
           </div>
         </div>
       </div>
-
       {/* MODAL CONFIRMACIÓN */}
       {showConfirm && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-800 backdrop-blur-sm">

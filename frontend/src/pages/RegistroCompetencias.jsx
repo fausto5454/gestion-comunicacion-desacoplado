@@ -530,110 +530,128 @@ const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion
      </div>
     </div>
       {/* TABLA: SOLUCIÓN AL DESPLAZAMIENTO */}
-      <div className="p-6 flex-1">
+      <div className="p-4 flex-1">
         <div className="bg-white border border-slate-200 shadow-2xl rounded-[1.5rem] overflow-hidden">
           {/* Contenedor con scroll horizontal SOLAMENTE */}
-          <div className="overflow-x-auto">
-            <table className="w-max md:w-full border-collapse">
-              <thead>
-                <tr className="bg-green-600 text-white text-[9px] uppercase">
-                  {/* Celdas STICKY: Se quedan quietas horizontalmente pero se mueven verticalmente con la página */}
-                  <th rowSpan="2" className="p-1.5 w-9 sticky left-0 z-30 bg-green-600 border-r border-b border-green-400">N°</th>
-                  <th rowSpan="2" className="p-1 w-7 sticky left-5 z-30 bg-green-600 border-r border-b border-green-400">SEXO</th>
-                  <th rowSpan="2" className="p-2 w-[80px] md:w-[370px] sticky left-10 z-30 bg-green-600 border-r border-b border-green-400 text-center">APELLIDOS Y NOMBRES</th>
-                  {/* Clave: Para lograr el ancho equilibrado de Apellidos y nombres se aplicó w-90 y en competencias min-w-[80px] */}
-                  {competencias.map((c, i) => (
-                    <th key={i} colSpan="5" className="p-2 border-r border-b border-green-500 bg-green-700/30 text-center min-w-[80px]">{c}</th>
-                  ))}
-                  <th rowSpan="2" className="p-0.5 w-12 sticky right-0 z-30 bg-yellow-400 text-slate-800 font-black border-l border-b border-yellow-500">LOGRO</th>
-                </tr>
-                <tr className="bg-green-700 text-white text-[8px] text-center uppercase">
-                  {competencias.map((_, i) => (
-                    <React.Fragment key={i}>
-                      <th className="w-8 border-r border-green-600/50 py-1">D1</th>
-                      <th className="w-8 border-r border-green-600/50 py-1">D2</th>
-                      <th className="w-8 border-r border-green-600/50 py-1">D3</th>
-                      <th className="w-8 border-r border-green-600/50 py-1">D4</th>
-                      <th className="w-8 bg-green-500 font-bold border-r border-green-600">PROM</th>
-                    </React.Fragment>
-                  ))}
-                </tr>
-              </thead>
-             <tbody className={`text-[10px] ${perfilUsuario?.rol_id === 6 ? 'pointer-events-none' : ''}`}>
-            {alumnosOrdenados
-            .filter(({ nombre }) => {
-             const rolUsuario = perfilUsuario?.rol_id;
-              if (rolUsuario === 1 || rolUsuario === 3) return true;
-                const idFila = normalizarID(nombre);
-                 const idUsuario = normalizarID(perfilUsuario?.nombre_completo);
-                  return idFila.includes(idUsuario) || idUsuario.includes(idFila);
-                  })
-                  .map(({ nombre, originalIdx }, displayIdx) => {
-                   // 1. Normalización estricta para asegurar el 'match' con Supabase
-                   const nombreEst = (nombre || "").toUpperCase().trim();
-                    const idUnico = normalizarID(nombreEst);
-                     // 2. Recuperamos el género usando el nombre normalizado
-                      const generoActual = generos[nombreEst] || "";
-                        return (
-                         <tr key={originalIdx} className="border-b border-slate-200 hover:bg-green-50/50 h-10">
-                         {/* NÚMERO DE ORDEN - Fijo a la izquierda */}
-                        <td className="text-center sticky left-0 z-20 bg-green-200 font-bold border-r border-slate-300 text-gray-600 w-7">
-                      {displayIdx + 1}
-                     </td>
-                   {/* COLUMNA SEXO - Vinculación corregida */}
-                  <td className="p-0 sticky left-7 z-20 bg-gray-200 border-r border-slate-300 w-8">
-                  <select 
-                   disabled={esEstudiante}
-                   value={generoActual}
-                   onChange={(e) => setGeneros(prev => ({ ...prev, [nombreEst]: e.target.value }))}
-                    className={`w-full h-10 text-center font-bold outline-none appearance-none bg-transparent ${
-                       generoActual === 'H' ? 'text-blue-600' : 
-                       generoActual === 'M' ? 'text-pink-500' : 'text-gray-400'
-                        }`}>
-                        <option value="">-</option>
-                        <option value="M">M</option>
-                        <option value="H">H</option>
-                         </select>
-                      </td>
-                      <td className="p-0 sticky left-10 z-20 bg-white border-r-1 border-slate-200">
-                        <input
-                          type="text" 
-                           readOnly={esEstudiante} //El estudiante no puede editar su nombre.
-                            value={nombre || ""}
-                            onChange={(e) => {
-                            if (esEstudiante) return;
-                            const next = [...alumnos];
-                            next[originalIdx] = e.target.value;
-                            setAlumnos(next);
-                          }}
-                         className="w-full h-8 px-2 outline-none font-bold text-slate-700 uppercase bg-transparent cursor-default"
-                         placeholder="Nombre..."/>
-                      </td>
-                      {competencias.map((_, cIdx) => (
-                        <React.Fragment key={cIdx}>
-                          {[1, 2, 3, 4].map(dIdx => (
-                            <td key={dIdx} className="p-0 border-r border-slate-200">
-                              <select 
-                               disabled={esEstudiante}
-                                value={notas[`${idUnico}-${cIdx}-${dIdx}`] || ""}
-                                onChange={(e) => setNotas(prev => ({ ...prev, [`${idUnico}-${cIdx}-${dIdx}`]: e.target.value }))}
-                                className={`w-full h-10 text-center font-bold outline-none appearance-none bg-green-50/50 ${getColorNota(notas[`${idUnico}-${cIdx}-${dIdx}`])}`}>
-                            <option value="">-</option><option value="AD">AD</option><option value="A">A</option><option value="B">B</option><option value="C">C</option>
-                        </select>
-                     </td>
-                    ))}
-                    <td className={`text-center font-black bg-green-100 border-r border-slate-200 ${getColorNota(calcularPromedio(nombre, cIdx))}`}>
-                      {calcularPromedio(nombre, cIdx)}
-                      </td>
-                      </React.Fragment>
-                        ))}
-                        <td className={`text-center font-black bg-yellow-200 sticky right-0 z-20 border-l border-yellow-200 ${getColorNota(calcularLogroBimestral(nombre))}`}>
-                        {calcularLogroBimestral(nombre)}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
+          <div className="overflow-x-auto custom-scrollbar shadow-xl rounded-lg">
+            <table className="w-max md:w-full border-collapse table-auto">
+            <thead>
+           <tr className="bg-green-600 text-white text-[9px] uppercase font-bold h-10">
+         {/* N° - Ancho fijo w-7 coincide con left-7 de los nombres */}
+       <th rowSpan="2" className="p-1 w-10 sticky left-0 z-50 bg-green-600 border-r border-b border-green-400 text-center">
+      N°
+    </th>
+    {/* SEXO - Solo escritorio */}
+    <th rowSpan="2" className="hidden md:table-cell p-1 w-8 sticky left-7 z-50 bg-green-600 border-r border-b border-green-400 text-center">
+     SEXO
+      </th>
+       {/* APELLIDOS Y NOMBRES - Desplazamiento coordinado */}
+        <th rowSpan="2" className="w-[100px] md:w-[300px] sticky left-7 md:left-15 z-40 bg-green-600 border-r border-b border-green-400 text-center px-1 shadow-[3px_0_3px_-2px_rgba(0,0,0,0.3)]">
+         <div className="text-[9px] md:text-[9px] leading-tight whitespace-normal md:whitespace-nowrap flex items-center justify-center h-full">
+        APELLIDOS Y NOMBRES
+      </div>
+    </th>
+    {competencias.map((c, i) => (
+    <th key={i} colSpan="5" className="p-1 border-r border-b border-green-500 bg-green-700/30 text-center min-w-[60px] text-[8px]">
+      {c}
+       </th>
+        ))}
+       <th rowSpan="2" className="p-0.5 w-10 sticky right-0 z-50 bg-yellow-400 text-slate-800 font-black border-l border-b border-yellow-500 text-center text-[9px]">
+      LOGRO
+    </th>
+  </tr>
+  <tr className="bg-green-700 text-white text-[9px] text-center uppercase h-6">
+    {competencias.map((_, i) => (
+      <React.Fragment key={i}>
+       {/* Columnas D1-D4 más anchas en escritorio */}
+        <th className="w-8 md:w-10 border-r border-green-600/50">D1</th>
+        <th className="w-8 md:w-10 border-r border-green-600/50">D2</th>
+        <th className="w-8 md:w-10 border-r border-green-600/50">D3</th>
+        <th className="w-8 md:w-10 border-r border-green-600/50">D4</th>
+        <th className="w-8 md:w-10 bg-green-500 font-bold border-r border-green-600">PROM</th>
+      </React.Fragment>
+    ))}
+  </tr>
+  </thead>
+  <tbody className={`text-[10px] ${perfilUsuario?.rol_id === 6 ? 'pointer-events-none' : ''}`}>
+   {alumnosOrdenados
+    .filter(({ nombre }) => {
+      const rolUsuario = perfilUsuario?.rol_id;
+      if (rolUsuario === 1 || rolUsuario === 3) return true;
+      const idFila = normalizarID(nombre);
+      const idUsuario = normalizarID(perfilUsuario?.nombre_completo);
+      return idFila.includes(idUsuario) || idUsuario.includes(idFila);
+      })
+      .map(({ nombre, originalIdx }, displayIdx) => {
+      const nombreEst = (nombre || "").toUpperCase().trim();
+      const idUnico = normalizarID(nombreEst);
+      const generoActual = generos[nombreEst] || "";
+      return (
+        <tr key={originalIdx} className="border-b border-slate-200 hover:bg-green-50/50 h-8">
+          {/* NÚMERO DE ORDEN */}
+          <td className="text-center sticky left-0 z-20 bg-green-200 font-bold border-r border-slate-300 text-gray-600 w-6 text-[10px]">
+            {displayIdx + 1}
+          </td>
+          {/* COLUMNA SEXO */}
+          <td className="hidden md:table-cell p-0 sticky left-7 z-20 bg-gray-200 border-r border-slate-300 w-8">
+            <select
+              disabled={esEstudiante}
+              value={generoActual}
+               onChange={(e) => setGeneros(prev => ({ ...prev, [nombreEst]: e.target.value }))}
+               className={`w-full h-full text-center font-bold outline-none appearance-none bg-transparent ${
+                generoActual === 'H' ? 'text-blue-600' :
+                generoActual === 'M' ? 'text-pink-500' : 'text-gray-400'
+               }`}>
+               <option value="">-</option>
+              <option value="M">M</option>
+              <option value="H">H</option>
+             </select>
+           </td>
+          {/* COLUMNA NOMBRE - Sincronizada con left-7 y altura ajustada */}
+        <td className="p-0 sticky left-7 md:left-15 z-30 bg-white border-r border-slate-200 min-w-[80px] md:min-w-[250px] h-8 shadow-[3px_0_3px_-2px_rgba(0,0,0,0.1)]">
+      <div
+     contentEditable={!esEstudiante}
+     suppressContentEditableWarning={true}
+      onBlur={(e) => {
+      if (esEstudiante) return;
+      const next = [...alumnos];
+      next[originalIdx] = e.currentTarget.innerText;
+      setAlumnos(next);
+      {/* TEX TAREA: interlineado de móviles y centrado vertical de nombres en escritorio */}
+     }}
+     className="w-full h-full px-1.5 md:pl-5 md:pr-2 outline-none font-bold text-slate-700 uppercase bg-transparent cursor-text overflow-hidden text-[7.5px] md:text-[9px] leading-[1.4] md:leading-normal whitespace-normal md:whitespace-nowrap flex items-center justify-start">
+    {nombre || ""}
+     </div>
+      </td>
+        {competencias.map((_, cIdx) => (
+          <React.Fragment key={cIdx}>
+            {[1, 2, 3, 4].map(dIdx => (
+              <td key={dIdx} className="p-0 border-r border-slate-200 w-7">
+                 <select
+                    disabled={esEstudiante}
+                     value={notas[`${idUnico}-${cIdx}-${dIdx}`] || ""}
+                      onChange={(e) => setNotas(prev => ({ ...prev, [`${idUnico}-${cIdx}-${dIdx}`]: e.target.value }))}
+                       className={`w-full h-7 text-center font-bold outline-none appearance-none bg-green-50/50 text-[9px] ${getColorNota(notas[`${idUnico}-${cIdx}-${dIdx}`])}`}>
+                       <option value="">-</option>
+                       <option value="AD">AD</option>
+                       <option value="A">A</option>
+                       <option value="B">B</option>
+                       <option value="C">C</option>
+                  </select>
+                </td>
+              ))}
+             <td className={`text-center font-black bg-green-100 border-r border-slate-200 text-[9px] w-8 ${getColorNota(calcularPromedio(nombre, cIdx))}`}>
+             {calcularPromedio(nombre, cIdx)}
+              </td>
+               </React.Fragment>
+                ))}
+                 <td className={`text-center font-black bg-yellow-200 sticky right-0 z-20 border-l border-yellow-300 text-[9px] w-10 ${getColorNota(calcularLogroBimestral(nombre))}`}>
+                  {calcularLogroBimestral(nombre)}
+                  </td>
+                 </tr>
+                 );
+               })}
+             </tbody>
             </table>
           </div>
         </div>

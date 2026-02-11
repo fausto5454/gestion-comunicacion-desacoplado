@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { supabase } from '../config/supabaseClient';
 import { 
   Save, FileText, FileSpreadsheet, Loader2, 
@@ -42,54 +42,55 @@ const AsistenciaAlumnos = ({ }) => {
     try {
       const idsMatricula = nomina.map(n => n.id_matricula);
       const { data, error } = await supabase
-          .from('matriculas')
-          .select('id_matricula, apellido_paterno, apellido_materno, nombres')
-          // IMPORTANTE: Concatenamos el símbolo ° para que coincida con la DB
-          .eq('grado', `${grado}${grado.includes('°') ? '' : '°'}`) 
-          .eq('seccion', seccion.trim())
-          .eq('anio_lectivo', 2026)
-          .eq('estado_estudiante', 'Activo')
-          .order('apellido_paterno', { ascending: true });
+        .from('asistencia') // Tabla correcta
+        .select('id_estudiante, estado')
+        .in('id_estudiante', idsMatricula)
+        .eq('fecha', fecha)
+        .eq('observaciones', areaSeleccionada);
 
       if (error) throw error;
+
       if (data && data.length > 0) {
         const guardada = { ...init };
-        data.forEach(reg => { guardada[reg.id_auxiliar] = reg.estado; });
+        data.forEach(reg => {
+          guardada[reg.id_estudiante] = reg.estado;
+        });
         setAsistencia(guardada);
       } else {
         setAsistencia(init);
       }
     } catch (e) {
+      console.error("Error al recuperar asistencia previa:", e);
       setAsistencia(init);
     }
   };
 
- const fetchNomina = async () => {
+  // 3. DECLARAR FUNCIÓN PRINCIPAL (Uso de useCallback para evitar bucles)
+  const fetchNomina = useCallback(async () => {
+    if (!grado || !seccion) return;
     setLoading(true);
+
     try {
-      // Definimos el formato exacto del grado tal como está en Supabase (ej: "1°")
+      // Formateo para evitar Error 400 de Supabase
       const gradoFormateado = grado.includes('°') ? grado : `${grado}°`;
 
       const { data, error } = await supabase
         .from('matriculas')
-        .select('id_matricula, apellido_paterno, apellido_materno, nombres, genero, grado, seccion')
-        .eq('grado', gradoFormateado) // Filtro corregido para buscar "1°" en lugar de 1
+        .select('id_matricula, apellido_paterno, apellido_materno, nombres, genero')
+        .eq('grado', gradoFormateado)
         .eq('seccion', seccion.trim())
         .eq('anio_lectivo', 2026)
         .eq('estado_estudiante', 'Activo')
-        .order('apellido_paterno', { ascending: true })
-        .order('apellido_materno', { ascending: true })
-        .order('nombres', { ascending: true });
+        .order('apellido_paterno', { ascending: true });
 
       if (error) throw error;
-      
+
       if (data) {
         setEstudiantes(data);
-        // Inicializamos el estado de asistencia para los nuevos alumnos cargados
         const init = {};
         data.forEach(est => init[est.id_matricula] = 'Presente');
         
-        // Buscamos si ya existe asistencia guardada para esta fecha/área
+        // Llamada segura: la función ya existe en este punto
         await fetchAsistenciaExistente(data, init);
       }
     } catch (err) {
@@ -98,12 +99,12 @@ const AsistenciaAlumnos = ({ }) => {
     } finally {
       setLoading(false);
     }
-  };
-   
-  // El efecto se dispara cada vez que cambies el grado o la sección en el select
-  useEffect(() => {
-    if (grado && seccion) fetchNomina();
-  }, [grado, seccion, fecha, areaSeleccionada]);
+   }, [grado, seccion, fecha, areaSeleccionada]);
+
+   // 4. EFECTO DISPARADOR (Llamado después de todas las definiciones)
+   useEffect(() => {
+     fetchNomina();
+  }, [fetchNomina]);
 
   const exportarExcel = async () => {
   // 1. Crear instancia local (ayuda a la velocidad en descargas sucesivas)

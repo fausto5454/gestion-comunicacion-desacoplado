@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { 
     LayoutDashboard, Users, Send, Inbox, FileText, BarChart, 
     ShieldCheck, X, GraduationCap, CalendarCheck, Bell, LogOut, 
-    Loader2, ChevronDown, ChevronRight, MessageSquare, BookOpen, FolderTree, LayoutGrid 
+    Loader2, ChevronDown, ChevronRight, MessageSquare, BookOpen, FolderTree, LayoutGrid, FileSpreadsheet 
 } from 'lucide-react';
 import { COLOR_IE_GREEN_LIGHT, COLOR_IE_GREEN } from '../styles/CustomStyles';
 
@@ -36,6 +36,7 @@ const Sidebar = ({ rol_id, userName, userEmail, setCurrentView, currentView, isS
                 { name: 'Calificaciones', view: 'calificaciones', icon: GraduationCap, roles: [1, 3, 5, 6] },
                 { name: 'Asistencia', view: 'asistencia', icon: CalendarCheck, roles: [1, 3, 5, 6] },
                 { name: 'Consolidado', view: 'consolidado', icon: LayoutGrid, roles: [1, 2, 3, 5] },
+                { name: 'Matrícula', view: 'matricula', icon: FileSpreadsheet, roles: [1] },
                 { name: 'IGA-Estadística', view: 'iga-estadistica', icon: BarChart, roles: [1, 2, 3, 5] },
             ]
         },

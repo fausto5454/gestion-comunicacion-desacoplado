@@ -40,88 +40,114 @@ const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion
   const esDocente = Number(rolActual) === 3;
   const esAdmin = Number(rolActual) === 1;
 
+ useEffect(() => {
+  const sincronizarDNIs = async () => {
+    // Eliminamos 'nombre_estudiante' que causa el Error 400
+    const { data, error } = await supabase
+      .from('matriculas')
+      .select('dni_estudiante, apellido_paterno, apellido_materno, nombres');
+
+    if (error) {
+      console.error("Fallo en sincronización:", error.message);
+      return;
+    }
+
+    if (data) {
+      const mapaDnisLocal = {}; // Declaración local para evitar ReferenceError
+      data.forEach(m => {
+        // Construimos la llave exactamente como en el resto de la app
+        const nombreCompleto = `${m.apellido_paterno} ${m.apellido_materno}, ${m.nombres}`.toUpperCase().trim();
+        const id = normalizarID(nombreCompleto);
+        mapaDnisLocal[id] = m.dni_estudiante;
+      });
+      
+      setDnis(mapaDnisLocal); 
+      console.log("✅ Conexión establecida: DNIs cargados por identidad construida.");
+    }
+   };
+   sincronizarDNIs();
+ }, []);
+
  const cargarDatos = useCallback(async () => {
   if (!grado || !area || !bimestre) return;
   setLoading(true);
-  
+
   try {
-    // Limpieza agresiva de filtros para evitar fallos de coincidencia
+    // 1. Limpieza de Grado y Sección
     const partes = grado.split(" ");
-    const numGrado = partes[0].trim(); // "1°"
-    const letraSeccion = partes[1]?.trim() || "A"; // "A"
+    const numGrado = partes[0].trim().replace("°", ""); // Solo el número: "1"
+    const letraSeccion = partes[1]?.trim() || "A";
 
-    console.log("Intentando cargar con:", { numGrado, letraSeccion }); // Debug real
-
-    // 1. FUENTE DE VERDAD: Matrículas
+    // 2. FUENTE DE VERDAD: Matrículas
+    // Eliminamos el .order si sospechamos de la columna, o aseguramos el nombre exacto
     const { data: matriculados, error: matError } = await supabase
-      .from('matriculas')
-      .select('dni_estudiante, apellido_paterno, apellido_materno, nombres, genero')
-      .ilike('grado', `%${numGrado}%`) // Busqueda flexible para el símbolo °
-      .eq('seccion', letraSeccion)
-      .order('apellido_paterno');
+        .from('matriculas')
+        .select('dni_estudiante, apellido_paterno, apellido_materno, nombres, genero')
+        .eq('grado', `${numGrado}°`) // Buscamos el valor exacto ej: "1°"
+        .eq('seccion', letraSeccion)
+        .eq('anio_lectivo', 2026)
+        .order('apellido_paterno', { ascending: true }); // Asegúrate que 'apellido_paterno' exista tal cual
 
     if (matError) throw matError;
 
-    if (matriculados) {
-       const mapaGeneros = {};
-       matriculados.forEach(est => {
-       const nombreCompleto = `${est.apellido_paterno} ${est.apellido_materno}, ${est.nombres}`.toUpperCase().trim();
-       mapaGeneros[nombreCompleto] = est.genero;
-       });
-      setGeneros(mapaGeneros);
-     }
-
-    // Procesar identidades para el frontend
+    // 3. Procesamiento de identidades
     const nombresFull = [];
-    const mapaDnis = {};
     const dniToId = {};
+    const mapaGeneros = {};
+    const mapaDnisLocal = {};
 
-    matriculados.forEach(m => {
-      const nombreCompleto = `${m.apellido_paterno} ${m.apellido_materno}, ${m.nombres}`.toUpperCase();
+    matriculados?.forEach(m => {
+      const nombreCompleto = `${m.apellido_paterno} ${m.apellido_materno}, ${m.nombres}`.toUpperCase().trim();
       const idEst = normalizarID(nombreCompleto);
-      nombresFull.push(nombreCompleto);
-      mapaDnis[idEst] = m.dni_estudiante;
-      dniToId[m.dni_estudiante] = idEst;
+  
+     // Llenamos los mapas usando la llave correcta
+     mapaDnisLocal[idEst] = m.dni_estudiante; 
+     dniToId[m.dni_estudiante] = nombreCompleto;
+     mapaGeneros[nombreCompleto] = m.genero; 
+     nombresFull.push(nombreCompleto);
     });
 
+    // 2. Actualizamos los estados de React
     setAlumnos(nombresFull);
-    setDnis(mapaDnis);
+    setGeneros(mapaGeneros);
+    setDnis(mapaDnisLocal);
 
-    // 2. CARGAR NOTAS (califData ahora está dentro del try para evitar ReferenceError)
+    // 4. Cargar Notas
     const { data: califData, error: califError } = await supabase
-      .from('calificaciones')
-      .select('*')
-      .eq('grado', numGrado)
-      .eq('seccion', letraSeccion)
-      .eq('area', area)
-      .eq('bimestre', parseInt(bimestre));
+       .from('calificaciones')
+       .select('*')
+       .eq('grado', `${numGrado}°`) // Buscamos coincidencia exacta
+       .eq('seccion', letraSeccion)
+       .eq('area', area)
+       .eq('bimestre', parseInt(bimestre));
 
     if (califError) throw califError;
 
     const nuevasNotas = {};
     califData?.forEach(reg => {
-      const idEst = dniToId[reg.dni_estudiante] || normalizarID(reg.nombre_estudiante);
-      if (idEst) {
+      const nombreKey = dniToId[reg.dni_estudiante] || reg.nombre_estudiante?.toUpperCase().trim();
+      
+      if (nombreKey) {
         for (let c = 1; c <= 4; c++) {
           for (let d = 1; d <= 4; d++) {
-            if (reg[`c${c}_d${d}`]) nuevasNotas[`${idEst}-${c-1}-${d}`] = reg[`c${c}_d${d}`];
+            const valor = reg[`c${c}_d${d}`];
+            if (valor) nuevasNotas[`${nombreKey}-${c-1}-${d}`] = valor;
           }
         }
       }
     });
 
     setNotas(nuevasNotas);
-    setMensaje(null);
 
-  } catch (error) {
-    console.error("Fallo de carga:", error.message);
-  } finally {
-    setLoading(false);
-  }
+   } catch (error) {
+     console.error("Error en la vinculación:", error);
+   } finally {
+     setLoading(false);
+   }
   }, [grado, area, bimestre]);
-     
-   useEffect(() => {
-     cargarDatos();
+
+    useEffect(() => {
+    cargarDatos();
   }, [cargarDatos]);
   
   const alumnosOrdenados = useMemo(() => {
@@ -345,53 +371,56 @@ const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion
       XLSX.writeFile(wb, `Registro_Auxiliar_2026.xlsx`);
     };
 
- const handleGuardarTodo = async () => {
-  if (!grado || !area || !bimestre) return;
-  setLoading(true);
+   const handleGuardarTodo = async () => {
+    if (!grado || !area || !bimestre) return;
+    setLoading(true);
 
-  try {
-    const [numGrado, letraSeccion] = grado.split(" ");
-    const seccionFinal = letraSeccion?.trim() || "A";
+    try {
+      const [numGrado, letraSeccion] = grado.split(" ");
+      const seccionFinal = letraSeccion?.trim() || "A";
+      const areaNormalizada = area.toUpperCase().trim();
 
-    const batchCalificaciones = [];
-    const batchMatriculas = [];
-    const batchAsistencia = [];
+      const batchCalificaciones = [];
+      const batchMatriculas = [];
+      const batchAsistencia = [];
 
-    alumnos.forEach((nombre) => {
-      // 1. NORMALIZACIÓN CRÍTICA: Aseguramos que la llave coincida con el estado 'generos'
-      const nombreLimpio = (nombre || "").toUpperCase().trim();
-      const idEst = normalizarID(nombreLimpio);
-      
-      const dni = dnis[idEst];
-      // Buscamos el género con el nombre limpio para que no falle el registro
-      const gen = generos[nombreLimpio] || null; 
+      alumnos.forEach((nombre) => {
+        // 1. NORMALIZACIÓN Y OBTENCIÓN DE DATOS
+        const nombreLimpio = (nombre || "").toUpperCase().trim();
+        const idEst = normalizarID(nombreLimpio);
+        const dni = dnis[idEst] ? dnis[idEst].toString().trim() : null;
+        const gen = generos[nombreLimpio] || null; 
 
-      // 2. Calificaciones (Notas y Promedios)
+        // VALIDACIÓN CRÍTICA: Impedir el envío si el DNI es NULL para evitar duplicados erróneos
+        if (!dni) {
+          console.warn(`Registro omitido: No se encontró DNI para ${nombreLimpio}`);
+          return; 
+        }
+
+      // 2. CONSTRUCCIÓN DE CALIFICACIONES (Blindaje contra NULLs)
       batchCalificaciones.push({
-        dni_estudiante: dni,
-        nombre_estudiante: nombreLimpio, // Guardamos el nombre limpio
-        grado: numGrado,
-        seccion: seccionFinal,
-        area,
-        bimestre: parseInt(bimestre),
-        genero: gen,
-        promedio_c1: calcularPromedio(nombre, 0),
-        promedio_c2: calcularPromedio(nombre, 1),
-        promedio_c3: calcularPromedio(nombre, 2),
-        promedio_c4: calcularPromedio(nombre, 3),
-        logro_bimestral: calcularLogroBimestral(nombre),
-        ...Object.fromEntries(
-          Array.from({ length: 16 }, (_, i) => {
-            const c = Math.floor(i / 4) + 1;
-            const d = (i % 4) + 1;
-            // Usamos idEst (que es normalizarID) para buscar la nota en el estado
-            return [`c${c}_d${d}`, notas[`${idEst}-${c - 1}-${d}`] || null];
-          })
-        )
-      });
+          dni_estudiante: dni,
+          nombre_estudiante: nombreLimpio,
+          grado: numGrado,
+          seccion: seccionFinal,
+          area: areaNormalizada,
+          bimestre: parseInt(bimestre),
+          genero: gen,
+          promedio_c1: calcularPromedio(nombre, 0),
+          promedio_c2: calcularPromedio(nombre, 1),
+          promedio_c3: calcularPromedio(nombre, 2),
+          promedio_c4: calcularPromedio(nombre, 3),
+          logro_bimestral: calcularLogroBimestral(nombre),
+          ...Object.fromEntries(
+            Array.from({ length: 16 }, (_, i) => {
+              const c = Math.floor(i / 4) + 1;
+              const d = (i % 4) + 1;
+              return [`c${c}_d${d}`, notas[`${idEst}-${c - 1}-${d}`] || null];
+            })
+          )
+        });
 
-      // 3. Matrícula (Sincronización de Género en la tabla base)
-      if (dni) {
+        // 3. CONSTRUCCIÓN DE MATRÍCULA (Sincronización de base)
         batchMatriculas.push({ 
           dni_estudiante: dni, 
           genero: gen, 
@@ -399,41 +428,57 @@ const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion
           seccion: seccionFinal 
         });
 
-        // 4. Asistencia (Actualizamos identidad y género para que aparezca en el otro módulo)
+        // 4. CONSTRUCCIÓN DE ASISTENCIA (Identidad vinculada para el Consolidado)
         batchAsistencia.push({ 
           dni_estudiante: dni, 
           genero: gen, 
           grado: numGrado, 
           seccion: seccionFinal,
-          // Mantenemos estado null para no sobrescribir asistencias ya marcadas si se usa upsert
+          // No enviamos 'estado' ni 'fecha' aquí para no sobrescribir registros diarios existentes
         });
-      }
-    });
+      });
 
-    // Envío paralelo optimizado
-    const results = await Promise.all([
-      supabase.from('calificaciones').upsert(batchCalificaciones, { onConflict: 'dni_estudiante,grado,seccion,area,bimestre' }),
-      supabase.from('matriculas').upsert(batchMatriculas, { onConflict: 'dni_estudiante' }),
-      supabase.from('asistencia').upsert(batchAsistencia, { onConflict: 'dni_estudiante,grado,seccion' })
-    ]);
+      // 5. ENVÍO PARALELO OPTIMIZADO CON UPSERT
+      const results = await Promise.all([
+        supabase.from('calificaciones').upsert(batchCalificaciones, { 
+          onConflict: 'dni_estudiante,area,bimestre' 
+        }),
+        supabase.from('matriculas').upsert(batchMatriculas, { 
+          onConflict: 'dni_estudiante' 
+        }),
+        supabase.from('asistencia').upsert(batchAsistencia, { 
+          onConflict: 'dni_estudiante,grado,seccion' 
+        })
+      ]);
 
-    // Verificación de errores en la ráfaga
-    const errorResult = results.find(r => r.error);
-    if (errorResult) throw errorResult.error;
+     // Verificación de errores en la ráfaga
+      const errorResult = results.find(r => r.error);
+      if (errorResult) throw errorResult.error;
 
-    setMensaje({ texto: "¡REGISTRO ACTUALIZADO: NOTAS, SEXO Y ASISTENCIA SINCRONIZADOS!", tipo: 'success' });
-    setShowConfirm(false);
-    
-    setTimeout(() => setMensaje(null), 3000);
+      // MENSAJE MEJORADO: Informamos que el sistema detectó y actualizó registros existentes
+      setMensaje({ 
+        texto: "¡SINCRONIZACIÓN EXITOSA! Los registros existentes han sido actualizados y los nuevos han sido guardados.", 
+        tipo: 'success' 
+      });
 
-  } catch (error) {
-    console.error("Fallo de guardado:", error.message);
-    setMensaje({ texto: "Error al guardar: " + error.message, tipo: 'error' });
-    setTimeout(() => setMensaje(null), 5000);
-  } finally {
-    setLoading(false);
-  }
- };
+      setShowConfirm(false);
+      
+      // Limpiamos el mensaje después de 3 segundos
+      setTimeout(() => setMensaje(null), 3000);
+
+    } catch (error) {
+      console.error("Error detectado:", error);
+      
+      // Mantenemos la alerta para errores críticos y el estado visual
+      alert("❌ Error al guardar: " + error.message);
+      setMensaje({ texto: "Error al guardar: " + error.message, tipo: 'error' });
+      
+      setTimeout(() => setMensaje(null), 4000);
+    } finally {
+      // DESCONGELAR BOTÓN: Pase lo que pase, el botón vuelve a estar activo
+      setLoading(false);
+    }
+  };
 
   const getColorNota = (nota) => {
     if (nota === 'C') return 'text-red-600';
@@ -663,7 +708,7 @@ const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion
             <h3 className="text-xl font-black text-slate-800">¿Guardar registro?</h3>
             <div className="flex gap-4 mt-8">
               <button onClick={() => setShowConfirm(false)} className="flex-1 py-4 bg-green-600 text-white font-bold rounded-2xl text-xs uppercase">Cancelar</button>
-              <button onClick={handleGuardarTodo} className="flex-1 py-4 bg-slate-900 text-white font-bold rounded-2xl text-xs uppercase">Sí, Guardar</button>
+              <button onClick={handleGuardarTodo} className="flex-1 py-4 bg-slate-900 hover:bg-slate-400 text-white font-bold rounded-2xl text-xs uppercase">Sí, Guardar</button>
             </div>
           </div>
         </div>

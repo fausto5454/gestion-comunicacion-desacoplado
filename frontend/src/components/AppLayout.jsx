@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../config/supabaseClient';
-import toast from 'react-hot-toast'; 
 import { Menu, Bell } from 'lucide-react';
 
 import DashboardPage from '../pages/DashboardPage';
@@ -16,6 +15,7 @@ import IGAEstadistica from '../pages/IGAEstadistica';
 import AsistenciaAlumnos from './AsistenciaAlumnos';
 import PanelAsistencia from './PanelAsistencia';
 import ConsolidadoAsistencia from './ConsolidadoAsistencia';
+import ImportarMatricula from './ImportarMatricula';
 import Sidebar from './Sidebar';
 
 const AppLayout = ({ session, onLogout, currentView, setCurrentView, onCursoSelect, cursoActivo }) => {
@@ -81,7 +81,8 @@ const AppLayout = ({ session, onLogout, currentView, setCurrentView, onCursoSele
         'iga-estadistica': IGAEstadistica,
         // Agregamos asistencia (usaremos una función para decidir qué mostrar)
         asistencia: cursoActivo ? AsistenciaAlumnos : PanelAsistencia,
-        consolidado: ConsolidadoAsistencia, 
+        consolidado: ConsolidadoAsistencia,
+        matricula: ImportarMatricula,
     };
 
     const renderContent = () => {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { supabase } from '../config/supabaseClient';
 import { Search, Filter, FileSpreadsheet, Menu } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -54,59 +54,85 @@ const ConsolidadoAsistencia = () => {
   }, [seleccion.mes]);
 
   // ✅ Mejora 2: Carga de datos real desde Supabase (Filtro por Grado/Sección/Mes)
- const cargarDatos = async () => {
-    setLoading(true);
-    try {
-      // 1. Formatear el grado para que coincida con la DB (ej: "1°")
-      const gradoFormateado = seleccion.grado.includes('°') ? seleccion.grado : `${seleccion.grado}°`;
+ // 1. Definimos la función con useCallback para evitar ReferenceError
+const cargarDatos = useCallback(async () => {
+  if (!seleccion.grado || !seleccion.seccion) return;
+  setLoading(true);
+  
+  try {
+    // A. Formateo de parámetros para evitar error 400
+    const gradoFormateado = seleccion.grado.includes('°') ? seleccion.grado : `${seleccion.grado}°`;
+    const anio = 2026;
+    const mesFmt = seleccion.mes.toString().padStart(2, '0');
+    
+    // Cálculo de rango de fechas del mes seleccionado
+    const ultimoDiaMes = new Date(anio, seleccion.mes, 0).getDate();
+    const primerDia = `${anio}-${mesFmt}-01`;
+    const ultimoDia = `${anio}-${mesFmt}-${ultimoDiaMes}`;
+
+    // B. Cargar Nómina (Fuente de verdad)
+    const { data: nomina, error: errorNomina } = await supabase
+      .from('matriculas')
+      .select('id_matricula, apellido_paterno, apellido_materno, nombres, genero')
+      .eq('grado', gradoFormateado)
+      .eq('seccion', seleccion.seccion)
+      .eq('anio_lectivo', anio)
+      .order('apellido_paterno', { ascending: true });
+
+    if (errorNomina) throw errorNomina;
+
+    // Procesamos nombres para la columna fija de la izquierda
+    const estudiantesProcesados = nomina?.map(est => ({
+      ...est,
+      nombreCompleto: `${est.apellido_paterno} ${est.apellido_materno}, ${est.nombres}`.toUpperCase()
+    })) || [];
+    
+    setEstudiantes(estudiantesProcesados);
+
+    // C. Cargar Asistencias del Rango Mensual
+    const { data: asistencias, error: errorAsistencia } = await supabase
+      .from('asistencia')
+      .select('id_estudiante, fecha, estado')
+      .eq('observaciones', seleccion.area)
+      .gte('fecha', primerDia)
+      .lte('fecha', ultimoDia);
+
+    if (errorAsistencia) throw errorAsistencia;
+
+    // D. Procesamiento del Mapa (Totales para el Consolidado)
+    const mapaConsolidado = {};
+    asistencias?.forEach(a => {
+      if (!mapaConsolidado[a.id_estudiante]) {
+        // Inicializamos contadores por estudiante
+        mapaConsolidado[a.id_estudiante] = { P: 0, F: 0, T: 0, J: 0, dias: {} };
+      }
       
-      // 2. Definir rango de fechas para el mes
-      const anio = 2026;
-      const mesFmt = seleccion.mes.toString().padStart(2, '0');
-      const primerDia = `${anio}-${mesFmt}-01`;
-      const ultimoDia = `${anio}-${mesFmt}-${new Date(anio, seleccion.mes, 0).getDate()}`;
+      const dia = parseInt(a.fecha.split('-')[2]);
+      const inicial = a.estado[0].toUpperCase();
+      
+      // Guardamos el detalle diario
+      mapaConsolidado[a.id_estudiante].dias[dia] = inicial;
+      
+      // Incrementamos el contador del estado correspondiente
+      if (mapaConsolidado[a.id_estudiante][inicial] !== undefined) {
+        mapaConsolidado[a.id_estudiante][inicial]++;
+      }
+    });
 
-      // 3. Cargar Nómina
-      const { data: nomina, error: errorNomina } = await supabase
-        .from('matriculas')
-        .select('id_matricula, apellido_paterno, apellido_materno, nombres')
-        .eq('grado', gradoFormateado) // Filtro corregido
-        .eq('seccion', seleccion.seccion)
-        .eq('anio_lectivo', 2026)
-        .order('apellido_paterno');
+    setDatos(mapaConsolidado);
 
-      if (errorNomina) throw errorNomina;
-      setEstudiantes(nomina || []);
+  } catch (error) {
+    console.error("Error detallado en consolidado:", error);
+    toast.error("Error al sincronizar datos del mes");
+  } finally {
+    setLoading(false);
+  }
+ }, [seleccion.grado, seleccion.seccion, seleccion.mes, seleccion.area]);
 
-      // 4. Cargar Asistencias
-      const { data: asistencias, error: errorAsistencia } = await supabase
-        .from('asistencia')
-        .select('id_estudiante, fecha, estado')
-        .eq('observaciones', seleccion.area)
-        .gte('fecha', primerDia)
-        .lte('fecha', ultimoDia);
-
-      if (errorAsistencia) throw errorAsistencia;
-
-      const mapa = {};
-      asistencias?.forEach(a => {
-        // Usamos split para evitar problemas de zona horaria con el objeto Date
-        const dia = parseInt(a.fecha.split('-')[2]); 
-        if (!mapa[a.id_estudiante]) mapa[a.id_estudiante] = {};
-        // Guardamos la inicial (P, A, T, J)
-        mapa[a.id_estudiante][dia] = a.estado[0].toUpperCase();
-      });
-      setDatos(mapa);
-
-    } catch (error) {
-      console.error("Error detallado:", error);
-      toast.error("Error al cargar los datos del consolidado");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => { cargarDatos(); }, [seleccion.grado, seleccion.seccion, seleccion.mes]);
+  // 2. Ejecución segura después de la inicialización
+  useEffect(() => {
+    cargarDatos();
+  }, [cargarDatos]);
 
   // ✅ Mejora 3: Buscador Funcional
   const filtrados = estudiantes.filter(e => 
@@ -239,7 +265,6 @@ const ConsolidadoAsistencia = () => {
     saveAs(new Blob([buffer]), `Asistencia_${seleccion.area}_${seleccion.grado}${seleccion.seccion}.xlsx`);
   };
   
-
   return (
     <div className="p-4 md:p-6 bg-slate-50 min-h-screen text-[8px] md:text-base">
       {/* TÍTULO */}

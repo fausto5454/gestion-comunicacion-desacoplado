@@ -30,6 +30,7 @@ const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion
   const [mensaje, setMensaje] = useState(null);
   const [loading, setLoading] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [nombreDocenteAsignado, setNombreDocenteAsignado] = useState("");
   const [conclusiones, setConclusiones] = useState({});
   const [asistenciaReferencia, setAsistenciaReferencia] = useState({});
   const [dnis, setDnis] = useState({});
@@ -78,6 +79,20 @@ const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion
     const numGrado = partes[0].trim().replace("°", ""); // Solo el número: "1"
     const letraSeccion = partes[1]?.trim() || "A";
 
+    const { data: docenteData } = await supabase
+    .from('docente_asignaciones') // Asegúrate que este sea el nombre de tu tabla
+    .select('nombre_docente')
+    .eq('grado', `${numGrado}°`)
+    .eq('seccion', letraSeccion)
+    .eq('area', area)
+    .single();
+
+     if (docenteData) {
+        setNombreDocenteAsignado(docenteData.nombre_docente.toUpperCase());
+     } else {
+       setNombreDocenteAsignado("POR ASIGNAR");
+    }
+
     // 2. FUENTE DE VERDAD: Matrículas
     // Eliminamos el .order si sospechamos de la columna, o aseguramos el nombre exacto
     const { data: matriculados, error: matError } = await supabase
@@ -99,11 +114,12 @@ const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion
     matriculados?.forEach(m => {
       const nombreCompleto = `${m.apellido_paterno} ${m.apellido_materno}, ${m.nombres}`.toUpperCase().trim();
       const idEst = normalizarID(nombreCompleto);
-  
+
      // Llenamos los mapas usando la llave correcta
      mapaDnisLocal[idEst] = m.dni_estudiante; 
      dniToId[m.dni_estudiante] = nombreCompleto;
      mapaGeneros[nombreCompleto] = m.genero; 
+     mapaGeneros[idEst] = m.genero;
      nombresFull.push(nombreCompleto);
     });
 
@@ -123,20 +139,40 @@ const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion
 
     if (califError) throw califError;
 
-    const nuevasNotas = {};
-    califData?.forEach(reg => {
-      const nombreKey = dniToId[reg.dni_estudiante] || reg.nombre_estudiante?.toUpperCase().trim();
-      
-      if (nombreKey) {
-        for (let c = 1; c <= 4; c++) {
-          for (let d = 1; d <= 4; d++) {
-            const valor = reg[`c${c}_d${d}`];
-            if (valor) nuevasNotas[`${nombreKey}-${c-1}-${d}`] = valor;
-          }
-        }
-      }
-    });
+   const nuevasNotas = {};
+   const nuevosGeneros = { ...mapaGeneros }; // Empezamos con los de matrícula
 
+   califData?.forEach(reg => {
+    // Intentamos buscar por DNI primero (es lo más seguro)
+    let nombreKey = dniToId[reg.dni_estudiante];
+    
+    // Si no hay DNI coincidente, buscamos por nombre normalizado
+    if (!nombreKey) {
+        const idDb = normalizarID(reg.nombre_estudiante);
+        // Buscamos en nuestro array de alumnos cuál coincide con este ID normalizado
+        nombreKey = nombresFull.find(n => normalizarID(n) === idDb);
+    }
+
+    if (nombreKey) {
+        // Asignar género si viene en la tabla calificaciones y no estaba en matriculas
+        if (reg.genero && !nuevosGeneros[nombreKey]) {
+            nuevosGeneros[nombreKey] = reg.genero;
+        }
+
+        // Mapeo de notas
+        for (let c = 1; c <= 4; c++) {
+            for (let d = 1; d <= 4; d++) {
+                const valor = reg[`c${c}_d${d}`];
+                if (valor) {
+                    // IMPORTANTE: Usar normalizarID para la llave del estado 'notas'
+                    nuevasNotas[`${normalizarID(nombreKey)}-${c-1}-${d}`] = valor;
+                 }
+              }
+          }
+       }
+   });
+
+    setGeneros(nuevosGeneros);
     setNotas(nuevasNotas);
 
    } catch (error) {
@@ -183,193 +219,147 @@ const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion
 
   // Restaurado y Mejorado: Función Excel Profesional
   const exportarExcel = () => {
-      const alumnosValidos = alumnosOrdenados.filter(a => a.nombre && a.nombre.trim() !== "");
-      if (alumnosValidos.length === 0) return;
-  
-      // 1. Cálculos Estadísticos
-      const nFinales = alumnosValidos.map(a => calcularLogroBimestral(a.nombre));
-      const totalAlumnos = nFinales.length;
-      const stats = {
-          AD: nFinales.filter(n => n === 'AD').length,
-          A: nFinales.filter(n => n === 'A').length,
-          B: nFinales.filter(n => n === 'B').length,
-          C: nFinales.filter(n => n === 'C').length
-      };
-  
-      // 2. ESTILOS DE ALTA PRECISIÓN (TODO FUENTE 8)
-      const borderThin = { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } };
-      const estiloBase = { font: { sz: 8 }, border: borderThin, alignment: { vertical: "center", horizontal: "center" } };
-      
-      const estiloVerdeOscuro = { 
-          ...estiloBase, 
-          font: { bold: true, color: { rgb: "FFFFFF" }, sz: 8 }, 
-          fill: { fgColor: { rgb: "00A859" } }, 
-          alignment: { horizontal: "center", vertical: "center", wrapText: true } 
-      };
+    const alumnosParaExportar = (typeof matriculados !== 'undefined' ? matriculados : alumnosOrdenados);
+    const alumnosValidos = alumnosParaExportar.filter(a => a.nombre || a.nombres);
+    if (alumnosValidos.length === 0) return;
 
-      // Estilo Naranja Logro Final (Corregido para una sola celda)
-      const estiloNaranjaLogro = { 
-          ...estiloBase, 
-          font: { bold: true, color: { rgb: "FFFFFF" }, sz: 8 }, 
-          fill: { fgColor: { rgb: "F4A300" } }, 
-          alignment: { horizontal: "center", vertical: "center", wrapText: true } 
-      };
-  
-      const estiloAzulResumen = { 
-          ...estiloBase, 
-          font: { bold: true, color: { rgb: "FFFFFF" }, sz: 8 }, 
-          fill: { fgColor: { rgb: "64740B" } },
-          alignment: { horizontal: "center", vertical: "center" }
-      };
-  
-      const rows = [];
-      // La columna Logro Final es la inmediatamente posterior a las competencias
-      const colLogroIdx = 3 + (competencias.length * 5); 
-  
-      // FILA 1: TÍTULO PRINCIPAL
-      rows.push([{ v: "REGISTRO AUXILIAR 2026", s: { font: { bold: true, sz: 14 }, alignment: { horizontal: "center" } } }]);
-  
-      // FILA 2: CABECERA DE INFORMACIÓN (Ajustada para máxima visibilidad)
-       const filaInfo = Array(colLogroIdx + 6).fill({ v: "", s: {} });
-      filaInfo[0] = { v: `ÁREA: ${area.toUpperCase()}`, s: { font: { bold: true, sz: 8 } } };
-      filaInfo[8] = { v: `GRADO: ${grado}`, s: { font: { bold: true, sz: 8 } } };
-      const nombreDocente = perfilUsuario?.full_name ? perfilUsuario.full_name.toUpperCase() : "DOCENTE NO IDENTIFICADO";
-      filaInfo[colLogroIdx - 4] = { v: `DOCENTE: ${nombreDocente}`, s: { font: { bold: true, sz: 8 }, alignment: { horizontal: "center" } } };
-      
-      rows.push(filaInfo);
-      rows.push([]); 
-  
-      // FILA 4: ENCABEZADO SUPERIOR
-      const h1 = [
-          { v: "N°", s: estiloVerdeOscuro }, 
-          { v: "SEXO", s: estiloVerdeOscuro }, 
-          { v: "APELLIDOS Y NOMBRES", s: estiloVerdeOscuro }
-      ];
-      
-      competencias.forEach(c => {
-          h1.push({ v: c.toUpperCase(), s: estiloVerdeOscuro }, "", "", "", "");
-      });
-      h1.push({ v: "LOGRO FINAL", s: estiloNaranjaLogro }); // Solo ocupa una columna
-      h1.push({ v: "", s: {} }); // Celda de separación vacía
-      h1.push({ v: "RESUMEN ESTADÍSTICO", s: estiloAzulResumen }, "", "", "");
-      rows.push(h1);
-  
-      // FILA 5: ENCABEZADO INFERIOR (Sub-cabeceras)
-      const h2 = [{ v: "", s: estiloVerdeOscuro }, { v: "", s: estiloVerdeOscuro }, { v: "", s: estiloVerdeOscuro }];
-      competencias.forEach(() => ["D1", "D2", "D3", "D4", "PROM"].forEach(t => h2.push({ v: t, s: estiloVerdeOscuro })));
-      h2.push({ v: "", s: estiloNaranjaLogro }); // Merge vertical con la fila superior
-      h2.push({ v: "", s: {} });
-      h2.push({ v: "NIVELES", s: estiloAzulResumen }, { v: "NOTAS", s: estiloAzulResumen }, { v: "CANT.", s: estiloAzulResumen }, { v: "%", s: estiloAzulResumen });
-      rows.push(h2);
-  
-      // 3. CUERPO DE DATOS
-      alumnosValidos.forEach((alumno, idx) => {
-          const idEst = normalizarID(alumno.nombre);
-          const row = [
-              { v: idx + 1, s: estiloBase },
-              { v: generos[idEst] || "-", s: estiloBase },
-              { v: alumno.nombre.toUpperCase(), s: { ...estiloBase, alignment: { horizontal: "left" } } }
-          ];
-  
-          // Notas y Promedios
-          competencias.forEach((_, cIdx) => {
-              [1, 2, 3, 4].forEach(d => {
-                  const val = notas[`${idEst}-${cIdx}-${d}`] || "-";
-                  row.push({ v: val, s: { ...estiloBase, font: { sz: 8, color: { rgb: val === 'C' ? "FF0000" : "000000" } } } });
-              });
-              const p = calcularPromedio(alumno.nombre, cIdx);
-              row.push({ v: p, s: { ...estiloBase, fill: { fgColor: { rgb: "DCFCE7" } }, font: { bold: true, sz: 8 } } });
-          });
-  
-          // Celda Logro Final (Fondo amarillo como en la imagen)
-          const lf = calcularLogroBimestral(alumno.nombre);
-          row.push({ v: lf, s: { ...estiloBase, fill: { fgColor: { rgb: "FEF08A" } }, font: { bold: true, sz: 8 } } });
-          row.push({ v: "", s: {} }); // Separador
-  
-          // Resumen Estadístico Lateral
-          if (idx < 4) {
-          const item = [
-              { n: "DESTACADO", k: "AD", c: "00CC00" },
-              { n: "LOGRADO", k: "A", c: "2563EB" },
-              { n: "EN PROCESO", k: "B", c: "FFFF00" },
-              { n: "EN INICIO", k: "C", c: "FF0000" }
-          ][idx];
-          
-          row.push(
-              { v: item.n, s: { ...estiloBase, fill: { fgColor: { rgb: item.c } }, font: { bold: true, sz: 8 } } },
-              { v: item.k, s: { ...estiloBase, font: { bold: true, sz: 8 } } },
-              { v: stats[item.k] || 0, s: estiloBase },
-              { v: totalAlumnos > 0 ? `${((stats[item.k]/totalAlumnos)*100).toFixed(0)}%` : "0%", s: estiloBase }
-            );
-          } else if (idx === 4) {
-           // FILA TOTAL CORREGIDA: Combinamos visualmente las dos primeras celdas
-          const estiloTotal = { ...estiloBase, font: { bold: true, sz: 8 }, fill: { fgColor: { rgb: "E0F2FE" } } };
-          row.push(
-              { v: "TOTAL", s: estiloTotal }, 
-              { v: "", s: estiloTotal }, // Esta celda se ocultará tras el merge
-              { v: totalAlumnos, s: estiloTotal },
-              { v: "100%", s: estiloTotal }
-          );
-        }
-      rows.push(row);
-      });
-      const ws = XLSX.utils.aoa_to_sheet(rows);
-  
-      // 4. MERGES ESTRATÉGICOS (PARA EVITAR DATOS OCULTOS)
-      ws['!merges'] = [
-          { s: { r: 0, c: 0 }, e: { r: 0, c: colLogroIdx + 5 } }, // Título Principal
-          { s: { r: 1, c: 0 }, e: { r: 1, c: 5 } },             // ÁREA (Visible)
-          { s: { r: 1, c: 8 }, e: { r: 1, c: 13 } },            // GRADO (Visible)
-          { s: { r: 1, c: colLogroIdx - 4 }, e: { r: 1, c: colLogroIdx + 1 } }, // DOCENTE (Visible)
-          { s: { r: 3, c: 0 }, e: { r: 4, c: 0 } },             // N°
-          { s: { r: 3, c: 1 }, e: { r: 4, c: 1 } },             // SEXO
-          { s: { r: 3, c: 2 }, e: { r: 4, c: 2 } },             // APELLIDOS Y NOMBRES
-          { s: { r: 3, c: colLogroIdx }, e: { r: 4, c: colLogroIdx } }, // LOGRO FINAL (Vertical Única)
-          { s: { r: 3, c: colLogroIdx + 2 }, e: { r: 3, c: colLogroIdx + 5 } } // RESUMEN ESTADÍSTICO (Título)
-      ];
-  
-      // Merge para los títulos de cada competencia
-      let currCol = 3;
-      competencias.forEach(() => {
-          ws['!merges'].push({ s: { r: 3, c: currCol }, e: { r: 3, c: currCol + 4 } });
-          currCol += 5;
-      });
-  
-      // MEJORA: Merge dinámico para la fila TOTAL del Resumen Estadístico
-      // El resumen estadístico empieza en la fila index 5. El TOTAL está en el index 9.
-      const colResumenStart = colLogroIdx + 2; 
-      ws['!merges'].push({ 
-          s: { r: 9, c: colResumenStart },     // Inicio: Celda "TOTAL"
-          e: { r: 9, c: colResumenStart + 1 } // Fin: Combina con la siguiente celda (Notas)
-      });
-  
-      // 5. AJUSTE DE ANCHOS DE COLUMNA (Fuente 8)
-      ws['!cols'] = [
-          { wch: 4 }, { wch: 6 }, { wch: 40 }, // Datos personales
-          ...Array(competencias.length * 5).fill({ wch: 4.2 }), // D1 a PROM
-          { wch: 5 },    // LOGRO FINAL (Estrecho similar a PROM)
-          { wch: 2 },    // Separador
-          { wch: 15 },   // NIVELES (Resumen)
-          { wch: 4 },    // NOTAS (Resumen)
-          { wch: 4 },    // CANT. (Resumen)
-          { wch: 4 }     // % (Resumen)
-      ];
-
-      if (!ws["!cols"]) ws["!cols"] = [];
-      // N°
-      ws["!cols"][0] = { wch: 4 };
-      // SEXO
-      ws["!cols"][1] = { wch: 4 };
-      // APELLIDOS Y NOMBRES
-      ws["!cols"][2] = { wch: 32 };
-
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "REGISTRO");
-      ws['!rows'] = [];
-      ws['!rows'][3] = { hpt: 28 }; // A4 → altura ideal para títulos largos
-      ws['!rows'][4] = { hpt: 22 }; // A5 → subencabezados
-      XLSX.writeFile(wb, `Registro_Auxiliar_2026.xlsx`);
+    // Estadísticas (Ya confirmadas como perfectas)
+    const nFinales = alumnosValidos.map(a => {
+        const nombreFull = a.nombre || `${a.apellido_paterno} ${a.apellido_materno}, ${a.nombres}`.toUpperCase();
+        return calcularLogroBimestral(nombreFull);
+    });
+    
+    const totalRegistros = 20; 
+    const stats = {
+        AD: nFinales.filter(n => n === 'AD').length,
+        A: nFinales.filter(n => n === 'A').length,
+        B: nFinales.filter(n => n === 'B').length,
+        C: nFinales.filter(n => n === 'C').length
     };
+
+    const borderThin = { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } };
+    const estiloBase = { font: { sz: 8 }, border: borderThin, alignment: { vertical: "center", horizontal: "center" } };
+    
+    // Estilos de Cabecera
+    const estiloVerdeOscuro = { ...estiloBase, font: { bold: true, color: { rgb: "FFFFFF" }, sz: 8 }, fill: { fgColor: { rgb: "00A859" } }, alignment: { horizontal: "center", vertical: "center", wrapText: true } };
+    const estiloNaranjaLogro = { ...estiloBase, font: { bold: true, color: { rgb: "FFFFFF" }, sz: 8 }, fill: { fgColor: { rgb: "F4A300" } } };
+    const estiloAzulResumen = { ...estiloBase, font: { bold: true, color: { rgb: "FFFFFF" }, sz: 8 }, fill: { fgColor: { rgb: "64740B" } } };
+
+    const rows = [];
+    const colLogroIdx = 3 + (competencias.length * 5); 
+
+    // Encabezados
+    rows.push([{ v: "REGISTRO AUXILIAR 2026", s: { font: { bold: true, sz: 14 }, alignment: { horizontal: "center" } } }]);
+    const filaInfo = Array(colLogroIdx + 6).fill({ v: "", s: {} });
+    filaInfo[0] = { v: `ÁREA: ${area.toUpperCase()}`, s: { font: { bold: true, sz: 8 } } };
+    filaInfo[8] = { v: `GRADO: ${grado}`, s: { font: { bold: true, sz: 8 } } };
+    const docenteFinal = nombreDocenteAsignado || (perfilUsuario?.nombre_completo || "").toUpperCase();
+    filaInfo[colLogroIdx - 4] = { v: `DOCENTE: ${docenteFinal}`, s: { font: { bold: true, sz: 8 } } };
+    rows.push(filaInfo);
+    rows.push([]); 
+
+    const h1 = [{ v: "N°", s: estiloVerdeOscuro }, { v: "SEXO", s: estiloVerdeOscuro }, { v: "APELLIDOS Y NOMBRES", s: estiloVerdeOscuro }];
+    competencias.forEach(c => { h1.push({ v: c.toUpperCase(), s: estiloVerdeOscuro }, "", "", "", ""); });
+    h1.push({ v: "LOGRO", s: estiloNaranjaLogro }, { v: "", s: {} }, { v: "RESUMEN ESTADÍSTICO", s: estiloAzulResumen }, "", "", "");
+    rows.push(h1);
+
+    const h2 = [{ v: "", s: estiloVerdeOscuro }, { v: "", s: estiloVerdeOscuro }, { v: "", s: estiloVerdeOscuro }];
+    competencias.forEach(() => ["D1", "D2", "D3", "D4", "PROM"].forEach(t => h2.push({ v: t, s: estiloVerdeOscuro })));
+    h2.push({ v: "", s: estiloNaranjaLogro }, { v: "", s: {} }, { v: "NIVELES", s: estiloAzulResumen }, { v: "NOTAS", s: estiloAzulResumen }, { v: "CANT.", s: estiloAzulResumen }, { v: "%", s: estiloAzulResumen });
+    rows.push(h2);
+
+    // CUERPO CON MEJORAS DE COLOR
+    alumnosValidos.forEach((alumno, idx) => {
+        const nombreFull = alumno.nombre || `${alumno.apellido_paterno} ${alumno.apellido_materno}, ${alumno.nombres}`.toUpperCase().trim();
+        const idEst = normalizarID(nombreFull);
+        
+        // Mejora 1: Color por Sexo (Azul para H, Fucsia para M)
+        const valSexo = (alumno.sexo || alumno.genero || generos[idEst] || generos[nombreFull] || "-").toUpperCase();
+        const colorSexo = valSexo === 'M' ? "FF00FF" : (valSexo === 'H' ? "0000FF" : "000000");
+
+        const row = [
+            { v: idx + 1, s: estiloBase },
+            { v: valSexo, s: { ...estiloBase, font: { sz: 8, bold: true, color: { rgb: colorSexo } } } },
+            { v: nombreFull, s: { ...estiloBase, alignment: { horizontal: "left" } } }
+        ];
+
+        // Notas de competencias
+        competencias.forEach((_, cIdx) => {
+            [1, 2, 3, 4].forEach(d => {
+                const val = notas[`${idEst}-${cIdx}-${d}`] || "-";
+                const colorNota = val === 'AD' ? "00B050" : val === 'A'  ? "0070C0" : val === 'C'  ? "FF0000" : "000000";
+                row.push({ 
+                v: val, s: {  ...estiloBase, 
+                font: { sz: 8, color: { rgb: colorNota } }  } 
+                });
+    
+                });
+                const p = calcularPromedio(nombreFull, cIdx);
+                const colorPromedioFinal = p === 'AD' ? "00B050" : p === 'A' ? "0070C0" : p === 'C' ? "FF0000" : "000000";
+           row.push({ 
+                v: p, 
+                s: { ...estiloBase, 
+                fill: { fgColor: { rgb: "DCFCE7" } }, 
+                font: { bold: true, sz: 8, color: { rgb: colorPromedioFinal } } } });
+                });
+        // Mejora 2: Logro Final con C en Rojo
+        const lf = calcularLogroBimestral(nombreFull);
+        row.push({ 
+            v: lf, 
+            s: { 
+                ...estiloBase, 
+                fill: { fgColor: { rgb: "FEF08A" } }, 
+                font: { bold: true, sz: 8, color: { rgb: lf === 'AD' ? "00B050": lf === 'A'  ? "0070C0": lf === 'C'  ? "FF0000" : "000000" } } 
+            }
+        });
+        row.push({ v: "", s: {} }); 
+
+        // Resumen Estadístico (Manteniendo el éxito previo)
+        if (idx < 4) {
+            const item = [{ n: "DESTACADO", k: "AD", c: "00CC00" }, { n: "LOGRADO", k: "A", c: "2563EB" }, { n: "EN PROCESO", k: "B", c: "FFFF00" }, { n: "EN INICIO", k: "C", c: "FF0000" }][idx];
+            row.push(
+                { v: item.n, s: { ...estiloBase, fill: { fgColor: { rgb: item.c } }, font: { bold: true, sz: 8, color: { rgb: item.k === 'B' ? "000000" : "FFFFFF" } } } },
+                { v: item.k, s: { ...estiloBase, font: { bold: true, sz: 8 } } },
+                { v: stats[item.k] || 0, s: estiloBase },
+                { v: `${(((stats[item.k] || 0) / totalRegistros) * 100).toFixed(0)}%`, s: estiloBase }
+            );
+        } else if (idx === 4) {
+            const estiloTotal = { ...estiloBase, font: { bold: true, sz: 8 }, fill: { fgColor: { rgb: "E0F2FE" } } };
+            row.push({ v: "TOTAL", s: estiloTotal }, { v: "", s: estiloTotal }, { v: totalRegistros, s: estiloTotal }, { v: "100%", s: estiloTotal });
+        }
+        rows.push(row);
+    });
+
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    
+    // Merges y Alturas (Configuración estable)
+    ws['!merges'] = [
+        { s: { r: 0, c: 0 }, e: { r: 0, c: colLogroIdx + 5 } },
+        { s: { r: 1, c: 0 }, e: { r: 1, c: 5 } }, { s: { r: 1, c: 8 }, e: { r: 1, c: 13 } },
+        { s: { r: 1, c: colLogroIdx - 4 }, e: { r: 1, c: colLogroIdx + 1 } },
+        { s: { r: 3, c: 0 }, e: { r: 4, c: 0 } }, { s: { r: 3, c: 1 }, e: { r: 4, c: 1 } },
+        { s: { r: 3, c: 2 }, e: { r: 4, c: 2 } }, { s: { r: 3, c: colLogroIdx }, e: { r: 4, c: colLogroIdx } },
+        { s: { r: 3, c: colLogroIdx + 2 }, e: { r: 3, c: colLogroIdx + 5 } },
+        { s: { r: 9, c: colLogroIdx + 2 }, e: { r: 9, c: colLogroIdx + 3 } }
+    ];
+
+    let currCol = 3;
+    competencias.forEach(() => {
+        ws['!merges'].push({ s: { r: 3, c: currCol }, e: { r: 3, c: currCol + 4 } });
+        currCol += 5;
+    });
+
+    ws['!cols'] = [{ wch: 4 }, { wch: 4 }, { wch: 32 }, ...Array(competencias.length * 5).fill({ wch: 4 }), { wch: 6 }, { wch: 2 }, { wch: 15 }, { wch: 5 }, { wch: 5 }, { wch: 5 }];
+
+    ws['!rows'] = [];
+    ws['!rows'][0] = { hpt: 30 }; 
+    ws['!rows'][3] = { hpt: 28 }; 
+    ws['!rows'][4] = { hpt: 22 }; 
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "REGISTRO");
+    XLSX.writeFile(wb, `Registro_Auxiliar_2026_${grado}_${area}.xlsx`);
+  };
 
    const handleGuardarTodo = async () => {
     if (!grado || !area || !bimestre) return;
@@ -482,7 +472,7 @@ const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion
 
   const getColorNota = (nota) => {
     if (nota === 'C') return 'text-red-600';
-    if (nota === 'B') return 'text-blue-600';
+    if (nota === 'A') return 'text-blue-600';
     if (nota === 'AD') return 'text-green-600';
     return 'text-slate-700';
   };

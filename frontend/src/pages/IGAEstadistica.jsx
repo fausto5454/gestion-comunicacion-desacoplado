@@ -89,27 +89,48 @@ const IGAEstadistica = () => {
         worksheet.getCell('J2').value = `BIMESTRE: ${filtros?.bimestre || ''}`;
 
         worksheet.getRow(2).eachCell(c => {
-            c.font = { size: 10, bold: true, name: 'Calibri' };
+            c.font = { size: 9, bold: true, name: 'Calibri' };
             c.alignment = { horizontal: 'left' };
         });
 
         worksheet.addRow([]); // Espacio (Fila 3)
 
         // 3. ENCABEZADOS DE TABLA (Fila 4 y 5)
-        const h1 = worksheet.getRow(4);
-        h1.values = [null, 'N°', 'ESTUDIANTE', 'GÉNERO', null, 'AD', 'A', 'B', 'C', 'LOGRO'];
-        const h2 = worksheet.getRow(5);
-        h2.values = [null, null, null, 'H', 'M', null, null, null, null, null];
+       const h1 = worksheet.getRow(4);
+       h1.values = [null, 'N°', 'APELLIDOS Y NOMBRES', 'GÉNERO', null, 'AD', 'A', 'B', 'C', 'LOGRO'];
+       const h2 = worksheet.getRow(5);
+       h2.values = [null, null, null, 'H', 'M', null, null, null, null, null];
 
-        for (let i = 2; i <= 10; i++) {
-            [h1, h2].forEach(row => {
-                const cell = row.getCell(i);
-                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF16A34A' } };
-                cell.font = { color: { argb: 'FFFFFFFF' }, size: 10, bold: true };
-                cell.alignment = { horizontal: 'center', vertical: 'middle' };
-                cell.border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
-            });
-        }
+       for (let i = 2; i <= 10; i++) {
+          [h1, h2].forEach(row => {
+          const cell = row.getCell(i);
+        
+          // DISEÑO PARA LA CELDA "LOGRO" (Columna 10)
+          if (i === 10) {
+              cell.fill = { 
+                  type: 'pattern', 
+                  pattern: 'solid', 
+                  fgColor: { argb: 'FFFFC000' } // Naranja/Ámbar vibrante del diseño
+              };
+              cell.font = { color: { argb: 'FFFFFFFF' }, size: 9, bold: true }; // Texto blanco
+           } 
+           // DISEÑO PARA EL RESTO DE CABECERAS (Verde)
+           else {
+               cell.fill = { 
+                   type: 'pattern', 
+                   pattern: 'solid', 
+                   fgColor: { argb: 'FF16A34A' } 
+              };
+               cell.font = { color: { argb: 'FFFFFFFF' }, size: 9, bold: true };
+            }
+
+            cell.alignment = { horizontal: 'center', vertical: 'middle' };
+            cell.border = { 
+                top: {style:'thin'}, left: {style:'thin'}, 
+                bottom: {style:'thin'}, right: {style:'thin'} 
+             };
+         });
+       }
 
         worksheet.mergeCells('B4:B5'); // N°
         worksheet.mergeCells('C4:C5'); // ESTUDIANTE
@@ -121,27 +142,63 @@ const IGAEstadistica = () => {
         worksheet.mergeCells('J4:J5'); // LOGRO
 
         // 4. DATOS
-        let countH = 0; let countM = 0;
-        (stats?.estudiantes || []).forEach((est, i) => {
-            const genero = est.genero?.toUpperCase(); 
-            if (genero === 'M') countM++; if (genero === 'H') countH++;
+      let countH = 0; let countM = 0;
+         (stats?.estudiantes || []).forEach((est, i) => {
+         const genero = est.genero?.toUpperCase(); 
+         if (genero === 'M') countM++; if (genero === 'H') countH++;
 
-            const row = worksheet.addRow([
-                null, i + 1, est.nombre_estudiante, 
-                genero === 'H' ? '1' : '', genero === 'M' ? '1' : '', 
-                est.logro_bimestral === 'AD' ? '1' : '', est.logro_bimestral === 'A' ? '1' : '',
-                est.logro_bimestral === 'B' ? '1' : '', est.logro_bimestral === 'C' ? '1' : '',
-                est.logro_bimestral
-            ]);
+         const row = worksheet.addRow([
+            null, i + 1, est.nombre_estudiante, 
+            genero === 'H' ? '1' : '', genero === 'M' ? '1' : '', 
+            est.logro_bimestral === 'AD' ? '1' : '', est.logro_bimestral === 'A' ? '1' : '',
+            est.logro_bimestral === 'B' ? '1' : '', est.logro_bimestral === 'C' ? '1' : '',
+            est.logro_bimestral
+         ]);
 
-            row.eachCell((c, colNum) => {
-                if (colNum >= 2) {
-                    c.font = { size: 10, name: 'Calibri' };
-                    c.border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
-                    c.alignment = { horizontal: colNum === 3 ? 'left' : 'center' };
-                }
-            });
-        });
+         // MAPA DE COLORES PARA LAS LETRAS (Sin relleno, solo fuente)
+         const coloresLetraNota = {
+               'AD': 'FF008000', // Verde oscuro profesional
+               'A':  'FF0000FF', // Azul puro
+               'B':  '00000000', // Ámbar/Naranja oscuro para legibilidad
+               'C':  'FFFF0000'  // Rojo puro
+         };
+
+          row.eachCell((c, colNum) => {
+             if (colNum >= 2) {
+               c.font = { size: 9, name: 'Calibri' };
+                 c.border = { 
+                    top: {style:'thin'}, left: {style:'thin'}, 
+                      bottom: {style:'thin'}, right: {style:'thin'} 
+                   };
+                 c.alignment = { 
+                     horizontal: colNum === 3 ? 'left' : 'center', 
+                     vertical: 'middle' 
+                };
+
+                // APLICACIÓN DEL DISEÑO A LA COLUMNA "LOGRO" (Columna 10)
+                if (colNum === 10) {
+                    const nota = est.logro_bimestral;
+
+                // 1. FONDO ÁMBAR CLARO (Toda la columna sombreada bajito)
+                  c.fill = {
+                       type: 'pattern',
+                       pattern: 'solid',
+                       fgColor: { argb: 'FFFFFAEB' } // El ámbar claro exacto de Excel
+                    };
+
+                // 2. COLOR SOLO A LA LETRA (Sin relleno adicional)
+                   if (coloresLetraNota[nota]) {
+                          c.font = { 
+                             color: { argb: coloresLetraNota[nota] }, 
+                               bold: true, 
+                                 size: 9, 
+                                   name: 'Calibri' 
+                              };
+                          }
+                       }
+                    }
+                });
+          });
 
         // 5. FILA TOTAL (AJUSTE: Combinación B y C corregida)
         const totalRowIndex = worksheet.lastRow.number + 1;
@@ -160,7 +217,7 @@ const IGAEstadistica = () => {
 
         totalRow.eachCell((c, colNum) => {
             if (colNum >= 2) {
-                c.font = { bold: true, size: 10 };
+                c.font = { bold: true, size: 9 };
                 c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFC000' } };
                 c.border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
                 c.alignment = { horizontal: 'center' };
@@ -180,7 +237,7 @@ const IGAEstadistica = () => {
 
         worksheet.getRow(resRowIdx).eachCell(c => {
             if (c.value) {
-                c.font = { bold: true, size: 10 };
+                c.font = { bold: true, size: 9 };
                 c.alignment = { horizontal: 'center' };
             }
         });
@@ -198,7 +255,7 @@ const IGAEstadistica = () => {
             [`B${rIdx}`, `E${rIdx}`, `G${rIdx}`].forEach(ref => {
                 const cell = worksheet.getCell(ref);
                 cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: colorHex } };
-                cell.font = { color: { argb: 'FFFFFFFF' }, bold: true, size: 10 };
+                cell.font = { color: { argb: 'FFFFFFFF' }, bold: true, size: 9 };
                 cell.border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
                 cell.alignment = { horizontal: 'center' };
             });
@@ -211,7 +268,7 @@ const IGAEstadistica = () => {
                 const imageId = workbook.addImage({ base64: dataUrl, extension: 'png' });
                 worksheet.addImage(imageId, {
                     tl: { col: 2, row: worksheet.lastRow.number + 2 },
-                    ext: { width: 450, height: 250 }
+                    ext: { width: 350, height: 250 }
                 });
             } catch (e) { console.error("Error gráfico:", e); }
         }
@@ -219,9 +276,14 @@ const IGAEstadistica = () => {
         // --- AJUSTE DE ANCHOS (Reducción de columna C) ---
         worksheet.getColumn(1).width = 2;   // Margen A
         worksheet.getColumn(2).width = 5;   // N°
-        worksheet.getColumn(3).width = 30;  // ESTUDIANTE (Antes era 45, ahora es más estrecha)
+        worksheet.getColumn(3).width = 35;  // ESTUDIANTE (Antes era 45, ahora es más estrecha)
         worksheet.getColumn(4).width = 5;   // H
         worksheet.getColumn(5).width = 5;   // M
+        worksheet.getColumn(6).width = 5;   //AD
+        worksheet.getColumn(7).width = 5;   //A
+        worksheet.getColumn(8).width = 5;   //B
+        worksheet.getColumn(9).width = 5;   //C
+        worksheet.getColumn(10).width = 7; //Logro  
 
         const buffer = await workbook.xlsx.writeBuffer();
         saveAs(new Blob([buffer]), `Consolidado_IGA_${filtros?.area || 'Reporte'}.xlsx`);
@@ -270,9 +332,9 @@ const IGAEstadistica = () => {
 
     return (
         <div className="p-6 bg-slate-50 min-h-screen space-y-6">
-            <div className="bg-yellow-200 p-6 rounded-[2rem] shadow-sm border border-slate-200 grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
+            <div className="bg-emerald-300 p-6 rounded-[2rem] shadow-sm border border-slate-200 grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
                 <div className="space-y-2">
-                    <label className="text-[10px] font-black text-gray-500 uppercase ml-2">Área Curricular</label>
+                    <label className="text-[10px] font-black text-gray-600 uppercase ml-2">Área Curricular</label>
                     <select value={filtros.area} onChange={(e) => setFiltros({...filtros, area: e.target.value})} className="w-full bg-green-600 border-none rounded-xl text-white font-bold p-3">
                         <option value="MATEMÁTICA">Matemática</option>
                         <option value="COMUNICACIÓN">Comunicación</option>
@@ -287,14 +349,14 @@ const IGAEstadistica = () => {
                     </select>
                 </div>
                 <div className="space-y-2">
-                    <label className="text-[10px] font-black text-gray-500 uppercase ml-2">Bimestre</label>
+                    <label className="text-[10px] font-black text-gray-600 uppercase ml-2">Bimestre</label>
                     <select value={filtros.bimestre} onChange={(e) => setFiltros({...filtros, bimestre: e.target.value})} className="w-full bg-green-600 border-none rounded-xl text-white font-bold p-3">
                         <option value="1">1° Bimestre</option><option value="2">2° Bimestre</option>
                         <option value="3">3° Bimestre</option><option value="4">4° Bimestre</option>
                     </select>
                 </div>
                 <div className="space-y-2">
-                    <label className="text-[10px] font-black text-gray-500 uppercase ml-2">Grado / Sección</label>
+                    <label className="text-[10px] font-black text-gray-600 uppercase ml-2">Grado / Sección</label>
                     <div className="flex gap-1">
                         <select value={filtros.grado} onChange={(e) => setFiltros({...filtros, grado: e.target.value})} className="w-full bg-green-600 border-none rounded-xl text-white text-[10px] font-bold p-3">
                             <option value="1°">1° Sec</option><option value="2°">2° Sec</option>
@@ -316,7 +378,7 @@ const IGAEstadistica = () => {
 
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 {stats.resumen.map((item, i) => (
-                    <div key={i} className="bg-emerald-200 p-5 rounded-[2rem] border border-slate-100 shadow-sm">
+                    <div key={i} className="bg-sky-200 p-5 rounded-[2rem] border border-slate-100 shadow-sm">
                         <p className="text-[9px] font-black text-slate-500 uppercase tracking-tighter">{item.name}</p>
                         <div className="flex justify-between items-end mt-2">
                             <p className="text-3xl font-black text-slate-800">{item.cant}</p>

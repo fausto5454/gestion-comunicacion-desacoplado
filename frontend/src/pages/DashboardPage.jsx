@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { supabase } from '../config/supabaseClient';
-import * as XLSX from 'xlsx'; // Importación para Excel
-import { Download } from 'lucide-react';
 
 const DashboardPage = ({ userEmail }) => {
     const [statsData, setStatsData] = useState({
@@ -109,15 +107,7 @@ const DashboardPage = ({ userEmail }) => {
                     <h1 className="text-2xl md:text-3xl font-black text-gray-800 leading-tight">Bienvenido al Sistema</h1>
                     <p className="text-xs md:text-sm text-green-600 font-bold tracking-widest mt-1">Panel de control • Gestión de comunicaciones</p>
                 </div>
-                <button 
-                    onClick={exportarExcel}
-                    className="relative z-10 flex items-center gap-2 bg-green-600 hover:bg-white text-white px-4 py-2 rounded-2xl text-xs font-black shadow-sm transition-all active:scale-95 uppercase tracking-wider"
-                >
-                    <Download size={14} /> Exportar Excel
-                </button>
-                <div className="absolute -right-10 -top-10 w-40 h-40 bg-green-200/30 rounded-full blur-3xl"></div>
             </div>
-
             {/* STATS CARDS */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                 {stats.map((stat, index) => (

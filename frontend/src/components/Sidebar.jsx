@@ -41,7 +41,7 @@ const Sidebar = ({ rol_id, userName, userEmail, setCurrentView, currentView, isS
             ]
         },
         { 
-            name: 'Documentos y Reportes', 
+            name: 'Reportes', 
             icon: FolderTree, 
             roles: [1, 2, 3, 4, 5],
             children: [

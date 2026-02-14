@@ -196,15 +196,15 @@ const AuditoriaPage = () => {
         <div className="flex flex-col gap-6 animate-in fade-in duration-700">
             {/* PANEL DE ESTADÍSTICAS Y MANTENIMIENTO */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="bg-gray-700 p-6 rounded-3xl border border-gray-600 shadow-sm flex items-center justify-between">
+                <div className="bg-gray-600 p-6 rounded-3xl border border-gray-600 shadow-sm flex items-center justify-between">
                     <div>
-                        <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Base de Datos</p>
+                        <p className="text-[10px] font-black uppercase text-gray-300 tracking-widest">Base de Datos</p>
                         <button 
                             onClick={limpiarLogsAntiguos}
                             disabled={limpiando}
-                            className="mt-2 flex items-center gap-2 px-3 py-2 bg-red-500/50 hover:bg-red-500 text-red-500 hover:text-white rounded-2xl text-[10px] font-black transition-all active:scale-95 disabled:opacity-50 border border-red-500/20"
+                            className="mt-2 flex items-center gap-2 px-3 py-2 bg-gray-400 hover:bg-red-500 text-red-500 hover:text-white rounded-2xl text-[10px] font-black transition-all active:scale-95 disabled:opacity-50 border border-red-500/20"
                         >
-                            <Trash2 size={14} /> {limpiando ? 'PROCESANDO...' : 'PURGAR > 30 DÍAS'}
+                            <Trash2 size={14} /> {limpiando ? 'PROCESANDO...' : 'Limpiar > 30 días'}
                         </button>
                     </div>
                     <div className="flex gap-4">
@@ -217,9 +217,9 @@ const AuditoriaPage = () => {
                     </div>
                 </div>
                 {/* Salud de Rendimiento Dinámica */}
-                <div className={`p-5 rounded-3xl border shadow-sm flex items-center justify-between transition-all duration-500 ${promedioMs > 400 ? 'bg-red-50 border-red-200' : 'bg-gray-700 border-gray-600'}`}>
+                <div className={`p-5 rounded-3xl border shadow-sm flex items-center justify-between transition-all duration-500 ${promedioMs > 400 ? 'bg-red-50 border-red-200' : 'bg-gray-600 border-gray-600'}`}>
                     <div>
-                        <p className={`text-[10px] font-black uppercase tracking-widest ${promedioMs > 400 ? 'text-red-500' : 'text-gray-400'}`}>Rendimiento Promedio</p>
+                        <p className={`text-[10px] font-black uppercase tracking-widest ${promedioMs > 400 ? 'text-red-500' : 'text-gray-300'}`}>Rendimiento Promedio</p>
                         <h3 className={`text-2xl font-black ${promedioMs > 400 ? 'text-red-600' : 'text-amber-500'}`}>{promedioMs} ms</h3>
                     </div>
                     <div className={`p-5 rounded-2xl transition-colors ${promedioMs > 400 ? 'bg-red-100' : 'bg-amber-50'}`}>
@@ -295,7 +295,7 @@ const AuditoriaPage = () => {
                 <div className="hidden md:block overflow-x-auto">
                     <table className="w-full text-left border-collapse">
                         <thead>
-                            <tr className="bg-gray-700">
+                            <tr className="bg-gray-600">
                                 <th className="p-5 text-[10px] font-black text-gray-300 text-center uppercase">Fecha y Hora</th>
                                 <th className="p-5 text-[10px] font-black text-gray-300 text-center uppercase">Responsable</th>
                                 <th className="p-5 text-[10px] font-black text-gray-300 text-center uppercase">Acción</th>

@@ -1,177 +1,244 @@
 import React, { useState, useEffect } from 'react';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend, AreaChart, Area, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { supabase } from '../config/supabaseClient';
+import { Monitor, GraduationCap, ClipboardCheck, Send, AlertTriangle, CheckCircle2, MessageSquare, Loader2 } from 'lucide-react';
 
-const DashboardPage = ({ userEmail }) => {
-    const [statsData, setStatsData] = useState({
-        usuarios: 0,
-        mensajes: 0,
-        alertas: 0,
-        documentos: 0,
-        grafico: [],
-        rawMessages: [] // Guardamos los datos para exportar
+const DashboardPage = () => {
+    // ESTADOS DE CONTROL
+    const [aula, setAula] = useState('1° A');
+    const [area, setArea] = useState('MATEMÁTICA');
+    const [bimestre, setBimestre] = useState(1);
+    const [loading, setLoading] = useState(false);
+    
+    const [stats, setStats] = useState({
+        totalNotas: 0, aprobados: 0, totalComs: 0, urgentes: 0,
+        leidos: 0, pendientes: 0,
+        dataPie: [], dataFlujo: []
     });
-    const [loading, setLoading] = useState(true);
+
+    const aulas = ['1° A', '1° B', '1° C', '2° A', '2° B', '2° C', '3° A', '3° B', '4° A', '4° B', '5° A', '5° B'];
+    const areas = ['MATEMÁTICA', 'COMUNICACIÓN', 'CIENCIA Y TECNOLOGÍA', 'DPCC', 'PERSONAL SOCIAL', 'EPT', 'RELIGIÓN', 'INGLÉS', 'ARTE Y CULTURA', 'EDUCACIÓN FÍSICA'];
 
     useEffect(() => {
-        const fetchDashboardData = async () => {
+        if (!aula || !area || !bimestre) return;
+
+        const fetchAllData = async () => {
             setLoading(true);
             try {
-                const { count: userCount } = await supabase
-                    .from('usuarios')
-                    .select('*', { count: 'exact', head: true });
+                const [grado, seccion] = aula.split(' ');
 
-                const { data: comunicaciones } = await supabase
-                    .from('comunicaciones')
-                    .select('fecha_envio, prioridad, archivo_url, titulo, estado');
+                const [nResponse, cResponse] = await Promise.all([
+                    supabase.from('calificaciones').select('logro_bimestral')
+                        .eq('grado', grado).eq('seccion', seccion).eq('area', area).eq('bimestre', bimestre),
+                    supabase.from('comunicaciones').select('*').eq('area', area)
+                ]);
 
-                if (comunicaciones) {
-                    const totalMsgs = comunicaciones.length;
-                    const alertasHoy = comunicaciones.filter(m => {
-                        const hoy = new Date().toISOString().split('T')[0];
-                        const fechaMsg = new Date(m.fecha_envio).toISOString().split('T')[0];
-                        return m.prioridad === 'Urgente' && hoy === fechaMsg;
-                    }).length;
+                const nData = nResponse.data;
+                const cData = cResponse.data;
 
-                    const totalDocs = comunicaciones.filter(m => m.archivo_url !== null).length;
-                    const diasSemana = ['Dom', 'Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab'];
-                    const hoy = new Date();
-                    const ultimos7Dias = {};
+                if (nData) {
+                    const total = nData.length;
+                    const countAD = nData.filter(n => n.logro_bimestral === 'AD').length;
+                    const countA  = nData.filter(n => n.logro_bimestral === 'A').length;
+                    const countB  = nData.filter(n => n.logro_bimestral === 'B').length;
+                    const countC  = nData.filter(n => n.logro_bimestral === 'C').length;
 
-                    for (let i = 6; i >= 0; i--) {
-                        const d = new Date();
-                        d.setDate(hoy.getDate() - i);
-                        ultimos7Dias[d.toISOString().split('T')[0]] = { 
-                            name: diasSemana[d.getDay()], 
-                            mensajes: 0 
-                        };
-                    }
+                    const totalC = cData?.length || 0;
+                    // Simulación de lectura (puedes conectar a tu tabla de confirmaciones real)
+                    const leidosCount = Math.round(totalC * 0.4); 
 
-                    comunicaciones.forEach(m => {
-                        const fecha = new Date(m.fecha_envio).toISOString().split('T')[0];
-                        if (ultimos7Dias[fecha]) ultimos7Dias[fecha].mensajes += 1;
-                    });
-
-                    setStatsData({
-                        usuarios: userCount || 0,
-                        mensajes: totalMsgs,
-                        alertas: alertasHoy,
-                        documentos: totalDocs,
-                        grafico: Object.values(ultimos7Dias),
-                        rawMessages: comunicaciones
+                    setStats({
+                        totalNotas: total,
+                        aprobados: countAD + countA,
+                        totalComs: totalC,
+                        urgentes: cData?.filter(c => c.prioridad === 'Urgente').length || 0,
+                        leidos: leidosCount,
+                        pendientes: totalC - leidosCount,
+                        dataPie: [
+                            { name: 'AD', value: countAD, color: '#10b981' },
+                            { name: 'A',  value: countA,  color: '#3b82f6' },
+                            { name: 'B',  value: countB,  color: '#f59e0b' },
+                            { name: 'C',  value: countC,  color: '#ef4444' },
+                        ].filter(item => item.value > 0),
+                        dataFlujo: [
+                            { name: 'Sem 1', v: Math.floor(total * 0.2) },
+                            { name: 'Sem 2', v: Math.floor(total * 0.5) },
+                            { name: 'Sem 3', v: total }
+                        ]
                     });
                 }
-            } catch (error) {
-                console.error("Error:", error);
+            } catch (err) {
+                console.error("Error cargando datos:", err);
             } finally {
-                setLoading(false);
+                // Pequeño delay para que la transición no sea brusca
+                setTimeout(() => setLoading(false), 500);
             }
         };
-        fetchDashboardData();
-    }, []);
-
-    // FUNCIÓN PARA EXPORTAR A EXCEL
-    const exportarExcel = () => {
-        const dataParaExcel = statsData.rawMessages.map(m => ({
-            Fecha: new Date(m.fecha_envio).toLocaleString(),
-            Asunto: m.titulo,
-            Prioridad: m.prioridad,
-            Estado: m.estado,
-            Tiene_Adjunto: m.archivo_url ? 'SÍ' : 'NO'
-        }));
-
-        const ws = XLSX.utils.json_to_sheet(dataParaExcel);
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "Reporte Comunicaciones");
-        XLSX.writeFile(wb, `Reporte_Sistema_${new Date().toISOString().split('T')[0]}.xlsx`);
-    };
-
-    const stats = [
-        { label: 'Usuarios Activos', value: statsData.usuarios.toString(), icon: "👥", color: 'bg-blue-500' },
-        { label: 'Mensajes Enviados', value: statsData.mensajes.toLocaleString(), icon: "📩", color: 'bg-green-600' },
-        { label: 'Documentos', value: statsData.documentos.toString(), icon: "📄", color: 'bg-purple-500' },
-        { label: 'Alertas Hoy', value: statsData.alertas.toString(), icon: "🔔", color: 'bg-amber-500' },
-    ];
-
-    if (loading) return (
-        <div className="flex h-96 items-center justify-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
-        </div>
-    );
+        fetchAllData();
+    }, [aula, area, bimestre]);
 
     return (
-        <div className="flex flex-col gap-8 animate-in fade-in duration-700">
-            {/* CABECERA */}
-            <div className="bg-yellow-300/80 p-6 rounded-3xl border border-green-200/50 shadow-sm relative overflow-hidden flex justify-between items-center">
-                <div className="relative z-10">
-                    <h1 className="text-2xl md:text-3xl font-black text-gray-800 leading-tight">Bienvenido al Sistema</h1>
-                    <p className="text-xs md:text-sm text-green-600 font-bold tracking-widest mt-1">Panel de control • Gestión de comunicaciones</p>
-                </div>
+        <div className="p-6 space-y-6 bg-gray-200 min-h-screen relative">
+        {/* CABECERA DINÁMICA CORREGIDA */}
+       <header className="bg-sky-600 p-4 md:p-6 rounded-[1.5rem] md:rounded-[2.5rem] shadow-sm border border-slate-200 flex flex-col xl:flex-row justify-between items-center gap-4">
+       {/* Título e Icono: Se alinean al centro en móvil, a la izquierda en desktop */}
+        <div className="flex items-center gap-3 md:gap-4 w-full xl:w-auto justify-center md:justify-start">
+          <div className="bg-[#00a859] p-2 md:p-3 rounded-xl md:rounded-2xl text-white shadow-lg shrink-0">
+            <Monitor size={window.innerWidth < 768 ? 20 : 24} />
+             </div>
+               <div className="text-center md:text-left">
+               <h1 className="text-lg md:text-xl font-black text-slate-900 tracking-tight uppercase leading-tight">
+                  Bienvenidos al Sistema
+               </h1>
+               <p className="text-[9px] md:text-[10px] text-white font-bold uppercase tracking-widest leading-none mt-1">
+              I.E. 2079 Antonio Raimondi
+            </p>
+        </div>
+    </div>
+    {/* ZONA DE FILTROS: En móvil se apilan o distribuyen equitativamente */}
+    <div className="flex flex-col sm:flex-row flex-wrap items-center justify-center gap-3 w-full xl:w-auto">
+    {/* Bloque Bimestre: Scroll horizontal suave si el espacio es muy pequeño */}
+        <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200 shadow-inner w-full sm:w-auto justify-center">
+            {[1, 2, 3, 4].map(b => (
+                <button key={b} onClick={() => setBimestre(b)}
+                    className={`flex-1 sm:flex-none px-1 md:px-3 py-1 rounded-lg text-[10px] font-black transition-all ${
+                        bimestre === b ? 'bg-green-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-600'
+                    }`}>
+                    {b}° BIM
+                </button>
+            ))}
+        </div>
+        {/* Contenedor de Selectores: Dos columnas en móviles pequeños, fila en desktop */}
+        <div className="grid grid-cols-2 sm:flex items-center gap-2 w-full sm:w-auto">
+            {/* Selector Aula */}
+            <div className="flex items-center bg-slate-50 border border-slate-200 rounded-xl px-2 md:px-3 py-2 hover:bg-white transition-all shadow-sm">
+                <span className="text-[8px] md:text-[9px] font-black text-slate-400 uppercase mr-1 md:mr-2 border-r pr-1 md:pr-2 border-slate-200">Aula</span>
+                <select 
+                    value={aula} 
+                    onChange={e => setAula(e.target.value)} 
+                    className="bg-transparent border-none font-bold text-[10px] md:text-xs focus:ring-0 outline-none cursor-pointer text-slate-700 w-full sm:w-auto min-w-[40px]"
+                     >
+                    {aulas.map(a => <option key={a} value={a}>{a}</option>)}
+                </select>
             </div>
-            {/* STATS CARDS */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                {stats.map((stat, index) => (
-                    <div key={index} className="bg-emerald-200 p-6 rounded-3xl shadow-sm border border-gray-100 flex items-center hover:shadow-md transition-all group">
-                        <div className={`${stat.color} w-14 h-14 rounded-2xl text-white flex items-center justify-center text-2xl group-hover:rotate-6 transition-transform shadow-lg shadow-gray-200`}>
-                            {stat.icon}
-                        </div>
-                        <div className="ml-5">
-                            <p className="text-[10px] text-gray-500 uppercase font-black tracking-wider">{stat.label}</p>
-                            <p className="text-3xl font-black text-gray-800 leading-none mt-1">{stat.value}</p>
-                        </div>
-                    </div>
-                ))}
+            {/* Selector Área */}
+            <div className="flex items-center bg-slate-50 border border-slate-200 rounded-xl px-2 md:px-2 py-2 hover:bg-white transition-all shadow-sm">
+                <span className="text-[8px] md:text-[9px] font-black text-slate-400 uppercase mr-1 md:mr-2 border-r pr-1 md:pr-2 border-slate-200">Área</span>
+                <select 
+                    value={area} 
+                    onChange={e => setArea(e.target.value)} 
+                    className="bg-transparent border-none font-bold text-[10px] md:text-[11px] uppercase focus:ring-0 outline-none cursor-pointer text-slate-700 w-full sm:w-auto max-w-[120px] md:max-w-[180px] truncate"
+                    >
+                    {areas.map(a => <option key={a} value={a}>{a}</option>)}
+                </select>
+              </div>
             </div>
-            {/* GRÁFICO Y SIDEBAR */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <div className="lg:col-span-2 bg-sky-100 p-6 md:p-8 rounded-3xl shadow-sm border border-gray-100">
-                    <div className="flex justify-between items-center mb-8">
-                        <div>
-                            <h2 className="text-xl font-black text-gray-800">Flujo de Actividad</h2>
-                            <p className="text-xs text-gray-400 font-bold">Interacciones del sistema por semana</p>
-                        </div>
-                        <span className="text-[10px] font-black text-green-600 bg-green-50 px-4 py-1.5 rounded-full uppercase tracking-tighter">Últimos 7 días</span>
-                    </div>
-                    <div className="h-72 w-full">
+          </div>
+        </header>
+          {/* TARJETAS KPI */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <Card label="Progreso Registro" value={stats.totalNotas} color="border-emerald-500" icon={<ClipboardCheck size={20} className="text-emerald-500" />} />
+                <Card label="Efectividad AD/A" value={`${stats.totalNotas > 0 ? Math.round((stats.aprobados/stats.totalNotas)*100) : 0}%`} color="border-blue-500" icon={<GraduationCap size={20} className="text-blue-500" />} />
+                <Card label="Comunicaciones" value={stats.totalComs} color="border-purple-500" icon={<MessageSquare size={20} className="text-purple-500" />} />
+                <Card label="Alertas Críticas" value={stats.urgentes} color="border-rose-500" icon={<AlertTriangle size={20} className="text-rose-500" />} />
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* SALUD ACADÉMICA (PIE CHART) */}
+                <div className="lg:col-span-2 bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100">
+                    <h3 className="font-black text-slate-700 text-xs mb-8 uppercase tracking-widest flex items-center gap-2">
+                    <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" /> Salud Académica - {area}
+                    </h3>
+                    <div className="h-72">
                         <ResponsiveContainer width="100%" height="100%">
-                            <AreaChart data={statsData.grafico}>
-                                <defs>
-                                    <linearGradient id="colorMsg" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="#16a34a" stopOpacity={0.2}/>
-                                        <stop offset="95%" stopColor="#16a34a" stopOpacity={0}/>
-                                    </linearGradient>
-                                </defs>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 11, fill: '#94a3b8', fontWeight: 600}} />
-                                <YAxis hide />
-                                <Tooltip contentStyle={{ borderRadius: '20px', border: 'none', boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1)', padding: '12px' }} itemStyle={{ fontSize: '12px', fontWeight: 'bold' }} />
-                                <Area type="monotone" dataKey="mensajes" stroke="#16a34a" strokeWidth={4} fillOpacity={1} fill="url(#colorMsg)" />
-                            </AreaChart>
+                            <PieChart>
+                                <Pie 
+                                    data={stats.dataPie} 
+                                    innerRadius={70} 
+                                    outerRadius={105} 
+                                    paddingAngle={5} 
+                                    dataKey="value"
+                                    stroke="none"
+                                    labelLine={false}
+                                    label={({ cx, cy, midAngle, innerRadius, outerRadius, percent }) => {
+                                        const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+                                        const x = cx + radius * Math.cos(-midAngle * (Math.PI / 180));
+                                        const y = cy + radius * Math.sin(-midAngle * (Math.PI / 180));
+                                        return (
+                                            <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central" style={{ fontSize: '11px', fontWeight: '900' }}>
+                                                {`${(percent * 100).toFixed(0)}%`}
+                                            </text>
+                                        );
+                                    }}
+                                    >
+                                    {stats.dataPie.map((entry, index) => (
+                                        <Cell key={`cell-${index}`} fill={entry.color} />
+                                    ))}
+                                </Pie>
+                                <Tooltip />
+                                <Legend verticalAlign="bottom" iconType="circle" wrapperStyle={{paddingTop: '20px', fontSize: '10px', fontWeight: 'bold'}} />
+                            </PieChart>
                         </ResponsiveContainer>
                     </div>
                 </div>
-
-                <div className="flex flex-col gap-6">
-                    <div className="bg-sky-100 p-8 rounded-3xl shadow-sm border border-gray-100 h-full">
-                        <h2 className="text-xl font-black text-gray-800 mb-6">Información</h2>
-                        <div className="space-y-4">
-                            <div className="bg-blue-50/50 p-5 rounded-2xl border border-blue-100 transition-hover hover:bg-blue-50">
-                                <p className="text-[10px] font-black text-blue-600 uppercase mb-2 tracking-widest">Estado de Conexión</p>
-                                <div className="flex items-center gap-2">
-                                    <span className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></span>
-                                    <p className="text-sm font-bold text-gray-700">Usuario Conectado</p>
-                                </div>
-                            </div>
-                            <div className="p-5 border border-gray-100 rounded-2xl hover:border-green-200 transition-colors">
-                                <p className="text-[10px] text-gray-400 font-black mb-2 uppercase tracking-widest">Correo Institucional</p>
-                                <p className="text-sm font-bold text-gray-600 break-all">{userEmail}</p>
-                            </div>
+                {/* TASA DE LECTURA CON ALERTAS DINÁMICAS */}
+                <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100 flex flex-col justify-between">
+                    <div>
+                        <h3 className="font-black text-slate-700 text-xs mb-8 uppercase tracking-widest flex items-center gap-2">
+                             <Send size={14} className="text-purple-500" /> Seguimiento de Padres
+                        </h3>
+                        <div className="space-y-10">
+                            <ProgressItem 
+                                label="Leídos / Confirmados" 
+                                current={stats.leidos} 
+                                total={stats.totalComs} 
+                                color="bg-emerald-500" 
+                            />
+                            <ProgressItem 
+                                label="Sin Confirmar (Pendientes)" 
+                                current={stats.pendientes} 
+                                total={stats.totalComs} 
+                                // CAMBIO DINÁMICO DE COLOR: Si hay muchos pendientes (>50%), se pone rojo
+                                color={stats.pendientes > (stats.totalComs / 2) ? "bg-rose-500" : "bg-slate-200"} 
+                            />
                         </div>
+                    </div>
+                    <div className={`mt-6 p-4 rounded-2xl border border-dashed transition-colors ${stats.pendientes > (stats.totalComs/2) ? 'bg-rose-50 border-rose-200' : 'bg-slate-50 border-slate-200'}`}>
+                        <p className="text-[10px] font-black text-slate-500 uppercase mb-1">Estado de Gestión:</p>
+                        <p className="text-[11px] font-bold text-slate-600 leading-tight">
+                            {stats.pendientes > (stats.totalComs / 2) 
+                                ? "⚠️ Atención prioritaria: Gran cantidad de padres no han leído los comunicados." 
+                                : "✅ La mayoría de padres están informados correctamente."}
+                        </p>
                     </div>
                 </div>
             </div>
         </div>
     );
 };
+// COMPONENTES AUXILIARES
+const Card = ({ label, value, color, icon }) => (
+    <div className={`bg-white p-6 rounded-[2.2rem] shadow-sm border-b-[6px] ${color} flex flex-col items-center justify-center text-center transition-all hover:-translate-y-2 hover:shadow-lg`}>
+        <div className="mb-2 p-3 bg-slate-50 rounded-2xl">{icon}</div>
+        <p className="text-4xl font-black text-slate-800 tracking-tighter">{value}</p>
+        <p className="text-[10px] font-black text-slate-400 uppercase mt-1 tracking-widest">{label}</p>
+    </div>
+);
+const ProgressItem = ({ label, current, total, color }) => {
+    const percentage = total > 0 ? (current / total) * 100 : 0;
+    return (
+        <div className="space-y-2">
+            <div className="flex justify-between items-end">
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">{label}</span>
+                <span className="text-xs font-black text-slate-800">{Math.round(percentage)}%</span>
+            </div>
+            <div className="w-full bg-slate-100 h-3 rounded-full overflow-hidden shadow-inner border border-slate-50">
+                <div 
+                    className={`${color} h-full rounded-full transition-all duration-1000 ease-in-out`} 
+                    style={{ width: `${percentage}%` }}
+                 />
+             </div>
+         </div>
+     );
+ };
 
-export default DashboardPage;
+ export default DashboardPage;

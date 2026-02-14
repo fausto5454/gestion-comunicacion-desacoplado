@@ -213,10 +213,10 @@ const UsuariosPage = () => {
     };
 
     return (
-        <div className="p-4 md:p-8 bg-gray-700 animate-in fade-in duration-500">
+        <div className="p-4 md:p-8 bg-gray-200 animate-in fade-in duration-500">
             {/* Cabecera con Buscador y Excel */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-                <h1 className="text-3xl font-bold text-white flex items-center">
+                <h1 className="text-3xl font-bold text-gray-800 flex items-center">
                     <Users className="w-7 h-7 mr-3 text-green-600" />
                     Gestión de Usuarios
                 </h1>
@@ -308,7 +308,7 @@ const UsuariosPage = () => {
 
                     {/* Controles de Paginación */}
                     <div className="flex flex-col md:flex-row justify-between items-center mt-6 px-4 gap-4">
-                        <span className="text-[12px] font-black text-gray-100 uppercase tracking-widest">
+                        <span className="text-[12px] font-black text-gray-800 uppercase tracking-widest">
                            Total usuarios: {totalRecords}
                         </span>
                         <div className="flex gap-2">

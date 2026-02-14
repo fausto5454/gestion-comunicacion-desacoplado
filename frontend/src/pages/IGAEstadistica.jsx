@@ -332,7 +332,7 @@ const IGAEstadistica = () => {
 
     return (
         <div className="p-6 bg-slate-50 min-h-screen space-y-6">
-            <div className="bg-emerald-300 p-6 rounded-[2rem] shadow-sm border border-slate-200 grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
+            <div className="bg-emerald-200 p-6 rounded-[2rem] shadow-sm border border-slate-200 grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
                 <div className="space-y-2">
                     <label className="text-[10px] font-black text-gray-600 uppercase ml-2">Área Curricular</label>
                     <select value={filtros.area} onChange={(e) => setFiltros({...filtros, area: e.target.value})} className="w-full bg-green-600 border-none rounded-xl text-white font-bold p-3">
@@ -378,7 +378,7 @@ const IGAEstadistica = () => {
 
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 {stats.resumen.map((item, i) => (
-                    <div key={i} className="bg-sky-200 p-5 rounded-[2rem] border border-slate-100 shadow-sm">
+                    <div key={i} className="bg-orange-200 p-5 rounded-[2rem] border border-slate-100 shadow-sm">
                         <p className="text-[9px] font-black text-slate-500 uppercase tracking-tighter">{item.name}</p>
                         <div className="flex justify-between items-end mt-2">
                             <p className="text-3xl font-black text-slate-800">{item.cant}</p>

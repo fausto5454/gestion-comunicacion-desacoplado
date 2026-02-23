@@ -59,38 +59,38 @@ const UsuariosPage = () => {
 
     // --- FUNCIONES DE CARGA ---
     const fetchUsers = useCallback(async () => {
-        setIsLoading(true);
-        try {
-            const from = currentPage * pageSize;
-            const to = from + pageSize - 1;
+    setIsLoading(true);
+    try {
+        const from = currentPage * pageSize;
+        const to = from + pageSize - 1;
 
-            let query = supabase
-                .from('usuarios')
-                .select(`*, roles (nombre_rol)`, { count: 'exact' });
+        let query = supabase
+            .from('usuarios')
+            .select(`*, roles (nombre_rol)`, { count: 'exact' })
+            // ✅ FILTRO PERMANENTE: Solo personal administrativo, directivo y docente
+            .in('rol_id', [1, 2, 3, 4, 5]);
 
-            // Lógica de búsqueda integrada
-            if (searchTerm) {
-                query = query.ilike('nombre_completo', `%${searchTerm}%`);
-            }
-
-            // MEJORA: Lógica de filtro por rol integrada
-            if (selectedRol !== 'todos') {
-                query = query.eq('rol_id', parseInt(selectedRol));
-            }
-
-            const { data, error, count } = await query
-                .order('nombre_completo', { ascending: true })
-                .range(from, to);
-
-            if (error) throw error;
-            setUsers(data || []);
-            setTotalRecords(count || 0);
-        } catch (error) {
-            toast.error("Error al cargar usuarios");
-        } finally {
-            setIsLoading(false);
+        if (searchTerm) {
+            query = query.ilike('nombre_completo', `%${searchTerm}%`);
         }
-    }, [currentPage, searchTerm, selectedRol]); // Añadido selectedRol como dependencia
+
+        if (selectedRol !== 'todos') {
+            query = query.eq('rol_id', parseInt(selectedRol));
+        }
+
+        const { data, error, count } = await query
+            .order('nombre_completo', { ascending: true })
+            .range(from, to);
+
+        if (error) throw error;
+          setUsers(data || []);
+          setTotalRecords(count || 0);
+      } catch (error) {
+          toast.error("Error al cargar usuarios");
+      } finally {
+          setIsLoading(false);
+     }
+   }, [currentPage, searchTerm, selectedRol]);
 
     useEffect(() => {
         fetchUsers();

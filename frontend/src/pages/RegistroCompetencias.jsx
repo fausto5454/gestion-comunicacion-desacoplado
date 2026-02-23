@@ -447,7 +447,7 @@ const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion
 
       // MENSAJE MEJORADO: Informamos que el sistema detectó y actualizó registros existentes
       setMensaje({ 
-        texto: "¡GUARDADO EXITOSO DE LAS CALIFICACIONES!", 
+        texto: "¡GUARDADO EXITOSO!", 
         tipo: 'success' 
       });
 

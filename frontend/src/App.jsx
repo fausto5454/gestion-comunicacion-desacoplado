@@ -18,6 +18,7 @@ const App = () => {
   const [loading, setLoading] = useState(true);
   const [currentView, setCurrentView] = useState('dashboard');
   const [cursoActivo, setCursoActivo] = useState({ nombre: 'MATEMÁTICA', grado: '1° A' });
+    
 
   // 1. Carga de Sesión y Perfil Sincronizada con la DB
   useEffect(() => {

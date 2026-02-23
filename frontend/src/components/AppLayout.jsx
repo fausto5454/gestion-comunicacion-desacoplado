@@ -23,48 +23,98 @@ const AppLayout = ({ session, onLogout, currentView, setCurrentView, onCursoSele
     const [unreadCount, setUnreadCount] = useState(0);
     const [usuarioID, setUsuarioID] = useState(null);
     const [rolID, setRolID] = useState(null);
+    const [userGrado, setUserGrado] = useState(null);
+    const [userSeccion, setUserSeccion] = useState(null);
     
     const user = session?.user;
     const userEmail = user?.email || 'N/A';
     const userName = user?.user_metadata?.nombre_completo || user?.email || 'Usuario';
 
-    // ... (Efectos de fetchUserData y fetchUnreadMessages se mantienen igual)
-    useEffect(() => {
-        const fetchUserData = async () => {
-            if (!userEmail) return;
-            try {
-                const { data, error } = await supabase
-                    .from("usuarios")
-                    .select("id_usuario, rol_id")
-                    .eq("correo_electronico", userEmail)
-                    .single();
-                if (error) throw error;
-                setUsuarioID(data.id_usuario);
-                setRolID(data.rol_id);
-            } catch (err) {
-                console.error("❌ Error:", err.message);
-            }
-        };
-        fetchUserData();
+    
+   const fetchUserData = useCallback(async () => {
+    if (!userEmail) return;
+    try {
+        // La consulta debe ser una sola cadena continua hasta el final
+        const { data, error } = await supabase
+            .from("usuarios")
+            .select("id_usuario, rol_id, grado, seccion")
+            .eq("correo_electronico", userEmail)
+            .single();
+
+        if (error) throw error;
+
+        // Una vez que tenemos los datos, ejecutamos los estados
+        if (data) {
+            console.log("✅ Perfil Completo Cargado:", data);
+            setUsuarioID(data.id_usuario);
+            setRolID(data.rol_id);
+            setUserGrado(data.grado);   // Ahora sí se "despierta"
+            setUserSeccion(data.seccion); // Ahora sí se "despierta"
+        }
+    } catch (err) {
+        console.error("❌ Error cargando perfil:", err.message);
+    }
     }, [userEmail]);
 
-    const fetchUnreadMessages = useCallback(async () => {
-        if (!usuarioID) return;
-        try {
-            const { data, error } = await supabase
-                .from('comunicaciones')
-                .select('id_comunicacion')
-                .eq('destinatario_id', usuarioID)
-                .eq('estado', 'no leído');
-            if (error) throw error;
-            setUnreadCount(data ? data.length : 0);
-        } catch (err) {
-            console.error('❌ Error:', err.message);
-        }
+    useEffect(() => {
+       fetchUserData();
+    }, [fetchUserData]);;
+
+
+   const fetchUnreadMessages = useCallback(async () => {
+    if (!usuarioID) return;
+
+    try {
+        // Consultamos mensajes no leídos: Directos OR Globales
+        const { count, error } = await supabase
+            .from('comunicaciones')
+            .select('*', { count: 'exact', head: true })
+            .or(`usuario_destino_id.eq.${usuarioID},es_global.eq.true`)
+            .eq('estado', 'no leído');
+
+        if (error) throw error;
+        setUnreadCount(count || 0);
+    } catch (error) {
+        console.error("Error en conteo de campanita:", error.message);
+        setUnreadCount(0);
+    }
     }, [usuarioID]);
 
-    useEffect(() => {
-        if (usuarioID) fetchUnreadMessages();
+  useEffect(() => {
+    if (!usuarioID) return;
+
+    //EFECTO REAL-TIME
+    fetchUnreadMessages();
+
+    const channel = supabase
+        .channel('cambios-notificaciones-global')
+        .on(
+            'postgres_changes',
+            { 
+                event: '*', 
+                schema: 'public', 
+                table: 'comunicaciones' 
+            },
+            (payload) => {
+                // Notificación sonora solo si el nuevo mensaje es para este usuario
+                if (payload.eventType === 'INSERT' && payload.new.usuario_destino_id === String(usuarioID)) {
+                    const horaLima = new Date().toLocaleString('es-PE', {
+                        timeZone: 'America/Lima',
+                        hour: '2-digit', minute: '2-digit', hour12: true
+                    });
+                    console.log(`🔔 Notificación recibida ${horaLima}`);
+                    new Audio('/notificacion.mp3').play().catch(() => {});
+                }
+
+                // Recargar el contador siempre (ante insert, update o delete)
+                fetchUnreadMessages(); 
+            }
+        )
+        .subscribe();
+
+       return () => {
+          supabase.removeChannel(channel);
+      };
     }, [usuarioID, fetchUnreadMessages]);
 
     // ✅ 2. ACTUALIZACIÓN DEL MAPEO DE VISTAS
@@ -160,12 +210,16 @@ const AppLayout = ({ session, onLogout, currentView, setCurrentView, onCursoSele
                                 {userName?.charAt(0).toUpperCase()}
                             </div>
                         </div>
-                        <div className="relative p-2 cursor-pointer transition-transform hover:scale-110" onClick={() => setCurrentView('bandeja')}>
-                            <Bell className="w-7 h-7 fill-yellow-400 text-yellow-400 drop-shadow-md" />
-                        </div>
+                       <div className="relative p-2 cursor-pointer transition-transform hover:scale-110" onClick={() => setCurrentView('bandeja')}>
+                       <Bell className="w-7 h-7 fill-yellow-400 text-yellow-400 drop-shadow-md" />
+                         {unreadCount > 0 && (
+                           <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-600 text-[10px] font-bold text-white ring-2 ring-green-600 shadow-lg z-50 animate-bounce">
+                             {unreadCount}
+                           </span>
+                           )}
+                       </div>
                     </div>
                 </header>
-
                 <main className="flex-1 overflow-y-auto bg-slate-50">
                     <div className="max-w-[1600px] mx-auto p-4 md:p-8 animate-in fade-in duration-500">
                         {renderContent()}

@@ -5,45 +5,62 @@ import ListaNotificaciones from "./ListaNotificaciones";
 
 const BellNotificaciones = () => {
   const [open, setOpen] = useState(false);
-  const [notificaciones, setNotificaciones] = useState([]);
 
-  // Usamos useCallback para que la función sea estable y no cause re-renderizados infinitos
-  const cargarNotificaciones = useCallback(async () => {
-    // 1. Obtenemos el usuario autenticado para filtrar
+  const cargarComunicaciones = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser();
-    
     if (!user) return;
 
-    // 2. Consultamos solo las notificaciones de este usuario
+    // ✅ CORRECCIÓN: Traemos la notificación Y los datos del comunicado asociado
     const { data, error } = await supabase
-      .from("notificaciones")
-      .select("*")
-      .eq("usuario_id", user.id) // Filtro esencial por usuario
+      .from("comunicaciones")
+      .select(`
+        id,
+        leido,
+        usuario_id,
+        comunicacion_id,
+        created_at,
+        comunicaciones (
+          id_comunicacion,
+          titulo,
+          mensaje,
+          prioridad,
+          fecha_envio,
+          estado
+        )
+      `)
+      .eq("usuario_id", user.id)
       .order("created_at", { ascending: false });
 
     if (error) {
-      console.error("Error cargando notificaciones:", error.message);
+      console.error("Error cargando:", error.message);
       return;
     }
-    setNotificaciones(data || []);
+
+    // Limpiamos los datos para que ListaNotificaciones reciba objetos completos
+    const datosFormateados = data.map(n => ({
+      ...n,
+      // Si el join falló por RLS, evitamos que la app rompa
+      comunicado: n.comunicaciones 
+    }));
+
+    setComunicaciones(datosFormateados || []);
   }, []);
 
   useEffect(() => {
-    cargarNotificaciones();
+    cargarComunicaciones();
 
-    // Configuración de Realtime para actualizaciones automáticas
     const canal = supabase
-      .channel('cambios-notificaciones')
+      .channel('cambios-comunicaciones')
       .on(
         'postgres_changes', 
         { 
           event: '*', 
           schema: 'public', 
-          table: 'notificaciones' 
+          table: 'comunicaciones',
+          // Opcional: filtrar aquí también por usuario_id si tu RLS es estricto
         }, 
-        (payload) => {
-          // Si el cambio pertenece al usuario actual, refrescamos
-          cargarNotificaciones();
+        () => {
+          cargarComunicaciones();
         }
       )
       .subscribe();
@@ -53,7 +70,6 @@ const BellNotificaciones = () => {
     };
   }, [cargarNotificaciones]);
 
-  // Cálculo de mensajes no leídos basado en la columna 'leido'
   const noLeidas = notificaciones.filter(n => !n.leido).length;
 
   return (
@@ -73,9 +89,9 @@ const BellNotificaciones = () => {
       {open && (
         <div className="absolute right-0 z-[100]">
            <ListaNotificaciones
-            notificaciones={notificaciones}
-            refrescar={cargarNotificaciones}
-            setOpen={setOpen} // Pasamos setOpen para cerrar la lista al hacer clic fuera
+            notificaciones={comunicaciones}
+            refrescar={cargarComunicaciones}
+            setOpen={setOpen}
           />
         </div>
       )}

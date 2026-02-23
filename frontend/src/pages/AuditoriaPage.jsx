@@ -196,13 +196,13 @@ const AuditoriaPage = () => {
         <div className="flex flex-col gap-6 animate-in fade-in duration-700">
             {/* PANEL DE ESTADÍSTICAS Y MANTENIMIENTO */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="bg-gray-600 p-6 rounded-3xl border border-gray-600 shadow-sm flex items-center justify-between">
+                <div className="bg-sky-900 p-6 rounded-3xl border border-gray-600 shadow-sm flex items-center justify-between">
                     <div>
                         <p className="text-[10px] font-black uppercase text-gray-300 tracking-widest">Base de Datos</p>
                         <button 
                             onClick={limpiarLogsAntiguos}
                             disabled={limpiando}
-                            className="mt-2 flex items-center gap-2 px-3 py-2 bg-gray-400 hover:bg-red-500 text-red-500 hover:text-white rounded-2xl text-[10px] font-black transition-all active:scale-95 disabled:opacity-50 border border-red-500/20"
+                            className="mt-2 flex items-center gap-2 px-3 py-2 bg-gray-300 hover:bg-red-500 text-red-500 hover:text-white rounded-2xl text-[10px] font-black transition-all active:scale-95 disabled:opacity-50 border border-red-500/20"
                         >
                             <Trash2 size={14} /> {limpiando ? 'PROCESANDO...' : 'Limpiar > 30 días'}
                         </button>
@@ -217,7 +217,7 @@ const AuditoriaPage = () => {
                     </div>
                 </div>
                 {/* Salud de Rendimiento Dinámica */}
-                <div className={`p-5 rounded-3xl border shadow-sm flex items-center justify-between transition-all duration-500 ${promedioMs > 400 ? 'bg-red-50 border-red-200' : 'bg-gray-600 border-gray-600'}`}>
+                <div className={`p-5 rounded-3xl border shadow-sm flex items-center justify-between transition-all duration-500 ${promedioMs > 400 ? 'bg-red-50 border-red-200' : 'bg-sky-900 border-gray-600'}`}>
                     <div>
                         <p className={`text-[10px] font-black uppercase tracking-widest ${promedioMs > 400 ? 'text-red-500' : 'text-gray-300'}`}>Rendimiento Promedio</p>
                         <h3 className={`text-2xl font-black ${promedioMs > 400 ? 'text-red-600' : 'text-amber-500'}`}>{promedioMs} ms</h3>

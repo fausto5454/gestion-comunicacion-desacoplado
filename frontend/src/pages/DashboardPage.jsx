@@ -3,13 +3,12 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend, AreaChart, A
 import { supabase } from '../config/supabaseClient';
 import { Monitor, GraduationCap, ClipboardCheck, Send, AlertTriangle, CheckCircle2, MessageSquare, Loader2 } from 'lucide-react';
 
-const DashboardPage = () => {
+const DashboardPage = ({session}) => {
     // ESTADOS DE CONTROL
     const [aula, setAula] = useState('1° A');
     const [area, setArea] = useState('MATEMÁTICA');
     const [bimestre, setBimestre] = useState(1);
     const [loading, setLoading] = useState(false);
-    
     const [stats, setStats] = useState({
         totalNotas: 0, aprobados: 0, totalComs: 0, urgentes: 0,
         leidos: 0, pendientes: 0,
@@ -22,16 +21,31 @@ const DashboardPage = () => {
     useEffect(() => {
         if (!aula || !area || !bimestre) return;
 
-        const fetchAllData = async () => {
-            setLoading(true);
-            try {
-                const [grado, seccion] = aula.split(' ');
+     const fetchAllData = async () => {
+    // FIX: Verificar que la sesión exista antes de continuar
+    if (!session?.user?.id) return;
+    const userId = session.user.id;
 
-                const [nResponse, cResponse] = await Promise.all([
-                    supabase.from('calificaciones').select('logro_bimestral')
-                        .eq('grado', grado).eq('seccion', seccion).eq('area', area).eq('bimestre', bimestre),
-                    supabase.from('comunicaciones').select('*').eq('area', area)
-                ]);
+    setLoading(true);
+    try {
+        const [grado, seccion] = aula.split(' ');
+
+        const [nResponse, cResponse] = await Promise.all([
+            // 1. Calificaciones (SÍ tiene columna 'area')
+            supabase.from('calificaciones')
+                .select('logro_bimestral')
+                .eq('grado', grado)
+                .eq('seccion', seccion)
+                .eq('area', area)
+                .eq('bimestre', bimestre),
+            
+            // 2. Comunicaciones (NO tiene columna 'area' - Eliminamos el filtro)
+            supabase.from('comunicaciones')
+                .select('*')
+                .or(`remitente_id.eq.${userId},matricula_id.eq.${userId}`) // Filtro correcto por ID
+             ]);
+
+        if (cResponse.error) throw cResponse.error;
 
                 const nData = nResponse.data;
                 const cData = cResponse.data;
@@ -80,14 +94,14 @@ const DashboardPage = () => {
     return (
         <div className="p-6 space-y-6 bg-gray-200 min-h-screen relative">
         {/* CABECERA DINÁMICA CORREGIDA */}
-       <header className="bg-sky-600 p-4 md:p-6 rounded-[1.5rem] md:rounded-[2.5rem] shadow-sm border border-slate-200 flex flex-col xl:flex-row justify-between items-center gap-4">
+       <header className="bg-sky-900 p-4 md:p-6 rounded-[1.5rem] md:rounded-[2.5rem] shadow-sm border border-slate-200 flex flex-col xl:flex-row justify-between items-center gap-4">
        {/* Título e Icono: Se alinean al centro en móvil, a la izquierda en desktop */}
         <div className="flex items-center gap-3 md:gap-4 w-full xl:w-auto justify-center md:justify-start">
           <div className="bg-[#00a859] p-2 md:p-3 rounded-xl md:rounded-2xl text-white shadow-lg shrink-0">
             <Monitor size={window.innerWidth < 768 ? 20 : 24} />
              </div>
                <div className="text-center md:text-left">
-               <h1 className="text-lg md:text-xl font-black text-slate-900 tracking-tight uppercase leading-tight">
+               <h1 className="text-lg md:text-xl font-black text-green-400 tracking-tight uppercase leading-tight">
                   Bienvenidos al Sistema
                </h1>
                <p className="text-[9px] md:text-[10px] text-white font-bold uppercase tracking-widest leading-none mt-1">
@@ -149,6 +163,7 @@ const DashboardPage = () => {
                     <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" /> Salud Académica - {area}
                     </h3>
                     <div className="h-72">
+                        <div style={{ height: '300px', width: '100%' }}>
                         <ResponsiveContainer width="100%" height="100%">
                             <PieChart>
                                 <Pie 
@@ -178,6 +193,7 @@ const DashboardPage = () => {
                                 <Legend verticalAlign="bottom" iconType="circle" wrapperStyle={{paddingTop: '20px', fontSize: '10px', fontWeight: 'bold'}} />
                             </PieChart>
                         </ResponsiveContainer>
+                        </div>
                     </div>
                 </div>
                 {/* TASA DE LECTURA CON ALERTAS DINÁMICAS */}

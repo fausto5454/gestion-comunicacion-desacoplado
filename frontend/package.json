@@ -26,6 +26,7 @@
     "react-router-dom": "^7.9.5",
     "react-select": "^5.10.2",
     "recharts": "^3.7.0",
+    "sweetalert2": "^11.26.18",
     "tailwindcss": "^4.1.16",
     "vite-plugin-node-polyfills": "^0.25.0",
     "xlsx": "^0.18.5",

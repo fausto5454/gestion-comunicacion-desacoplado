@@ -130,10 +130,10 @@ const DocumentosPage = ({ session }) => {
     );
 
     return (
-        <div className="p-4 md:p-6 bg-white min-h-screen">
+        <div className="p-4 md:p-6 bg-gray-200 min-h-screen">
             <Toaster />
             
-            <header className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4 bg-green-300/50 backdrop-blur-sm p-5 md:p-8 rounded-[2.5rem] shadow-sm border border-green-100">
+            <header className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4 bg-emerald-300/80 backdrop-blur-sm p-5 md:p-8 rounded-[2.5rem] shadow-sm border border-green-100">
                 <div className="flex items-center gap-4">
                     <div className="bg-green-600 p-3 rounded-2xl text-white shadow-lg">
                         <FileText size={28} />
@@ -144,11 +144,11 @@ const DocumentosPage = ({ session }) => {
                     </div>
                 </div>
 
-                <div className="flex bg-gray-100 p-1.5 rounded-2xl w-full md:w-auto">
-                    <button onClick={() => setViewMode('publicos')} className={`flex-1 md:flex-none flex items-center justify-center px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-tighter transition-all ${viewMode === 'publicos' ? 'bg-green-300 text-green-600 shadow-sm' : 'text-gray-400'}`}>
+                <div className="flex bg-slate-700 p-1.5 rounded-2xl w-full md:w-auto">
+                    <button onClick={() => setViewMode('publicos')} className={`flex-1 md:flex-none flex items-center justify-center px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-tighter transition-all ${viewMode === 'publicos' ? 'bg-green-300 text-green-600 shadow-sm' : 'text-gray-200'}`}>
                         <Globe className="mr-2 w-4 h-4" /> Generales
                     </button>
-                    <button onClick={() => setViewMode('privados')} className={`flex-1 md:flex-none flex items-center justify-center px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-tighter transition-all ${viewMode === 'privados' ? 'bg-yellow-300 text-green-600 shadow-sm' : 'text-gray-400'}`}>
+                    <button onClick={() => setViewMode('privados')} className={`flex-1 md:flex-none flex items-center justify-center px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-tighter transition-all ${viewMode === 'privados' ? 'bg-yellow-200 text-green-600 shadow-sm' : 'text-gray-200'}`}>
                         <Lock className="mr-2 w-4 h-4" /> Mis Archivos
                     </button>
                 </div>
@@ -160,7 +160,7 @@ const DocumentosPage = ({ session }) => {
                     <input 
                         type="text" 
                         placeholder={`Buscar archivo...`}
-                        className="w-full pl-14 pr-6 py-4 rounded-[1.8rem] border-none shadow-sm focus:ring-2 ring-green-500 text-sm font-bold"
+                        className="w-full pl-14 pr-6 py-4 bg-white rounded-[1.8rem] border-none shadow-sm focus:ring-2 ring-green-500 text-sm font-bold"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                     />
@@ -179,7 +179,7 @@ const DocumentosPage = ({ session }) => {
             ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                     {filteredDocs.map((doc) => (
-                        <div key={doc.id_documento} className="bg-green-200/50 p-6 rounded-[2.5rem] shadow-sm border border-gray-100 hover:shadow-xl transition-all group relative overflow-hidden">
+                        <div key={doc.id_documento} className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-gray-100 hover:shadow-xl transition-all group relative overflow-hidden">
                             <div className="flex justify-between items-start mb-4">
                                 <div className="p-4 bg-gray-50 rounded-2xl text-green-600 group-hover:bg-green-600 group-hover:text-white transition-colors">
                                     {doc.nombre_archivo.match(/\.(xls|xlsx)$/i) ? <FileSpreadsheet size={24} /> : <File size={24} />}

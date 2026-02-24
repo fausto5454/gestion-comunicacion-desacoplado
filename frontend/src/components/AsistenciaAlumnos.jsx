@@ -406,16 +406,16 @@ const AsistenciaAlumnos = ({ }) => {
  };
 
   return (
-    <div className="bg-emerald-900 rounded-[1.5rem] md:rounded-[2rem] shadow-2xl border border-gray-100 overflow-hidden">
+    <div className="bg-white rounded-[1.5rem] md:rounded-[2rem] shadow-2xl border border-gray-100 overflow-hidden">
       
       {/* HEADER */}
-      <div className="p-4 md:p-8 bg-slate-50/80 border-b border-gray-100 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
+      <div className="p-4 md:p-8 bg-slate-500 border-b border-gray-100 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
         <div className="flex items-center gap-3 md:gap-5 w-full lg:w-auto">
           <div className="hidden sm:block bg-slate-900 p-4 rounded-3xl text-white shadow-lg">
             <Bookmark size={24} />
           </div>
           <div className="flex-1">
-            <h2 className="text-lg md:text-2xl font-black text-gray-800 tracking-tighter uppercase leading-none mb-2">Asistencia</h2>
+            <h2 className="text-lg md:text-2xl font-black text-green-400 tracking-tighter uppercase leading-none mb-2">Asistencia</h2>
             <div className="flex flex-wrap gap-2">
                 <select 
                  value={areaSeleccionada}
@@ -474,7 +474,7 @@ const AsistenciaAlumnos = ({ }) => {
             <tr className="bg-gray-500">
               <th className="border border-gray-300 px-3 py-2 text-left text-[10px] font-black text-green-400 bg-emerald-800 uppercase w-10">N°</th>
               <th className="border border-gray-300 px-4 py-2 text-left text-[10px] font-black text-green-400 uppercase tracking-wider">Apellidos y Nombres</th>
-              <th className="border border-gray-300 px-2 py-2 text-center text-[10px] font-black text-green-400 bg-emerald-800 uppercase w-40">Estado</th>
+              <th className="border border-gray-300 px-2 py-2 text-center text-[10px] font-black text-green-400 bg-pink-700 uppercase w-40">Estado</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-300">

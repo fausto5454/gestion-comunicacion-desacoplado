@@ -133,18 +133,18 @@ const DocumentosPage = ({ session }) => {
         <div className="p-4 md:p-6 bg-gray-200 min-h-screen">
             <Toaster />
             
-            <header className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4 bg-emerald-300/80 backdrop-blur-sm p-5 md:p-8 rounded-[2.5rem] shadow-sm border border-green-100">
+            <header className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4 bg-slate-600 backdrop-blur-sm p-5 md:p-8 rounded-[2.5rem] shadow-sm border border-green-100">
                 <div className="flex items-center gap-4">
                     <div className="bg-green-600 p-3 rounded-2xl text-white shadow-lg">
                         <FileText size={28} />
                     </div>
                     <div>
-                        <h1 className="text-xl md:text-3xl font-black text-gray-800 tracking-tight">Repositorio Institucional</h1>
-                        <p className="text-[10px] font-black text-green-600 uppercase tracking-widest">I.E. 2079 - Gestión Digital</p>
+                        <h1 className="text-xl md:text-3xl font-black text-green-400 tracking-tight">Repositorio Institucional</h1>
+                        <p className="text-[10px] font-black text-green-200 uppercase tracking-widest">I.E. 2079 - Gestión Digital</p>
                     </div>
                 </div>
 
-                <div className="flex bg-slate-700 p-1.5 rounded-2xl w-full md:w-auto">
+                <div className="flex bg-slate-900 p-1.5 rounded-2xl w-full md:w-auto">
                     <button onClick={() => setViewMode('publicos')} className={`flex-1 md:flex-none flex items-center justify-center px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-tighter transition-all ${viewMode === 'publicos' ? 'bg-green-300 text-green-600 shadow-sm' : 'text-gray-200'}`}>
                         <Globe className="mr-2 w-4 h-4" /> Generales
                     </button>
@@ -189,7 +189,7 @@ const DocumentosPage = ({ session }) => {
                                 </span>
                             </div>
                             
-                            <h3 className="font-black text-gray-800 text-sm mb-1 truncate" title={doc.nombre_archivo}>
+                            <h3 className="font-black text-gray-500 text-sm mb-1 truncate" title={doc.nombre_archivo}>
                                 {doc.nombre_archivo}
                             </h3>
                             <p className="text-[10px] text-gray-400 font-bold uppercase mb-6">
@@ -206,7 +206,7 @@ const DocumentosPage = ({ session }) => {
                                 {doc.subido_por === userId && (
                                     <button 
                                         onClick={() => setDocAEliminar(doc)}
-                                        className="p-3 text-gray-300 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
+                                        className="p-3 text-red-300 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
                                     >
                                         <Trash2 className="w-4 h-4" />
                                     </button>

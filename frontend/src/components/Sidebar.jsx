@@ -24,7 +24,7 @@ const Sidebar = ({ rol_id, userName, userEmail, setCurrentView, currentView, isS
             roles: [1, 2, 3, 4, 5, 6],
             children: [
                 { name: 'Enviar Mensaje', view: 'enviar', icon: Send, roles: [1, 2, 3, 4, 5] },
-                { name: 'Bandeja de Entrada', view: 'bandeja', icon: Inbox, roles: [1, 2, 6] },
+                { name: 'Bandeja de Entrada', view: 'bandeja', icon: Inbox, roles: [6] },
             ]
         },
         { 

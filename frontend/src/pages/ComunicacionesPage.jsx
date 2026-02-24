@@ -552,8 +552,10 @@ const ComunicacionesPage = ({ session }) => {
                             <option value="Alta">Alta</option>
                             <option value="Urgente">🚨 Urgente</option>
                         </select>
-                    ) : null}
-                    {getPrioridadEstilo}
+                       ) : null}
+                    <div className={`${getPrioridadEstilo(form.prioridad)} p-2 rounded-xl text-xs`}>
+                   Prioridad seleccionada: {form.prioridad}
+                 </div>
                 </div>
                 <textarea className="w-full p-4 bg-gray-50 border rounded-2xl text-sm mb-4 min-h-[100px]" placeholder="Escriba el mensaje aquí..." value={form.mensaje} onChange={e => setForm({...form, mensaje: e.target.value})} required />
                 {/* 3. ACCIONES */}

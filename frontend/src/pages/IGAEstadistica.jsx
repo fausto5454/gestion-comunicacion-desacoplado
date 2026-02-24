@@ -332,10 +332,10 @@ const IGAEstadistica = () => {
 
     return (
         <div className="p-6 bg-slate-50 min-h-screen space-y-6">
-            <div className="bg-emerald-200 p-6 rounded-[2rem] shadow-sm border border-slate-200 grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
+            <div className="bg-sky-900 p-6 rounded-[2rem] shadow-sm border border-slate-200 grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
                 <div className="space-y-2">
-                    <label className="text-[10px] font-black text-gray-600 uppercase ml-2">Área Curricular</label>
-                    <select value={filtros.area} onChange={(e) => setFiltros({...filtros, area: e.target.value})} className="w-full bg-green-600 border-none rounded-xl text-white font-bold p-3">
+                    <label className="text-[10px] font-black text-gray-200 uppercase ml-2">Área Curricular</label>
+                    <select value={filtros.area} onChange={(e) => setFiltros({...filtros, area: e.target.value})} className="w-full bg-white border-none rounded-xl text-gray-600 font-bold p-3">
                         <option value="MATEMÁTICA">Matemática</option>
                         <option value="COMUNICACIÓN">Comunicación</option>
                         <option value="ARTE Y CULTURA">Arte y Cultura</option>
@@ -349,36 +349,36 @@ const IGAEstadistica = () => {
                     </select>
                 </div>
                 <div className="space-y-2">
-                    <label className="text-[10px] font-black text-gray-600 uppercase ml-2">Bimestre</label>
-                    <select value={filtros.bimestre} onChange={(e) => setFiltros({...filtros, bimestre: e.target.value})} className="w-full bg-green-600 border-none rounded-xl text-white font-bold p-3">
+                    <label className="text-[10px] font-black text-gray-200 uppercase ml-2">Bimestre</label>
+                    <select value={filtros.bimestre} onChange={(e) => setFiltros({...filtros, bimestre: e.target.value})} className="w-full bg-white border-none rounded-xl text-gray-600 font-bold p-3">
                         <option value="1">1° Bimestre</option><option value="2">2° Bimestre</option>
                         <option value="3">3° Bimestre</option><option value="4">4° Bimestre</option>
                     </select>
                 </div>
                 <div className="space-y-2">
-                    <label className="text-[10px] font-black text-gray-600 uppercase ml-2">Grado / Sección</label>
+                    <label className="text-[10px] font-black text-gray-200 uppercase ml-2">Grado / Sección</label>
                     <div className="flex gap-1">
-                        <select value={filtros.grado} onChange={(e) => setFiltros({...filtros, grado: e.target.value})} className="w-full bg-green-600 border-none rounded-xl text-white text-[10px] font-bold p-3">
+                        <select value={filtros.grado} onChange={(e) => setFiltros({...filtros, grado: e.target.value})} className="w-full bg-white border-none rounded-xl text-gray-600 text-[10px] font-bold p-3">
                             <option value="1°">1° Sec</option><option value="2°">2° Sec</option>
                             <option value="3°">3° Sec</option><option value="4°">4° Sec</option>
                             <option value="5°">5° Sec</option>
                         </select>
-                        <select value={filtros.seccion} onChange={(e) => setFiltros({...filtros, seccion: e.target.value})} className="w-full bg-green-600 border-none rounded-xl text-white text-[10px] font-bold p-3">
+                        <select value={filtros.seccion} onChange={(e) => setFiltros({...filtros, seccion: e.target.value})} className="w-full bg-white border-none rounded-xl text-gray-600 text-[10px] font-bold p-3">
                             <option value="A">A</option><option value="B">B</option><option value="C">C</option>
                         </select>
                     </div>
                 </div>
-                <button onClick={exportarExcelCompleto} className="bg-slate-900 text-white p-2 rounded-xl font-black text-xs flex items-center justify-center gap-2 hover:bg-green-600 transition-all shadow-lg">
+                <button onClick={exportarExcelCompleto} className="bg-green-500 text-white p-2 rounded-xl font-black text-xs flex items-center justify-center gap-2 hover:bg-green-600 transition-all shadow-lg">
                     <FileDown size={18} /> EXPORTAR EXCEL + GRÁFICO
                 </button>
-                <div className="flex items-center gap-2 text-[12px] font-bold text-sky-600 p-3">
+                <div className="flex items-center gap-2 text-[12px] font-bold text-sky-200 p-3">
                     <RefreshCcw size={14} className={loading ? "animate-spin text-green-500" : ""} /> {loading ? "Sincronizando..." : "Sincronizado Realtime"}
                 </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 {stats.resumen.map((item, i) => (
-                    <div key={i} className="bg-orange-200 p-5 rounded-[2rem] border border-slate-100 shadow-sm">
+                    <div key={i} className="bg-sky-200 p-5 rounded-[2rem] border border-slate-100 shadow-sm">
                         <p className="text-[9px] font-black text-slate-500 uppercase tracking-tighter">{item.name}</p>
                         <div className="flex justify-between items-end mt-2">
                             <p className="text-3xl font-black text-slate-800">{item.cant}</p>

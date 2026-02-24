@@ -487,7 +487,7 @@ const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion
            </div>
           )}
         {/* HEADER */}
-      <div className="bg-emerald-400 border-b border-emerald-600 rounded-b-[2.5rem] p-4 md:p-6 shadow-sm z-40">
+      <div className="bg-slate-600 border-b border-emerald-600 rounded-b-[2.5rem] p-4 md:p-6 shadow-sm z-40">
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
      {/* SECCIÓN IZQUIERDA: Ícono, Título y Selectores */}
      <div className="flex items-start md:items-center gap-4">
@@ -496,7 +496,7 @@ const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion
         <FileSpreadsheet className="w-7 h-7" />
         </div>
         <div className="flex flex-col gap-2">
-        <h1 className="text-2xl md:text-3xl font-black text-slate-800 tracking-tighter leading-none">
+        <h1 className="text-2xl md:text-3xl font-black text-green-400 tracking-tighter leading-none">
           Registro 2026
         </h1>
         {/* Selectores con mejor espaciado y responsividad */}
@@ -505,7 +505,7 @@ const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion
             value={grado} 
             onChange={(e) => setGrado(e.target.value)} 
             disabled={esDocente || esEstudiante} 
-            className="bg-white border-slate-100 text-[10px] font-bold px-3 py-2 rounded-xl outline-none focus:ring-2 focus:ring-green-500 transition-all">
+            className="bg-green-50 border-slate-100 text-[10px] font-bold px-3 py-2 rounded-xl outline-none focus:ring-2 focus:ring-green-500 transition-all">
             {["1° A", "1° B", "1° C", "2° A", "2° B", "2° C", "3° A", "3° B", "4° A", "4° B", "5° A", "5° B"].map(g => (
               <option key={g} value={g}>{g}</option>
             ))}
@@ -531,7 +531,7 @@ const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion
             key={n} 
             onClick={() => setBimestre(n)} 
             className={`px-4 py-2 rounded-xl text-[10px] font-black whitespace-nowrap transition-all ${
-              bimestre === n ? 'bg-green-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-600'
+              bimestre === n ? 'bg-slate-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-600'
             }`}>
             {n}° BIM
           </button>
@@ -542,7 +542,7 @@ const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion
         {!esEstudiante && ( //Ocultar el botón Excel para estudiantes.
         <button 
           onClick={exportarExcel} 
-          className="bg-green-600 hover:bg-green-600 text-white px-4 py-2.5 rounded-xl text-[10px] font-black flex items-center justify-center gap-2 transition-all active:scale-95 shadow-lg shadow-green-100 flex-1 sm:flex-none">
+          className="bg-gray-900 hover:bg-green-600 text-white px-4 py-2.5 rounded-xl text-[10px] font-black flex items-center justify-center gap-2 transition-all active:scale-95 shadow-lg shadow-green-100 flex-1 sm:flex-none">
           <Download className="w-4 h-4" /> 
           <span className="inline">EXCEL</span>
        </button>
@@ -551,11 +551,11 @@ const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion
           <button 
             onClick={() => setShowConfirm(true)} 
             disabled={loading} 
-            className="bg-slate-900 hover:bg-slate-800 text-white px-7 py-4 rounded-xl text-[10px] font-black flex items-center justify-center gap-2 transition-all active:scale-95 shadow-xl shadow-slate-200 disabled:bg-slate-400 flex-1 sm:flex-none">
+            className="bg-gray-900 hover:bg-slate-800 text-white px-7 py-4 rounded-xl text-[10px] font-black flex items-center justify-center gap-2 transition-all active:scale-95 shadow-xl shadow-slate-200 disabled:bg-slate-400 flex-1 sm:flex-none">
             {loading ? (
-            <Loader2 className="w-4 h-4 animate-spin" />
+            <Loader2 className="w-2 h-2 animate-spin" />
             ) : (
-           <Save className="w-4 h-4 text-green-400" />
+           <Save className="w-4 h-4 text-green-100" />
             )} 
             <span>GUARDAR</span>
          </button>
@@ -571,23 +571,23 @@ const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion
           <div className="overflow-x-auto custom-scrollbar shadow-xl rounded-lg">
             <table className="w-max md:w-full border-collapse table-auto">
             <thead>
-           <tr className="bg-green-600 text-white text-[9px] uppercase font-bold h-10">
+           <tr className="bg-slate-600 text-white text-[9px] uppercase font-bold h-10">
          {/* N° - Ancho fijo w-7 coincide con left-7 de los nombres */}
-       <th rowSpan="2" className="p-1 w-10 sticky left-0 z-50 bg-green-600 border-r border-b border-green-400 text-center">
+       <th rowSpan="2" className="p-1 w-10 sticky left-0 z-50 bg-emerald-700 border-r border-b border-green-500 text-center">
       N°
     </th>
     {/* SEXO - Solo escritorio */}
-    <th rowSpan="2" className="hidden md:table-cell p-1 w-8 sticky left-7 z-50 bg-green-600 border-r border-b border-green-400 text-center">
+    <th rowSpan="2" className="hidden md:table-cell p-1 w-8 sticky left-7 z-50 bg-pink-700 border-r border-b border-green-500 text-center">
      SEXO
       </th>
        {/* APELLIDOS Y NOMBRES - Desplazamiento coordinado */}
-        <th rowSpan="2" className="w-[100px] md:w-[300px] sticky left-7 md:left-15 z-40 bg-green-600 border-r border-b border-green-400 text-center px-1 shadow-[3px_0_3px_-2px_rgba(0,0,0,0.3)]">
+        <th rowSpan="2" className="w-[100px] md:w-[300px] sticky left-7 md:left-15 z-40 bg-slate-600 border-r border-b border-slate-400 text-center px-1 shadow-[3px_0_3px_-2px_rgba(0,0,0,0.3)]">
          <div className="text-[10px] md:text-[10px] leading-tight whitespace-normal md:whitespace-nowrap flex items-center justify-center h-full">
         APELLIDOS Y NOMBRES
       </div>
     </th>
     {competencias.map((c, i) => (
-    <th key={i} colSpan="5" className="p-1 border-r border-b border-green-500 bg-green-700/30 text-center min-w-[60px] text-[8px]">
+    <th key={i} colSpan="5" className="p-1 border-r border-b border-slate-400 bg-slate-600 text-center min-w-[60px] text-[8px]">
       {c}
        </th>
         ))}
@@ -595,7 +595,7 @@ const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion
       LOGRO
     </th>
   </tr>
-  <tr className="bg-green-700 text-white text-[9px] text-center uppercase h-7">
+  <tr className="bg-slate-800 text-white text-[9px] text-center uppercase h-7">
     {competencias.map((_, i) => (
       <React.Fragment key={i}>
        {/* Columnas D1-D4 más anchas en escritorio */}
@@ -603,7 +603,7 @@ const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion
         <th className="w-8 border-r border-green-600/50">D2</th>
         <th className="w-8 border-r border-green-600/50">D3</th>
         <th className="w-8 border-r border-green-600/50">D4</th>
-        <th className="w-8 bg-green-500 font-bold border-r border-green-600">PROM</th>
+        <th className="w-8 bg-emerald-500 font-bold border-r border-green-600">PROM</th>
       </React.Fragment>
     ))}
   </tr>

@@ -229,7 +229,7 @@ const AuditoriaPage = () => {
             </div>
 
             {/* BUSCADOR */}
-            <div className="bg-emerald-500 p-4 md:p-6 rounded-3xl shadow-sm flex flex-col md:flex-row justify-between items-center gap-4">
+            <div className="bg-sky-600 p-4 md:p-6 rounded-3xl shadow-sm flex flex-col md:flex-row justify-between items-center gap-4">
                 <div className="flex items-center gap-3 self-start md:self-center">
                     <div className="bg-white/50 p-2 rounded-xl"><ShieldCheck className="text-white" size={24} /></div>
                     <div>

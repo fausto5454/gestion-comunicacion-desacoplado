@@ -69,7 +69,7 @@ const ReportesPage = () => {
   }, [fetchReportes]);
 
    return (
-    <div className="p-4 md:p-8 bg-gray-50 min-h-screen">
+    <div className="p-4 md:p-8 bg-gray-100 min-h-screen">
       <div className="max-w-7xl mx-auto">
         <header className="mb-8">
           <h1 className="text-3xl font-bold text-gray-800 flex items-center gap-3">
@@ -111,7 +111,7 @@ const ReportesPage = () => {
         </div>
             {/* Sección de exportación activada correctamente */}
             <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-              <h3 className="text-lg font-semibold mb-4 text-gray-700">Herramientas de Exportación</h3>
+              <h3 className="text-lg font-semibold mb-4 text-gray-800 text-center">Herramientas de Exportación</h3>
               {/* Se activa ExportarReportes con los datos para PDF/Excel */}
               <ExportarReportes data={datosTabla} stats={stats} />
             </div>

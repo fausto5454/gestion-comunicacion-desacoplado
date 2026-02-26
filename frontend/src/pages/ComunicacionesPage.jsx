@@ -322,21 +322,61 @@ const ComunicacionesPage = ({ session }) => {
   };
 
    const fetchComunicaciones = async () => {
-    // 1. Obtenemos los datos del perfil del usuario logueado
-    const userRole = session?.user?.user_metadata?.rol_id;
-    const userGrado = session?.user?.user_metadata?.grado; // Ej: "1°"
-    const userSeccion = session?.user?.user_metadata?.seccion; // Ej: "A"
-    const identificadorAlumno = `${userGrado} ${userSeccion}`;
+    // 1. INICIO DE MEDICIÓN Y ESTADO DE CARGA
+    setLoading(true); 
+    const t0 = performance.now(); 
+    
+    try {
+        const userRole = session?.user?.user_metadata?.rol_id;
+        const userGrado = session?.user?.user_metadata?.grado; 
+        const userSeccion = session?.user?.user_metadata?.seccion; 
+        const identificadorAlumno = `${userGrado} ${userSeccion}`;
 
-    let query = supabase
-        .from('v_comunicados_oficiales')
-        .select('*');
-    if (userRole === 6) {
-        query = query.or(`identificador_destino.eq."${identificadorAlumno}",es_global.eq.true`);
+        let query = supabase
+            .from('v_comunicados_oficiales')
+            .select('*');
+
+        // Filtro para Alumnos (Rol 6)
+        if (userRole === 6) {
+            query = query.or(`identificador_destino.eq."${identificadorAlumno}",es_global.eq.true`);
+        }
+
+        const { data, error } = await query.order('fecha_envio', { ascending: false });
+
+        if (error) throw error;
+
+        // 2. ACTUALIZACIÓN DE ESTADO (Corregido para evitar bucle)
+        setListaComunicaciones(data); // <--- Usa tu setter de estado, NO el nombre de la función
+
+        // 3. AUDITORÍA CON DESCRIPCIÓN REAL Y VELOCIDAD
+        const t1 = performance.now();
+        const duracion = Math.round(t1 - t0);
+        
+        // Obtener correo para la auditoría
+        const { data: { user } } = await supabase.auth.getUser();
+
+        await supabase.from('auditoria').insert([{
+            accion: 'SELECT',
+            modulo: 'Comunicaciones',
+            usuario_responsable: user?.email || 'Sistema',
+            descripcion: `Carga de comunicados: ${data.length} mensajes para ${identificadorAlumno.trim() || 'General'}`,
+            duracion_ms: duracion,
+            fecha_hora: new Date().toISOString()
+        }]);
+
+    } catch (error) {
+        console.error("Error en fetchComunicaciones:", error);
+        toast.error("No se pudieron cargar los comunicados");
+    } finally {
+        setLoading(false);
     }
-    const { data, error } = await query.order('fecha_envio', { ascending: false });
-    if (!error) fetchComunicaciones(data);
-   };
+    };
+
+    useEffect(() => {
+    if (session?.user) {
+        fetchComunicaciones();
+    }
+    }, [session]);
 
    useEffect(() => {
     const cargarUsuariosSelector = async () => {
@@ -747,7 +787,6 @@ const ComunicacionesPage = ({ session }) => {
            toast.tipo === 'success' ? 'bg-green-600' : 'bg-red-600'
              }`}>
               <div className="flex items-center gap-2">
-                {toast.tipo === 'success' ? '✅' : '❌'}
                  <span>{toast.mensaje}</span>
                  </div>
                </div>

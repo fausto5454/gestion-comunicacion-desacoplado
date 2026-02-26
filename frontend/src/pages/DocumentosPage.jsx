@@ -21,27 +21,40 @@ const DocumentosPage = ({ session }) => {
     const categorias = ['Todos', 'Administrativo', 'Académico', 'Planificaciones', 'Recursos', 'Otros'];
 
     const fetchDocumentos = useCallback(async () => {
-        setLoading(true);
-        try {
-            let query = supabase
-                .from('documentos')
-                .select(`*, usuarios!subido_por(nombre_completo)`)
-                .order('fecha_subida', { ascending: false });
+    setLoading(true);
+    const t0 = performance.now(); // Inicio de medición de velocidad
 
-            if (viewMode === 'publicos') {
-                query = query.eq('es_publico', true);
-            } else {
-                query = query.eq('subido_por', userId).eq('es_publico', false);
-            }
+    try {
+        let query = supabase
+            .from('documentos')
+            .select(`*, usuarios!subido_por(nombre_completo)`)
+            .order('fecha_subida', { ascending: false });
 
-            const { data, error } = await query;
-            if (error) throw error;
-            setDocumentos(data || []);
-        } catch (error) {
-            toast.error("Error al cargar documentos");
-        } finally {
-            setLoading(false);
+        if (viewMode === 'publicos') {
+            query = query.eq('es_publico', true);
+        } else {
+            query = query.eq('subido_por', userId).eq('es_publico', false);
         }
+
+        const { data, error } = await query;
+        if (error) throw error;
+        
+        setDocumentos(data || []);
+
+        // --- AUDITORÍA DE LECTURA ---
+        const t1 = performance.now();
+        const duracion = Math.round(t1 - t0);
+        
+        // Descripción dinámica basada en el modo de vista
+        const descLectura = `Consulta: ${data?.length || 0} documentos cargados (Modo: ${viewMode})`;
+        
+        await registrarAuditoria('SELECT', descLectura, 'Documentos', duracion);
+
+    } catch (error) {
+        toast.error("Error al cargar documentos");
+    } finally {
+        setLoading(false);
+    }
     }, [userId, viewMode]);
 
     useEffect(() => { fetchDocumentos(); }, [fetchDocumentos]);

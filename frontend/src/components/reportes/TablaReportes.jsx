@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 
 const TablaReportes = ({ datosTabla = [] }) => {
   const [paginaActual, setPaginaActual] = useState(1);
-  const registrosPorPagina = 5; // Reducimos a 4 para asegurar que quepa en pantalla
+  const registrosPorPagina = 4; // Reducimos a 4 para asegurar que quepa en pantalla
 
   const ultimoIndice = paginaActual * registrosPorPagina;
   const primerIndice = ultimoIndice - registrosPorPagina;
@@ -19,29 +19,30 @@ const TablaReportes = ({ datosTabla = [] }) => {
 
         <div className="overflow-x-auto">
           <table className="w-full bg-sky-50/50 text-sm text-left">
-            <thead>
-              <tr className="text-gray-200 bg-slate-600 uppercase text-[9px] font-bold">
-                <th className="pb-3 w-1/5">Título</th>
-                <th className="pb-3 w-2/5">Mensaje</th>
-                <th className="pb-3 w-1/5">Emisor</th>
-                <th className="pb-3 w-1/5">Receptor</th>
-                <th className="pb-3 text-center">Estado</th>
+            <thead className='overflow-hidden'>
+              <tr className="text-gray-200 bg-slate-600 uppercase text-[11px] font-bold">
+                   {/* Cambiamos pb-3 por py-3 para dar espacio arriba y abajo por igual */}
+                   <th className="py-3 px-8 w-1/5 shadow-sm rounded-tl-2xl">Título</th>
+                   <th className="py-3 px-8 w-1/5 shadow-sm">Mensaje</th>
+                   <th className="py-3 px-6 w-1/5 shadow-sm">Emisor</th>
+                   <th className="py-3 px-8 w-1/5 shadow-sm">Receptor</th>
+                   <th className="py-3 px-4 text-center shadow-sm rounded-tr-2xl">Estado</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {registrosActuales.length > 0 ? (
                 registrosActuales.map((reporte) => (
-                  <tr key={reporte.id_comunicacion} className="hover:bg-gray-50 transition-colors">
-                    <td className="py-3 pr-2 font-medium text-gray-700 align-top">
+                  <tr key={reporte.id_comunicacion} className="hover:bg-sky-100 transition-colors">
+                    <td className="py-3 px-6 pr-2 font-medium text-gray-700 align-top">
                       {reporte.titulo}
                     </td>
-                    <td className="py-3 pr-4 text-gray-600 italic leading-snug align-top">
+                    <td className="py-3 px-6 pr-4 text-gray-600 italic leading-snug align-top">
                       "{reporte.mensaje}"
                     </td>
-                    <td className="py-3 text-gray-600 align-top">
+                    <td className="py-3 px-6 text-gray-600 align-top">
                       {reporte.nombre_emisor}
                     </td>
-                    <td className="py-3 align-top">
+                    <td className="py-3 px-6 align-top">
                       <div className="flex flex-col">
                         <span className="text-gray-800">{reporte.nombre_receptor}</span>
                         <span className="text-[10px] text-gray-400 font-mono">
@@ -49,7 +50,7 @@ const TablaReportes = ({ datosTabla = [] }) => {
                         </span>
                       </div>
                     </td>
-                    <td className="py-3 text-center align-top">
+                    <td className="py-3 px-8 align-top">
                       <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold border ${
                         reporte.estado === 'leído' 
                           ? 'bg-green-50 text-green-600 border-green-100' 

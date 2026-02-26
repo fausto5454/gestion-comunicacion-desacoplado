@@ -12,6 +12,7 @@ const UsuariosPage = () => {
     // --- ESTADOS ---
     const [users, setUsers] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [isSubmitting, setIsSubmitting] = useState(false);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isEdit, setIsEdit] = useState(false);
     const [form, setForm] = useState({ id_usuario: '', nombre_completo: '', correo_electronico: '', contraseña: '', rol_id: '' });
@@ -121,95 +122,117 @@ const UsuariosPage = () => {
     };
 
     // --- OPERACIONES CRUD ---
-    const handleCreate = async (e) => {
+   const handleCreate = async (e) => {
     e.preventDefault();
+    if (isLoading) return; // Bloqueo de seguridad preventivo
+
     try {
-        // 1. Validar si el correo ya existe en la tabla usuarios antes de registrar
-        const { data: existingUser, error: checkError } = await supabase
-            .from('usuarios')
-            .select('correo_electronico')
-            .eq('correo_electronico', form.correo_electronico)
-            .maybeSingle();
+      // Normalización para evitar duplicados por espacios o mayúsculas
+      const emailLimpio = form.correo_electronico.toLowerCase().trim();
+      const nombreLimpio = form.nombre_completo.trim();
 
-        if (checkError) throw checkError;
-        
-        if (existingUser) {
-            toast.error("Este correo ya está registrado en el sistema");
-            return;
-        }
+      // 1. Validar si el correo ya existe en la tabla usuarios antes de registrar
+      const { data: existingUser, error: checkError } = await supabase
+        .from('usuarios')
+        .select('correo_electronico')
+        .eq('correo_electronico', emailLimpio)
+        .maybeSingle();
 
-        // 2. Si no existe, proceder con el registro en Auth
-        const { data: authData, error: signError } = await supabase.auth.signUp({
-            email: form.correo_electronico,
-            password: form.contraseña,
-        });
-        
-        if (signError) throw signError;
+      if (checkError) throw checkError;
 
-        // 3. Insertar en la tabla de perfil (usuarios)
-        const { error: insertError } = await supabase.from('usuarios').insert([
-            {
-                id_usuario: authData.user.id, 
-                nombre_completo: form.nombre_completo,
-                correo_electronico: form.correo_electronico,
-                rol_id: parseInt(form.rol_id, 10),
-            },
-        ]);
+      if (existingUser) {
+        toast.error("Este correo ya está registrado en el sistema");
+        return;
+      }
 
-        if (insertError) throw insertError;
+      // 2. Si no existe, proceder con el registro en Auth
+      const { data: authData, error: signError } = await supabase.auth.signUp({
+        email: emailLimpio,
+        password: form.contraseña,
+      });
 
-        // 4. Auditoría y éxito
-        await registrarAuditoria('CREAR', `Usuario creado: ${form.nombre_completo}`);
-        setIsModalOpen(false);
-        fetchUsers();
-        toast.success('Usuario registrado correctamente');
-        
-        } catch (err) {
-        toast.error(err.message || "Error al procesar el registro");
-       }
+      if (signError) throw signError;
+
+      // 3. Insertar en la tabla de perfil (usuarios)
+      // Usamos upsert con onConflict para blindar contra inserciones concurrentes
+      const { error: insertError } = await supabase.from('usuarios').upsert([
+        {
+          id_usuario: authData.user.id,
+          nombre_completo: nombreLimpio,
+          correo_electronico: emailLimpio,
+          rol_id: parseInt(form.rol_id, 10),
+        },
+      ], { onConflict: 'id_usuario' });
+
+      if (insertError) throw insertError;
+
+      // 4. Auditoría y éxito
+      await registrarAuditoria('CREAR', `Usuario creado: ${nombreLimpio}`);
+      setIsModalOpen(false);
+      fetchUsers();
+      toast.success('Usuario registrado correctamente');
+
+    } catch (err) {
+      toast.error(err.message || "Error al procesar el registro");
+    }
+  };
+
+  const handleUpdate = async (e) => {
+    e.preventDefault();
+    const t0 = performance.now(); // Inicio de medición de rendimiento
+    
+    try {
+      const emailLimpio = form.correo_electronico.toLowerCase().trim();
+      const nombreLimpio = form.nombre_completo.trim();
+
+      const { error } = await supabase
+        .from('usuarios')
+        .update({
+          nombre_completo: nombreLimpio,
+          correo_electronico: emailLimpio,
+          rol_id: parseInt(form.rol_id, 10),
+        })
+        .eq('id_usuario', form.id_usuario);
+
+      if (error) throw error;
+
+      // --- AUDITORÍA MEJORADA ---
+      const t1 = performance.now();
+      const duracion = Math.round(t1 - t0);
+      
+      // Descripción real que indica qué usuario y qué rol se asignó
+      const descUpdate = `Perfil actualizado: ${nombreLimpio} (${emailLimpio})`;
+      
+      await registrarAuditoria('EDITAR', descUpdate, 'Seguridad', duracion);
+      // --------------------------
+
+      setIsModalOpen(false);
+      fetchUsers();
+      toast.success('Usuario actualizado correctamente');
+    } catch (err) {
+      console.error("Error en update:", err);
+      toast.error('Error al actualizar');
+    }
     };
 
-    const handleUpdate = async (e) => {
-        e.preventDefault();
-        try {
-            const { error } = await supabase
-                .from('usuarios')
-                .update({
-                    nombre_completo: form.nombre_completo,
-                    correo_electronico: form.correo_electronico,
-                    rol_id: parseInt(form.rol_id, 10),
-                })
-                .eq('id_usuario', form.id_usuario);
+  const confirmDelete = async () => {
+    if (confirmText !== 'ELIMINAR') return;
+    try {
+      const { error } = await supabase
+        .from('usuarios')
+        .delete()
+        .eq('id_usuario', deleteModal.id_usuario);
 
-            if (error) throw error;
+      if (error) throw error;
 
-            await registrarAuditoria('EDITAR', `Actualizado: ${form.nombre_completo}`);
-            setIsModalOpen(false);
-            fetchUsers();
-            toast.success('Usuario actualizado correctamente');
-        } catch (err) {
-            toast.error('Error al actualizar');
-        }
-    };
-
-    const confirmDelete = async () => {
-        if (confirmText !== 'ELIMINAR') return;
-        try {
-            const { error } = await supabase
-                .from('usuarios')
-                .delete()
-                .eq('id_usuario', deleteModal.id_usuario);
-
-            if (error) throw error;
-
-            await registrarAuditoria('ELIMINAR', `Eliminado: ${deleteModal.nombre_completo}`);
-            setDeleteModal({ open: false, id_usuario: null, nombre_completo: '' });
-            setConfirmText('');
-            fetchUsers();
-            toast.success('Usuario eliminado definitivamente');
-        } catch (err) {
-            toast.error('No se pudo eliminar (registros vinculados)');
-        }
+      await registrarAuditoria('ELIMINAR', `Eliminado: ${deleteModal.nombre_completo}`);
+      setDeleteModal({ open: false, id_usuario: null, nombre_completo: '' });
+      setConfirmText('');
+      fetchUsers();
+      toast.success('Usuario eliminado definitivamente');
+    } catch (err) {
+      toast.error('No se pudo eliminar (registros vinculados)');
+    }
     };
 
     return (

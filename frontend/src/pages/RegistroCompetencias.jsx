@@ -362,10 +362,17 @@ const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion
   };
 
    const handleGuardarTodo = async () => {
-    if (!grado || !area || !bimestre) return;
+    // 1. PREVENCIÓN DE DOBLE CLIC Y VALIDACIÓN
+    if (!grado || !area || !bimestre || loading) return; 
     setLoading(true);
+    const t0 = performance.now(); 
 
     try {
+      // --- MEJORA: OBTENER EL USUARIO ANTES DE EMPEZAR ---
+      const { data: { user } } = await supabase.auth.getUser();
+      const correoResponsable = user?.email || 'usuario_desconocido';
+      // --------------------------------------------------
+
       const [numGrado, letraSeccion] = grado.split(" ");
       const seccionFinal = letraSeccion?.trim() || "A";
       const areaNormalizada = area.toUpperCase().trim();
@@ -375,20 +382,17 @@ const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion
       const batchAsistencia = [];
 
       alumnos.forEach((nombre) => {
-        // 1. NORMALIZACIÓN Y OBTENCIÓN DE DATOS
         const nombreLimpio = (nombre || "").toUpperCase().trim();
         const idEst = normalizarID(nombreLimpio);
         const dni = dnis[idEst] ? dnis[idEst].toString().trim() : null;
         const gen = generos[nombreLimpio] || null; 
 
-        // VALIDACIÓN CRÍTICA: Impedir el envío si el DNI es NULL para evitar duplicados erróneos
         if (!dni) {
           console.warn(`Registro omitido: No se encontró DNI para ${nombreLimpio}`);
           return; 
         }
 
-      // 2. CONSTRUCCIÓN DE CALIFICACIONES (Blindaje contra NULLs)
-      batchCalificaciones.push({
+        batchCalificaciones.push({
           dni_estudiante: dni,
           nombre_estudiante: nombreLimpio,
           grado: numGrado,
@@ -410,7 +414,6 @@ const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion
           )
         });
 
-        // 3. CONSTRUCCIÓN DE MATRÍCULA (Sincronización de base)
         batchMatriculas.push({ 
           dni_estudiante: dni, 
           genero: gen, 
@@ -418,57 +421,53 @@ const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion
           seccion: seccionFinal 
         });
 
-        // 4. CONSTRUCCIÓN DE ASISTENCIA (Identidad vinculada para el Consolidado)
         batchAsistencia.push({ 
           dni_estudiante: dni, 
           genero: gen, 
           grado: numGrado, 
           seccion: seccionFinal,
-          // No enviamos 'estado' ni 'fecha' aquí para no sobrescribir registros diarios existentes
         });
       });
 
-      // 5. ENVÍO PARALELO OPTIMIZADO CON UPSERT
+      // 2. EJECUCIÓN ATÓMICA (BATCH)
       const results = await Promise.all([
-        supabase.from('calificaciones').upsert(batchCalificaciones, { 
-          onConflict: 'dni_estudiante,area,bimestre' 
-        }),
-        supabase.from('matriculas').upsert(batchMatriculas, { 
-          onConflict: 'dni_estudiante' 
-        }),
-        supabase.from('asistencia').upsert(batchAsistencia, { 
-          onConflict: 'dni_estudiante,grado,seccion' 
-        })
+        supabase.from('calificaciones').upsert(batchCalificaciones, { onConflict: 'dni_estudiante,area,bimestre' }),
+        supabase.from('matriculas').upsert(batchMatriculas, { onConflict: 'dni_estudiante' }),
+        supabase.from('asistencia').upsert(batchAsistencia, { onConflict: 'dni_estudiante,grado,seccion' })
       ]);
 
-     // Verificación de errores en la ráfaga
       const errorResult = results.find(r => r.error);
       if (errorResult) throw errorResult.error;
 
-      // MENSAJE MEJORADO: Informamos que el sistema detectó y actualizó registros existentes
-      setMensaje({ 
-        texto: "¡GUARDADO EXITOSO!", 
-        tipo: 'success' 
-      });
+      // 3. AUDITORÍA UNIFICADA (CORREGIDA)
+      const t1 = performance.now();
+      const duracion = Math.round(t1 - t0);
 
+     // Definimos un mensaje dinámico basado en los datos reales
+     const descripcionReal = `Sincronización: ${batchCalificaciones.length} alumnos - Área: ${areaNormalizada} - Bimestre: ${bimestre}`;
+
+     await supabase.from('auditoria').insert([{
+         accion: 'UPDATE', 
+         modulo: 'Calificaciones', // Nombre del módulo específico
+         usuario_responsable: correoResponsable,
+         descripcion: descripcionReal, // <--- Descripción dinámica y real
+         duracion_ms: duracion,
+         fecha_hora: new Date().toISOString()
+      }]);
+
+      setMensaje({ texto: "¡DATOS SINCRONIZADOS EXITOSAMENTE!", tipo: 'success' });
       setShowConfirm(false);
       
-      // Limpiamos el mensaje después de 3 segundos
       setTimeout(() => setMensaje(null), 3000);
 
     } catch (error) {
-      console.error("Error detectado:", error);
-      
-      // Mantenemos la alerta para errores críticos y el estado visual
-      alert("❌ Error al guardar: " + error.message);
-      setMensaje({ texto: "Error al guardar: " + error.message, tipo: 'error' });
-      
-      setTimeout(() => setMensaje(null), 4000);
+      console.error("Error crítico:", error);
+      alert("❌ Error al procesar: " + error.message);
+      setMensaje({ texto: "Error: " + error.message, tipo: 'error' });
     } finally {
-      // DESCONGELAR BOTÓN: Pase lo que pase, el botón vuelve a estar activo
       setLoading(false);
     }
-  };
+    };
 
   const getColorNota = (nota) => {
     if (nota === 'C') return 'text-red-600';

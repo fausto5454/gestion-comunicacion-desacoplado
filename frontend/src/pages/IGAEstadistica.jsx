@@ -330,11 +330,27 @@ const IGAEstadistica = () => {
         
     };
 
+    const OPCIONES_GRADO_SECCION = [
+                 { value: '1A', label: '1° A' },
+                 { value: '1B', label: '1° B' },
+                 { value: '1C', label: '1° C' },
+                 { value: '2A', label: '2° A' },
+                 { value: '2B', label: '2° B' },
+                 { value: '2C', label: '2° C' },
+                 { value: '3A', label: '3° A' },
+                 { value: '3B', label: '3° B' },
+                 { value: '4A', label: '4° A' },
+                 { value: '4B', label: '4° B' },
+                 { value: '5A', label: '5° A' },
+                 { value: '5B', label: '5° B' },
+     ];
+    const [filtroGrado, setFiltroGrado] = useState('');
+
     return (
         <div className="p-6 bg-slate-50 min-h-screen space-y-6">
             <div className="bg-sky-900 p-6 rounded-[2rem] shadow-sm border border-slate-200 grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
-                <div className="space-y-2">
-                    <label className="text-[10px] font-black text-gray-200 uppercase ml-2">Área Curricular</label>
+                <div className="flex flex-col">
+                    <label className="text-[10px] text-center font-black text-white uppercase tracking-wider mb-1 ml-1">Área Curricular</label>
                     <select value={filtros.area} onChange={(e) => setFiltros({...filtros, area: e.target.value})} className="w-full bg-white border-none rounded-xl text-gray-600 font-bold p-3">
                         <option value="MATEMÁTICA">Matemática</option>
                         <option value="COMUNICACIÓN">Comunicación</option>
@@ -348,47 +364,71 @@ const IGAEstadistica = () => {
                         <option value="INGLÉS">Inglés</option>
                     </select>
                 </div>
-                <div className="space-y-2">
-                    <label className="text-[10px] font-black text-gray-200 uppercase ml-2">Bimestre</label>
+                <div className="flex flex-col">
+                    <label className="text-[10px] text-center font-black text-white uppercase tracking-wider mb-1 ml-1">Bimestres</label>
                     <select value={filtros.bimestre} onChange={(e) => setFiltros({...filtros, bimestre: e.target.value})} className="w-full bg-white border-none rounded-xl text-gray-600 font-bold p-3">
                         <option value="1">1° Bimestre</option><option value="2">2° Bimestre</option>
                         <option value="3">3° Bimestre</option><option value="4">4° Bimestre</option>
                     </select>
                 </div>
-                <div className="space-y-2">
-                    <label className="text-[10px] font-black text-gray-200 uppercase ml-2">Grado / Sección</label>
-                    <div className="flex gap-1">
-                        <select value={filtros.grado} onChange={(e) => setFiltros({...filtros, grado: e.target.value})} className="w-full bg-white border-none rounded-xl text-gray-600 text-[10px] font-bold p-3">
-                            <option value="1°">1° Sec</option><option value="2°">2° Sec</option>
-                            <option value="3°">3° Sec</option><option value="4°">4° Sec</option>
-                            <option value="5°">5° Sec</option>
-                        </select>
-                        <select value={filtros.seccion} onChange={(e) => setFiltros({...filtros, seccion: e.target.value})} className="w-full bg-white border-none rounded-xl text-gray-600 text-[10px] font-bold p-3">
-                            <option value="A">A</option><option value="B">B</option><option value="C">C</option>
-                        </select>
-                    </div>
-                </div>
-                <button onClick={exportarExcelCompleto} className="bg-green-500 text-white p-2 rounded-xl font-black text-xs flex items-center justify-center gap-2 hover:bg-green-600 transition-all shadow-lg">
-                    <FileDown size={18} /> EXPORTAR EXCEL + GRÁFICO
-                </button>
-                <div className="flex items-center gap-2 text-[12px] font-bold text-sky-200 p-3">
+              <div className="flex flex-col">
+              {/* Título uniforme y pegado al botón */}
+               <label className="text-[10px] text-center font-black text-white uppercase tracking-wider mb-1 ml-1">
+                Grado y Sección
+                </label>
+                <div className="relative">
+                <select 
+                   value={filtroGrado}
+                   onChange={(e) => setFiltroGrado(e.target.value)}
+                   className="w-full min-w-[130px] px-4 py-3 bg-white border-none rounded-xl text-sm font-bold text-gray-700 outline-none appearance-none cursor-pointer shadow-sm">
+                   {OPCIONES_GRADO_SECCION.map(op => (
+                   <option key={op.value} value={op.value}>
+                    {op.label}
+                   </option>
+                   ))}
+               </select>
+             {/* Icono de flecha para que se vea igual a los otros selectores */}
+            <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-600">
+            <svg className="w-3 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" d="M19 9l-7 7-7-7" />
+             </svg>
+              </div>
+               </div>
+               </div>
+                   <button onClick={exportarExcelCompleto} className="bg-green-500 text-white p-2 rounded-xl font-black text-xs flex items-center justify-center gap-2 hover:bg-green-600 transition-all shadow-lg">
+                   <FileDown size={18} /> EXPORTAR EXCEL + GRÁFICO
+                   </button>
+                   <div className="flex items-center gap-2 text-[12px] font-bold text-sky-200 p-3">
                     <RefreshCcw size={14} className={loading ? "animate-spin text-green-500" : ""} /> {loading ? "Sincronizando..." : "Sincronizado Realtime"}
                 </div>
             </div>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          {stats.resumen.map((item, i) => {
+           const estilosPorNivel = {
+            "DESTACADO (AD)": "bg-green-200 border-green-100 text-green-600",
+            "LOGRADO (A)": "bg-blue-200 border-blue-100 text-blue-600",
+            "PROCESO (B)": "bg-amber-200 border-amber-100 text-amber-600",
+            "INICIO (C)": "bg-red-200 border-red-100 text-red-600"
+            };
+           const estiloActual = estilosPorNivel[item.name] || "bg-white border-slate-100 text-slate-500";
+           const colorBase = estiloActual.split(' ')[2]; // Extrae el color para el porcentaje
 
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                {stats.resumen.map((item, i) => (
-                    <div key={i} className="bg-sky-200 p-5 rounded-[2rem] border border-slate-100 shadow-sm">
-                        <p className="text-[9px] font-black text-slate-500 uppercase tracking-tighter">{item.name}</p>
-                        <div className="flex justify-between items-end mt-2">
-                            <p className="text-3xl font-black text-slate-800">{item.cant}</p>
-                            <p className="text-sm font-black px-2 py-1 rounded-lg bg-slate-50" style={{color: item.color}}>{item.percent}%</p>
-                        </div>
-                    </div>
-                ))}
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+           return (
+               <div key={i} className={`${estiloActual.split(' ').slice(0,2).join(' ')} p-5 rounded-[2rem] border shadow-sm transition-all hover:shadow-md`}>
+                   <p className={`text-[9px] font-black uppercase tracking-tighter ${estiloActual.split(' ')[2]}`}>
+                    {item.name}
+                   </p>
+                   <div className="flex justify-between items-end mt-2">
+                       <p className="text-3xl font-black text-slate-800">{item.cant}</p>
+                       <p className={`text-sm font-black px-2 py-1 rounded-lg bg-white/50 shadow-sm`} style={{color: item.color}}>
+                          {item.percent}%
+                       </p>
+                     </div>
+                   </div>
+                  );
+                })}
+              </div>
+             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <div className="bg-white p-8 rounded-[3rem] shadow-sm border border-slate-100 h-[380px]">
                     <h3 className="text-[10px] font-black text-slate-400 uppercase mb-6 flex items-center gap-2 tracking-widest">
                         <LayoutDashboard size={14} className="text-green-600"/> Rendimiento: {filtros.area}

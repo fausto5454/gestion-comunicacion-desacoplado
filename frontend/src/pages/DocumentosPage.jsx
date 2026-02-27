@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { 
     FileText, Upload, Trash2, Search, AlertTriangle,
     File, Loader2, Globe, Lock, Eye, FileSpreadsheet, X
 } from 'lucide-react';
 import { supabase } from '../config/supabaseClient';
 import { toast, Toaster } from 'react-hot-toast';
+import { registrarAuditoria } from '../services/auditoriaService';
 
 const DocumentosPage = ({ session }) => {
     const userId = session?.user?.id;
@@ -21,13 +22,16 @@ const DocumentosPage = ({ session }) => {
     const categorias = ['Todos', 'Administrativo', 'Académico', 'Planificaciones', 'Recursos', 'Otros'];
 
     const fetchDocumentos = useCallback(async () => {
+    // 1. Evitar ejecuciones innecesarias si no hay usuario en modo privado
+    if (!userId && viewMode !== 'publicos') return;
+
     setLoading(true);
-    const t0 = performance.now(); // Inicio de medición de velocidad
+    const t0 = performance.now();
 
     try {
         let query = supabase
             .from('documentos')
-            .select(`*, usuarios!subido_por(nombre_completo)`)
+            .select(`*, usuarios:subido_por(nombre_completo)`)
             .order('fecha_subida', { ascending: false });
 
         if (viewMode === 'publicos') {
@@ -38,26 +42,36 @@ const DocumentosPage = ({ session }) => {
 
         const { data, error } = await query;
         if (error) throw error;
-        
         setDocumentos(data || []);
 
-        // --- AUDITORÍA DE LECTURA ---
         const t1 = performance.now();
         const duracion = Math.round(t1 - t0);
         
-        // Descripción dinámica basada en el modo de vista
-        const descLectura = `Consulta: ${data?.length || 0} documentos cargados (Modo: ${viewMode})`;
-        
-        await registrarAuditoria('SELECT', descLectura, 'Documentos', duracion);
+        // 2. Registro de Auditoría ÚNICO
+        await registrarAuditoria(
+            'SELECT', 
+            `Consulta: ${data?.length || 0} docs (${viewMode})`, 
+            'Documentos', 
+            duracion
+        );
 
     } catch (error) {
+        console.error("Error:", error.message);
         toast.error("Error al cargar documentos");
     } finally {
         setLoading(false);
     }
+    
     }, [userId, viewMode]);
 
-    useEffect(() => { fetchDocumentos(); }, [fetchDocumentos]);
+    const isInitialMount = useRef(true);
+
+    useEffect(() => {
+    if (isInitialMount.current) {
+        fetchDocumentos();
+        isInitialMount.current = false;
+    }
+    }, []);
 
     const handleVerDocumento = (url) => {
         if (!url) return;

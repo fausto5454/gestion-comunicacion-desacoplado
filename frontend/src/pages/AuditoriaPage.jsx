@@ -106,9 +106,10 @@ const AuditoriaPage = () => {
     };
 
     const getRendimientoBadge = (ms) => {
-        if (ms > 2000) return { bg: 'bg-red-50', text: 'text-red-600', border: 'border-red-200', icon: <AlertTriangle size={10} /> };
-        if (ms > 1000) return { bg: 'bg-orange-50', text: 'text-orange-600', border: 'border-orange-200', icon: <Zap size={10} /> };
-        return { bg: 'bg-emerald-50', text: 'text-emerald-600', border: 'border-emerald-200', icon: <Zap size={10} className="fill-current" /> };
+    const valorNum = Number(ms); // Forzamos a que sea un número
+    if (valorNum > 2000) return { bg: 'bg-red-50', text: 'text-red-600', border: 'border-red-200', icon: <AlertTriangle size={10} /> };
+    if (valorNum > 1000) return { bg: 'bg-orange-50', text: 'text-orange-600', border: 'border-orange-200', icon: <Zap size={10} /> };
+    return { bg: 'bg-emerald-50', text: 'text-emerald-600', border: 'border-emerald-200', icon: <Zap size={10} className="fill-current" /> };
     };
 
     // FUNCIONES DE EXPORTACIÓN
@@ -195,17 +196,39 @@ const AuditoriaPage = () => {
                  </div>
              </div>
             {/* Card Rendimiento */}
-            <div className={`p-6 rounded-[2rem] shadow-xl flex items-center justify-between border transition-all duration-500 ${promedioMs > 400 ? 'bg-red-600 border-red-400' : 'bg-[#004d71] border-white/10'}`}>
+            <div className={`p-6 rounded-[2rem] shadow-xl flex items-center justify-between border transition-all duration-500 
+             ${promedioMs > 2000 ? 'bg-red-600 border-red-400' : 
+               promedioMs > 1000 ? 'bg-orange-500 border-orange-300' : 
+               'bg-[#004d71] border-white/10'}`}>
+    
                 <div>
-                    <p className={`text-[10px] font-black uppercase tracking-[0.2em] mb-1 ${promedioMs > 400 ? 'text-red-100' : 'text-sky-300'}`}>Rendimiento Promedio</p>
-                    <h3 className={`text-3xl font-black ${promedioMs > 400 ? 'text-white' : 'text-amber-400'}`}>
-                        {promedioMs} <span className="text-sm font-bold opacity-80">ms</span>
-                    </h3>
-                </div>
-                <div className={`p-4 rounded-2xl transition-colors shadow-inner ${promedioMs > 400 ? 'bg-white/20' : 'bg-white/10'}`}>
-                    <Activity className={promedioMs > 400 ? 'text-white animate-pulse' : 'text-amber-400'} size={28} />
-                </div>
+                <p className={`text-[10px] font-black uppercase tracking-[0.2em] mb-1 
+               ${promedioMs > 1000 ? 'text-white/80' : 'text-sky-300'}`}>
+               Rendimiento Promedio
+             </p>
+            <h3 className={`text-3xl font-black 
+             ${promedioMs > 2000 ? 'text-white' : 
+               promedioMs > 1000 ? 'text-white' : 
+               'text-emerald-400'}`}>
+                {Math.round(promedioMs)} <span className="text-sm font-bold opacity-80">ms</span>
+               </h3>
+             </div>
+
+            <div className={`p-4 rounded-2xl transition-colors shadow-inner 
+             ${promedioMs > 2000 ? 'bg-white/20' : 
+              promedioMs > 1000 ? 'bg-white/10' : 
+              'bg-emerald-500/20'}`}>
+        
+              <Activity 
+                className={`${
+                  promedioMs > 2000 ? 'text-white animate-bounce' : 
+                  promedioMs > 1000 ? 'text-orange-100 animate-pulse' : 
+                  'text-emerald-400'
+                  }`} 
+                 size={28} 
+               />
             </div>
+          </div>
         </div>
         {/* BUSCADOR (Estilo Banner Azul) */}
         <div className="bg-green-600 p-2 rounded-[3rem] shadow-xl flex flex-col md:flex-row items-center justify-between gap-4 border-4 border-white">

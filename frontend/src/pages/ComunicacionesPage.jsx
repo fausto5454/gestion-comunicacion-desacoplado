@@ -158,16 +158,19 @@ const ComunicacionesPage = ({ session }) => {
             filtros += `,grado_destino.eq.${perfil.grado}`;
         }
 
-        // 3. Cargar Recibidos
+        // 3. Cargar Recibidos (Bandeja de Entrada)
         const { data: recibidos, error: errR } = await supabase
             .from('comunicaciones')
             .select('*')
             .or(filtros)
+            // MEJORA CRÍTICA: Excluimos los mensajes que el usuario actual envió 
+            // para que no se auto-reciba en su bandeja
+            .neq('remitente_id', currentUserId) 
             .order('fecha_envio', { ascending: false });
 
         if (errR) throw errR;
 
-        // 4. Cargar Enviados (Auditoría)
+        // 4. Cargar Enviados (Auditoría/Enviados)
         const { data: enviados, error: errE } = await supabase
             .from('comunicaciones')
             .select('*')
@@ -176,7 +179,7 @@ const ComunicacionesPage = ({ session }) => {
 
         if (errE) throw errE;
 
-        // 5. Guardar en los estados que acabamos de definir
+        // 5. Guardar en los estados definidos
         setMensajesRecibidos(recibidos || []);
         setMensajesEnviados(enviados || []);
 
@@ -199,23 +202,23 @@ const ComunicacionesPage = ({ session }) => {
     fetchData();
 
     const channel = supabase
-        .channel('cambios-comunicaciones')
+        .channel('cambios-comunicaciones-local')
         .on('postgres_changes', 
             { event: '*', schema: 'public', table: 'comunicaciones' }, 
             (payload) => {
-                // Solo mostrar toast si es un mensaje nuevo para MI
-                if (payload.eventType === 'INSERT' && payload.new.usuario_destino_id === userId) {
-                    toast('📬 ¡Tienes un nuevo mensaje!', { icon: '🔔' });
-                }
-                
-                // Si el evento es DELETE, refrescamos sin lanzar notificaciones
                 fetchData();
+                if (payload.eventType === 'INSERT' && payload.new.usuario_destino_id === userId) {
+                    toast('📬 Nuevo mensaje en tu bandeja', { 
+                        icon: '🔔',
+                        style: { border: '1px solid #10b981', padding: '16px' }
+                    });
+                }
             }
         )
         .subscribe();
 
       return () => { supabase.removeChannel(channel); };
-     }, [userId]);
+    }, [userId]);
 
      // 5. ACCIONES DE MENSAJERÍA
    const mostrarToast = (mensaje, tipo = 'success') => {
@@ -230,31 +233,38 @@ const ComunicacionesPage = ({ session }) => {
     }, 3000);
     };
 
-    const abrirMensaje = async (msg) => {
-    // 1. Mostrar el mensaje en el modal/detalle
-    setMsgDetalle(msg); 
+   const abrirMensaje = async (msg) => {
+    setMsgDetalle(msg);
 
-    // 2. Si el mensaje está 'no leído', actualizamos el estado y la fecha de lectura
-    if (msg.estado === 'no leído') {
+    // Identificamos quién es el usuario actual
+    const currentUserId = session?.user?.id;
+    
+    // Identificamos si el usuario es el DESTINATARIO (o si es un mensaje global que no envió él)
+    const esDestinatario = msg.usuario_destino_id === currentUserId || (msg.es_global && msg.remitente_id !== currentUserId);
+
+    // ✅ CORRECCIÓN: Solo marcar como leído si es RECIBIDO y está PENDIENTE
+    if (esDestinatario && msg.estado === 'no leído') {
         try {
             const { error } = await supabase
                 .from('comunicaciones')
                 .update({ 
                     estado: 'leído',
-                    // Registramos la fecha y hora exacta de apertura para auditoría
                     fecha_lectura: new Date().toISOString() 
                 })
-                .eq('id_comunicacion', msg.id_comunicacion); // ID real de tu tabla
+                .eq('id_comunicacion', msg.id_comunicacion);
 
-            if (error) throw error;
-
-            // 3. Refrescamos la lista para que el contador y las bandejas se actualicen
-            fetchData();
-            
-        } catch (error) {
-            console.error("Error en auditoría de lectura:", error);
+            if (!error) {
+                // Actualizamos la lista local y la campanita solo para el receptor
+                setMensajesRecibidos(prev => prev.map(m => 
+                    m.id_comunicacion === msg.id_comunicacion ? { ...m, estado: 'leído' } : m
+                ));
+                await fetchUnreadMessages();
+            }
+        } catch (err) {
+            console.error("Error al actualizar:", err);
         }
-      }
+     }
+    // Si es el Administrador viendo sus 'Enviados', no entra al IF y solo se abre el modal.
    };
 
   const handleEnviar = async (e) => {
@@ -689,14 +699,14 @@ const ComunicacionesPage = ({ session }) => {
                         {/* Estado y Acceso */}
                         <div className="flex items-center gap-4 shrink-0">
                             <div className="hidden md:flex flex-col items-end">
-                                <span className={`text-[9px] font-black uppercase px-3 py-1.5 rounded-lg border ${
-                                    msg.estado === 'leído' 
-                                        ? 'text-green-600 bg-green-50 border-green-200' 
-                                        : 'text-red-600 bg-red-50 border-red-200 shadow-sm'
-                                       }`}>
-                                    {msg.estado === 'leído' ? '✅ LEÍDO' : '⏳ PENDIENTE'}
+                                <span className={`text-[9px] font-black uppercase px-3 py-1.5 rounded-lg border transition-colors ${
+                                   msg.estado === 'leído' // CAMBIO: Comparación exacta en lugar de .includes()
+                                    ? 'text-green-600 bg-green-50 border-green-200' 
+                                    : 'text-red-600 bg-red-50 border-red-200 shadow-sm'
+                                   }`}>
+                                  {msg.estado === 'leído' ? '✅ LEÍDO' : '⏳ PENDIENTE'}
                                 </span>
-                            </div>
+                              </div>
                             <ChevronRight className="text-gray-300" size={18} />
                         </div>
                     </div>

@@ -61,61 +61,38 @@ const AppLayout = ({ session, onLogout, currentView, setCurrentView, onCursoSele
     }, [fetchUserData]);;
 
 
-   const fetchUnreadMessages = useCallback(async () => {
-    if (!usuarioID) return;
+  const fetchUnreadMessages = useCallback(async () => {
+    const currentUserId = session?.user?.id;
+    if (!currentUserId) return;
 
-    try {
-        // Consultamos mensajes no leídos: Directos OR Globales
-        const { count, error } = await supabase
-            .from('comunicaciones')
-            .select('*', { count: 'exact', head: true })
-            .or(`usuario_destino_id.eq.${usuarioID},es_global.eq.true`)
-            .eq('estado', 'no leído');
+    // Contamos solo mensajes "no leídos" destinados al usuario o globales
+    const { count, error } = await supabase
+        .from('comunicaciones')
+        .select('*', { count: 'exact', head: true })
+        .eq('estado', 'no leído')
+        .or(`usuario_destino_id.eq.${currentUserId},es_global.eq.true`)
+        // CRÍTICO: No contar lo que el propio usuario envió para no auto-notificarse
+        .neq('remitente_id', currentUserId);
 
-        if (error) throw error;
+      if (!error) {
         setUnreadCount(count || 0);
-    } catch (error) {
-        console.error("Error en conteo de campanita:", error.message);
-        setUnreadCount(0);
     }
-    }, [usuarioID]);
+    }, [session, session?.user?.id]);
 
-  useEffect(() => {
-    if (!usuarioID) return;
-
-    //EFECTO REAL-TIME
+    // Suscripción Realtime para que el número baje solo al marcar como leído
+    useEffect(() => {
     fetchUnreadMessages();
 
     const channel = supabase
-        .channel('cambios-notificaciones-global')
-        .on(
-            'postgres_changes',
-            { 
-                event: '*', 
-                schema: 'public', 
-                table: 'comunicaciones' 
-            },
-            (payload) => {
-                // Notificación sonora solo si el nuevo mensaje es para este usuario
-                if (payload.eventType === 'INSERT' && payload.new.usuario_destino_id === String(usuarioID)) {
-                    const horaLima = new Date().toLocaleString('es-PE', {
-                        timeZone: 'America/Lima',
-                        hour: '2-digit', minute: '2-digit', hour12: true
-                    });
-                    console.log(`🔔 Notificación recibida ${horaLima}`);
-                    new Audio('/notificacion.mp3').play().catch(() => {});
-                }
-
-                // Recargar el contador siempre (ante insert, update o delete)
-                fetchUnreadMessages(); 
-            }
+        .channel('db-changes')
+        .on('postgres_changes', 
+            { event: '*', schema: 'public', table: 'comunicaciones' }, 
+            () => fetchUnreadMessages()
         )
         .subscribe();
 
-       return () => {
-          supabase.removeChannel(channel);
-      };
-    }, [usuarioID, fetchUnreadMessages]);
+      return () => { supabase.removeChannel(channel); };
+    }, [fetchUnreadMessages]);
 
     // ✅ 2. ACTUALIZACIÓN DEL MAPEO DE VISTAS
     const viewComponents = {

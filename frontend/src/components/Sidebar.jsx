@@ -75,10 +75,14 @@ const Sidebar = ({ rol_id, userName, userEmail, setCurrentView, currentView, isS
         <div className={`flex flex-col h-full bg-gray-900 text-white w-64 fixed md:relative z-40 shadow-2xl transition-transform duration-300 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
             {/* Header */}
             <div className="p-5 flex items-center justify-between border-b border-gray-800">
-                <div className="sidebar-header">
-                 <img src="./public/sigescom.png" Alt="" width={135}/>
-                 </div>
-                <button className="md:hidden text-gray-400" onClick={() => setIsSidebarOpen(false)}>
+                <div className="flex items-center justify-center p-1 w-full">
+                 <img 
+                   src="/sigescom.png" 
+                   alt="Logo SIGESCOM 2079" 
+                   className="w-[100px] md:w-[130px] h-auto object-contain transition-all duration-300"
+                    />
+                  </div>
+                 <button className="md:hidden text-gray-400" onClick={() => setIsSidebarOpen(false)}>
                     <X className="w-6 h-6" />
                 </button>
             </div>

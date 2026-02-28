@@ -6,6 +6,7 @@ import {
     Loader2, ChevronDown, ChevronRight, MessageSquare, BookOpen, FolderTree, LayoutGrid, FileSpreadsheet 
 } from 'lucide-react';
 import { COLOR_IE_GREEN_LIGHT, COLOR_IE_GREEN } from '../styles/CustomStyles';
+import Logo from "./Logo";
 
 const Sidebar = ({ rol_id, userName, userEmail, setCurrentView, currentView, isSidebarOpen, setIsSidebarOpen }) => {
     const [isLoggingOut, setIsLoggingOut] = useState(false);
@@ -74,10 +75,9 @@ const Sidebar = ({ rol_id, userName, userEmail, setCurrentView, currentView, isS
         <div className={`flex flex-col h-full bg-gray-900 text-white w-64 fixed md:relative z-40 shadow-2xl transition-transform duration-300 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
             {/* Header */}
             <div className="p-5 flex items-center justify-between border-b border-gray-800">
-                <div className="flex flex-col">
-                    <h2 className="text-xl font-black tracking-tight" style={{ color: COLOR_IE_GREEN }}>I.E. N.° 2079</h2>
-                    <span className="text-[11px] text-gray-400 font-bold tracking-widest uppercase">Sistema de Gestión</span>
-                </div>
+                <div className="sidebar-header">
+                 <img src="./public/sigescom.png" Alt="" width={135}/>
+                 </div>
                 <button className="md:hidden text-gray-400" onClick={() => setIsSidebarOpen(false)}>
                     <X className="w-6 h-6" />
                 </button>

@@ -21,14 +21,14 @@ const inversa = { 4: "AD", 3: "A", 2: "B", 1: "C", 0: "-" };
 const normalizarID = (t) => t ? String(t).trim().toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") : "";
 
 const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion }) => {
-  const [grado, setGrado] = useState(perfilUsuario?.grado ? `${perfilUsuario.grado} ${perfilUsuario.seccion}` : "1° A");
-  const [area, setArea] = useState(perfilUsuario?.area || "MATEMÁTICA");
+  const [grado, setGrado] = useState(""); 
+  const [area, setArea] = useState("");
   const [bimestre, setBimestre] = useState(1);
   const [alumnos, setAlumnos] = useState([]); 
   const [notas, setNotas] = useState({});
   const [generos, setGeneros] = useState({}); // Nuevo: Estado para Género
   const [mensaje, setMensaje] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [showConfirm, setShowConfirm] = useState(false);
   const [nombreDocenteAsignado, setNombreDocenteAsignado] = useState("");
   const [conclusiones, setConclusiones] = useState({});
@@ -36,155 +36,163 @@ const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion
   const [dnis, setDnis] = useState({});
  
   const competencias = areasConfig[area] || [];
-  const rolActual = perfilUsuario?.rol_id || session?.user?.user_metadata?.rol_id;
-  const esEstudiante = Number(rolActual) === 6; 
-  const esDocente = Number(rolActual) === 3;
-  const esAdmin = Number(rolActual) === 1;
+  const rolActual = Number(perfilUsuario?.rol_id || session?.user?.user_metadata?.rol_id);
+  const esEstudiante = rolActual === 6;
+  const esDocente = rolActual === 3;
+  const esAdmin = rolActual === 1;
 
- useEffect(() => {
-  const sincronizarDNIs = async () => {
-    // Eliminamos 'nombre_estudiante' que causa el Error 400
-    const { data, error } = await supabase
-      .from('matriculas')
-      .select('dni_estudiante, apellido_paterno, apellido_materno, nombres');
+  const opcionesPermitidas = useMemo(() => {
+    const rolActual = Number(perfilUsuario?.rol_id);
+    const esAdmin = rolActual === 1;
+    const esEstudiante = rolActual === 6; // Definimos el rol de estudiante
+    const asignaciones = perfilUsuario?.asignaciones || [];
 
-    if (error) {
-      console.error("Fallo en sincronización:", error.message);
-      return;
+    // --- CASO 1: ADMINISTRADOR ---
+    if (esAdmin) {
+        return {
+            grados: ["1° A", "1° B", "1° C", "2° A", "2° B", "2° C", "3° A", "3° B", "4° A", "4° B", "5° A", "5° B"],
+            areas: Object.keys(areasConfig || {})
+        };
     }
 
-    if (data) {
-      const mapaDnisLocal = {}; // Declaración local para evitar ReferenceError
-      data.forEach(m => {
-        // Construimos la llave exactamente como en el resto de la app
-        const nombreCompleto = `${m.apellido_paterno} ${m.apellido_materno}, ${m.nombres}`.toUpperCase().trim();
-        const id = normalizarID(nombreCompleto);
-        mapaDnisLocal[id] = m.dni_estudiante;
-      });
-      
-      setDnis(mapaDnisLocal); 
-      console.log("✅ Conexión establecida: DNIs cargados por identidad construida.");
+    // --- CASO 2: ESTUDIANTE (Mejora integrada) ---
+    if (esEstudiante && perfilUsuario?.grado) {
+        // El estudiante solo puede ver su propio grado y sección
+        return {
+            grados: [`${perfilUsuario.grado} ${perfilUsuario.seccion}`],
+            areas: Object.keys(areasConfig || {}) // El estudiante puede consultar cualquier área
+        };
     }
-   };
-   sincronizarDNIs();
- }, []);
 
- const cargarDatos = useCallback(async () => {
-  if (!grado || !area || !bimestre) return;
-  setLoading(true);
+    // --- CASO 3: DOCENTE (Lógica original restaurada) ---
+    const gradosUnicos = [...new Set(asignaciones.map(a => `${a.grado} ${a.seccion}`))];
+    const areasDelGrado = asignaciones
+        .filter(a => `${a.grado} ${a.seccion}` === (grado || gradosUnicos[0]))
+        .map(a => a.area.toUpperCase());
 
-  try {
-    // 1. Limpieza de Grado y Sección
+    return { 
+        grados: gradosUnicos.length > 0 ? gradosUnicos : ["Cargando grados..."], 
+        areas: areasDelGrado.length > 0 ? areasDelGrado : ["Cargando áreas..."] 
+    };
+    }, [perfilUsuario, grado]);
+    // 3. Efectos al final
+    useEffect(() => {
+        if (opcionesPermitidas.grados.length > 0 && !grado) {
+            setGrado(opcionesPermitidas.grados[0]);
+        }
+    }, [opcionesPermitidas.grados]);
+
+   const cargarDatos = useCallback(async () => {
+   if (!grado || !area || !bimestre || !perfilUsuario?.id_usuario) return;
+
+   setLoading(true);
+   try {
     const partes = grado.split(" ");
-    const numGrado = partes[0].trim().replace("°", ""); // Solo el número: "1"
-    const letraSeccion = partes[1]?.trim() || "A";
+    const gradoDB = partes[0].trim();
+    const seccionDB = partes[1]?.trim() || "A";
+    const areaLimpia = area.toUpperCase().trim();
 
-    const { data: docenteData, error } = await supabase
-      .from('docente_asignaciones')
-      .select(`usuarios:id_usuario (nombre_completo)`)
-      .eq('grado', numGrado)
-      .eq('seccion', letraSeccion)
-      .eq('area', area)
-      .maybeSingle();
+    // --- PASO A: OBTENCIÓN DIRECTA DEL DNI ---
+    // Eliminamos el rescate por nombre; usamos el DNI que viene del perfil/login
+    let dniFinal = perfilUsuario?.dni || perfilUsuario?.dni_estudiante;
 
-     if (docenteData) {
-        setNombreDocenteAsignado(docenteData.nombre_docente.toUpperCase());
-     } else {
-       setNombreDocenteAsignado("POR ASIGNAR");
+    // --- PASO B: CARGAR MATRICULADOS (Sincronización de Género y DNI) ---
+    let queryMat = supabase
+      .from('matriculas')
+      .select('dni_estudiante, apellido_paterno, apellido_materno, nombres, genero')
+      .eq('grado', gradoDB)
+      .eq('seccion', seccionDB);
+
+    // Si es estudiante, filtramos la tabla de matrículas SOLO por su DNI real
+    if (esEstudiante && dniFinal) {
+      queryMat = queryMat.eq('dni_estudiante', dniFinal);
+    } else {
+      queryMat = queryMat.order('apellido_paterno', { ascending: true });
     }
 
-    // 2. FUENTE DE VERDAD: Matrículas
-    // Eliminamos el .order si sospechamos de la columna, o aseguramos el nombre exacto
-    const { data: matriculados, error: matError } = await supabase
-        .from('matriculas')
-        .select('dni_estudiante, apellido_paterno, apellido_materno, nombres, genero')
-        .eq('grado', `${numGrado}°`) // Buscamos el valor exacto ej: "1°"
-        .eq('seccion', letraSeccion)
-        .eq('anio_lectivo', 2026)
-        .order('apellido_paterno', { ascending: true }); // Asegúrate que 'apellido_paterno' exista tal cual
-
+    const { data: matriculados, error: matError } = await queryMat;
     if (matError) throw matError;
 
-    // 3. Procesamiento de identidades
-    const nombresFull = [];
-    const dniToId = {};
-    const mapaGeneros = {};
-    const mapaDnisLocal = {};
+    // Sincronizamos la lista de alumnos y sus géneros
+    const listaAlumnosFinal = [];
+    const mapaDnis = {};
+    const mapaGeneros = {}; // Para llenar la columna "SEXO" automáticamente
 
     matriculados?.forEach(m => {
-      const nombreCompleto = `${m.apellido_paterno} ${m.apellido_materno}, ${m.nombres}`.toUpperCase().trim();
-      const idEst = normalizarID(nombreCompleto);
-
-     // Llenamos los mapas usando la llave correcta
-     mapaDnisLocal[idEst] = m.dni_estudiante; 
-     dniToId[m.dni_estudiante] = nombreCompleto;
-     mapaGeneros[nombreCompleto] = m.genero; 
-     mapaGeneros[idEst] = m.genero;
-     nombresFull.push(nombreCompleto);
+      const nombreFull = `${m.apellido_paterno} ${m.apellido_materno}, ${m.nombres}`.toUpperCase().trim();
+      // Usamos el DNI como ID interno para evitar errores de nombres
+      listaAlumnosFinal.push(nombreFull);
+      mapaDnis[nombreFull] = m.dni_estudiante;
+      mapaGeneros[nombreFull] = m.genero; // Aquí se guarda "H" o "M"
     });
 
-    // 2. Actualizamos los estados de React
-    setAlumnos(nombresFull);
+    setAlumnos(listaAlumnosFinal);
+    setDnis(mapaDnis);
     setGeneros(mapaGeneros);
-    setDnis(mapaDnisLocal);
 
-    // 4. Cargar Notas
-    const { data: califData, error: califError } = await supabase
-       .from('calificaciones')
-       .select('*')
-       .eq('grado', `${numGrado}°`) // Buscamos coincidencia exacta
-       .eq('seccion', letraSeccion)
-       .eq('area', area)
-       .eq('bimestre', parseInt(bimestre));
+    if (matriculados?.length > 0) {
+      const dnisGrupo = matriculados.map(m => m.dni_estudiante);
+      const bimestreQuery = parseInt(bimestre);
+      const areaQuery = area.normalize("NFC").toUpperCase().trim(); 
 
-    if (califError) throw califError;
+      const { data: califData, error } = await supabase
+          .from('calificaciones')
+          .select('*')
+          .eq('area', areaQuery)
+          .eq('bimestre', parseInt(bimestre));
 
-   const nuevasNotas = {};
-   const nuevosGeneros = { ...mapaGeneros }; // Empezamos con los de matrícula
+      if (!califData || califData.length === 0) {
+      const { data: debugData } = await supabase
+          .from('calificaciones')
+          .select('area')
+          .limit(1);
+          console.log("Área detectada en BD es exactamente:", debugData?.[0]?.area);
+      }
 
-   califData?.forEach(reg => {
-    // Intentamos buscar por DNI primero (es lo más seguro)
-    let nombreKey = dniToId[reg.dni_estudiante];
-    
-    // Si no hay DNI coincidente, buscamos por nombre normalizado
-    if (!nombreKey) {
-        const idDb = normalizarID(reg.nombre_estudiante);
-        // Buscamos en nuestro array de alumnos cuál coincide con este ID normalizado
-        nombreKey = nombresFull.find(n => normalizarID(n) === idDb);
-    }
+     const nuevasNotas = {};
 
-    if (nombreKey) {
-        // Asignar género si viene en la tabla calificaciones y no estaba en matriculas
-        if (reg.genero && !nuevosGeneros[nombreKey]) {
-            nuevosGeneros[nombreKey] = reg.genero;
-        }
+     if (califData && califData.length > 0) {
+        matriculados.forEach(m => {
+        const dniBusqueda = String(m.dni_estudiante).trim();
 
-        // Mapeo de notas
-        for (let c = 1; c <= 4; c++) {
+       const reg = califData.find(r => String(r.dni_estudiante).trim() === dniBusqueda);
+        if (reg) {
+          for (let c = 1; c <= 4; c++) {
             for (let d = 1; d <= 4; d++) {
-                const valor = reg[`c${c}_d${d}`];
-                if (valor) {
-                    // IMPORTANTE: Usar normalizarID para la llave del estado 'notas'
-                    nuevasNotas[`${normalizarID(nombreKey)}-${c-1}-${d}`] = valor;
-                 }
-              }
-          }
-       }
-   });
+              const val = reg[`c${c}_d${d}`];
+                if (val) {
+                nuevasNotas[`${dniBusqueda}-${c-1}-${d}`] = val;
+               }
+             }
+           }
+          console.log(`✅ Notas vinculadas para DNI: ${dniBusqueda}`);
+         }
+       });
+      }
+     setNotas(nuevasNotas);
+    }
+  } catch (err) {
+    console.error("❌ Error en sincronización por DNI:", err.message);
+  } finally {
+    setLoading(false);
+  }
+  }, [grado, area, bimestre, perfilUsuario, esEstudiante]);
 
-    setGeneros(nuevosGeneros);
-    setNotas(nuevasNotas);
+  // --- 2. EFECTOS DE DISPARO (Trigger) ---
+  useEffect(() => {
+    cargarDatos();
+  }, [cargarDatos]);
 
-   } catch (error) {
-     console.error("Error en la vinculación:", error);
-   } finally {
-     setLoading(false);
-   }
-  }, [grado, area, bimestre]);
+  // Sincronizar área cuando cambie el grado (seguridad de filtros)
+  useEffect(() => {
+    if (opcionesPermitidas.areas.length > 0 && (!area || !opcionesPermitidas.areas.includes(area))) {
+      setArea(opcionesPermitidas.areas[0]);
+    }
+  }, [opcionesPermitidas.areas, grado]);
 
     useEffect(() => {
     cargarDatos();
-  }, [cargarDatos]);
+    }, [grado, area, bimestre]);
   
   const alumnosOrdenados = useMemo(() => {
     return [...alumnos].map((nombre, originalIdx) => ({ nombre, originalIdx }))
@@ -409,7 +417,7 @@ const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion
             Array.from({ length: 16 }, (_, i) => {
               const c = Math.floor(i / 4) + 1;
               const d = (i % 4) + 1;
-              return [`c${c}_d${d}`, notas[`${idEst}-${c - 1}-${d}`] || null];
+              return [`c${c}_d${d}`, notas[`${dni}-${c - 1}-${d}`] || null];
             })
           )
         });
@@ -431,13 +439,19 @@ const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion
 
       // 2. EJECUCIÓN ATÓMICA (BATCH)
       const results = await Promise.all([
-        supabase.from('calificaciones').upsert(batchCalificaciones, { onConflict: 'dni_estudiante,area,bimestre' }),
-        supabase.from('matriculas').upsert(batchMatriculas, { onConflict: 'dni_estudiante' }),
-        supabase.from('asistencia').upsert(batchAsistencia, { onConflict: 'dni_estudiante,grado,seccion' })
+            supabase.from('calificaciones').upsert(batchCalificaciones, { onConflict: 'dni_estudiante,area,bimestre' }),
+            supabase.from('matriculas').upsert(batchMatriculas, { onConflict: 'dni_estudiante' }),
+            supabase.from('asistencia').upsert(batchAsistencia, { onConflict: 'dni_estudiante,grado,seccion' })
       ]);
 
-      const errorResult = results.find(r => r.error);
-      if (errorResult) throw errorResult.error;
+     // Verificación de errores por tabla
+     const errors = results.filter(r => r.error);
+     if (errors.length > 0) {
+     console.error("Detalle de errores:", errors.map(e => e.error.message));
+     alert("Hubo un error al guardar algunos datos. Revisa la consola.");
+     } else {
+       alert("¡Todo guardado correctamente en SIGESCOM!");
+     }
 
       // 3. AUDITORÍA UNIFICADA (CORREGIDA)
       const t1 = performance.now();
@@ -476,6 +490,13 @@ const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion
     return 'text-slate-700';
   };
 
+  useEffect(() => {
+  if (esEstudiante && perfilUsuario?.asignaciones?.length > 0) {
+    const miAsignacion = perfilUsuario.asignaciones[0];
+    setGrado(`${miAsignacion.grado} ${miAsignacion.seccion}`);
+  }
+  }, [esEstudiante, perfilUsuario]);
+
   return (
     <div className="flex flex-col min-h-screen bg-slate-50 font-sans text-slate-900">
       {/* NOTIFICACIÓN */}
@@ -502,21 +523,25 @@ const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion
         <div className="flex flex-wrap gap-2">
           <select 
             value={grado} 
-            onChange={(e) => setGrado(e.target.value)} 
-            disabled={esDocente || esEstudiante} 
-            className="bg-green-50 border-slate-100 text-[10px] font-bold px-3 py-2 rounded-xl outline-none focus:ring-2 focus:ring-green-500 transition-all">
-            {["1° A", "1° B", "1° C", "2° A", "2° B", "2° C", "3° A", "3° B", "4° A", "4° B", "5° A", "5° B"].map(g => (
-              <option key={g} value={g}>{g}</option>
-            ))}
-          </select>
-          <select 
-            value={area} 
-            onChange={(e) => setArea(e.target.value)} 
-            disabled={esDocente || esEstudiante} 
-            className="bg-green-50 text-green-700 border border-green-200 text-[10px] font-bold px-3 py-2 rounded-xl outline-none focus:ring-2 focus:ring-green-500 transition-all">
-            {Object.keys(areasConfig).map(a => (
-              <option key={a} value={a}>{a}</option>
-            ))}
+               onChange={(e) => setGrado(e.target.value)}
+               disabled={esEstudiante} 
+               className="bg-green-50 border-slate-100 text-[10px] font-bold px-3 py-2 rounded-xl outline-none focus:ring-2 focus:ring-green-500 transition-all">
+              {opcionesPermitidas.grados.length > 0 ? (
+              opcionesPermitidas.grados.map(g => <option key={g} value={g}>{g}</option>)
+           ) : (
+       <option value="">Cargando grados...</option>
+      )}
+     </select>
+     <select 
+      value={area} 
+        onChange={(e) => setArea(e.target.value)}
+         disabled={esEstudiante} 
+          className="bg-green-50 text-green-700 border border-green-200 text-[10px] font-bold px-3 py-2 rounded-xl outline-none focus:ring-2 focus:ring-green-500 transition-all">
+          {opcionesPermitidas.areas.length > 0 ? (
+           opcionesPermitidas.areas.map(a => <option key={a} value={a}>{a}</option>)
+            ) : (
+            <option value="">Cargando áreas...</option>
+            )}
           </select>
         </div>
       </div>
@@ -536,30 +561,27 @@ const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion
           </button>
         ))}
       </div>
-      {/* Botones de Acción con mejor tamaño en móvil */}
       <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
-        {!esEstudiante && ( //Ocultar el botón Excel para estudiantes.
+     {!esEstudiante && (
+      <>
         <button 
           onClick={exportarExcel} 
-          className="bg-gray-900 hover:bg-green-600 text-white px-4 py-2.5 rounded-xl text-[10px] font-black flex items-center justify-center gap-2 transition-all active:scale-95 shadow-lg shadow-green-100 flex-1 sm:flex-none">
+           className="bg-gray-900 hover:bg-green-600 text-white px-4 py-2.5 rounded-xl text-[10px] font-black flex items-center justify-center gap-2 transition-all active:scale-95 shadow-lg shadow-green-100 flex-1 sm:flex-none"
+            >
           <Download className="w-4 h-4" /> 
-          <span className="inline">EXCEL</span>
-       </button>
-        )}
-        {!esEstudiante && (
-          <button 
-            onClick={() => setShowConfirm(true)} 
-            disabled={loading} 
-            className="bg-gray-900 hover:bg-slate-800 text-white px-7 py-4 rounded-xl text-[10px] font-black flex items-center justify-center gap-2 transition-all active:scale-95 shadow-xl shadow-slate-200 disabled:bg-slate-400 flex-1 sm:flex-none">
-            {loading ? (
-            <Loader2 className="w-2 h-2 animate-spin" />
-            ) : (
-           <Save className="w-4 h-4 text-green-100" />
-            )} 
+        <span className="inline">EXCEL</span>
+      </button>
+      <button 
+         onClick={() => setShowConfirm(true)} 
+          disabled={loading} 
+           className="bg-gray-900 hover:bg-slate-800 text-white px-7 py-4 rounded-xl text-[10px] font-black flex items-center justify-center gap-2 transition-all active:scale-95 shadow-xl shadow-slate-200 disabled:bg-slate-400 flex-1 sm:flex-none"
+            >
+            {loading ? <Loader2 className="w-2 h-2 animate-spin" /> : <Save className="w-4 h-4 text-green-100" />} 
             <span>GUARDAR</span>
-         </button>
+           </button>
+           </>
           )}
-        </div>
+       </div>
       </div>
      </div>
     </div>
@@ -610,37 +632,46 @@ const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion
   <tbody className={`text-[10px] ${perfilUsuario?.rol_id === 6 ? 'pointer-events-none' : ''}`}>
    {alumnosOrdenados
     .filter(({ nombre }) => {
-      const rolUsuario = perfilUsuario?.rol_id;
+      const rolUsuario = Number(perfilUsuario?.rol_id);
       if (rolUsuario === 1 || rolUsuario === 3) return true;
       const idFila = normalizarID(nombre);
       const idUsuario = normalizarID(perfilUsuario?.nombre_completo);
       return idFila.includes(idUsuario) || idUsuario.includes(idFila);
       })
       .map(({ nombre, originalIdx }, displayIdx) => {
-      const nombreEst = (nombre || "").toUpperCase().trim();
-      const idUnico = normalizarID(nombreEst);
-      const generoActual = generos[nombreEst] || "";
-      return (
+       const nombreEst = (nombre || "").toUpperCase().trim();
+       const generoActual = generos[nombreEst] || "";
+       const nombreKey = (nombre || "").toUpperCase().trim();
+       const dniEst = dnis[nombreKey];
+       if (!dniEst) return null;
+       console.log(`Buscando nota para ${nombreKey}:`, {
+       dniEncontrado: dniEst,
+       llaveGenerada: `${dniEst}-0-1`,
+       valorEnEstado: notas[`${dniEst}-0-1`]
+       });
+        return (
         <tr key={originalIdx} className="border-b border-slate-200 hover:bg-green-50/50 h-8">
           {/* NÚMERO DE ORDEN */}
           <td className="text-center sticky left-0 z-20 bg-green-200 font-bold border-r border-slate-300 text-gray-600 w-6 text-[10px]">
             {displayIdx + 1}
           </td>
           {/* COLUMNA SEXO */}
-          <td className="hidden md:table-cell p-0 sticky left-7 z-20 bg-gray-200 border-r border-slate-300 w-8">
-            <select
-              disabled={esEstudiante}
-              value={generoActual}
-               onChange={(e) => setGeneros(prev => ({ ...prev, [nombreEst]: e.target.value }))}
-               className={`w-full h-full text-center font-bold outline-none appearance-none bg-transparent ${
-                generoActual === 'H' ? 'text-blue-600' :
-                generoActual === 'M' ? 'text-pink-500' : 'text-gray-400'
-               }`}>
-               <option value="">-</option>
-              <option value="M">M</option>
-              <option value="H">H</option>
-             </select>
-           </td>
+         <td className="hidden md:table-cell p-0 sticky left-7 z-20 bg-gray-200 border-r border-slate-300 w-8">
+        <select
+       disabled={esEstudiante}
+      value={generoActual}
+      // CAMBIO: Usamos dniEst en lugar de nombreEst para la máxima eficiencia
+      onChange={(e) => setGeneros(prev => ({ ...prev, [dniEst]: e.target.value }))}
+      className={`w-full h-full text-center font-bold outline-none appearance-none bg-transparent ${
+        generoActual === 'H' ? 'text-blue-600' :
+        generoActual === 'M' ? 'text-pink-500' : 'text-gray-400'
+         }`}
+          >
+          <option value="">-</option>
+          <option value="M">M</option>
+          <option value="H">H</option>
+          </select>
+          </td>
           {/* COLUMNA NOMBRE - Sincronizada con left-7 y altura ajustada */}
         <td className="p-0 sticky left-7 md:left-15 z-30 bg-white border-r border-slate-200 min-w-[80px] md:min-w-[250px] h-8 shadow-[3px_0_3px_-2px_rgba(0,0,0,0.1)]">
       <div
@@ -657,30 +688,39 @@ const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion
     {nombre || ""}
      </div>
       </td>
-        {competencias.map((_, cIdx) => (
+        {competencias.map((comp, cIdx) => (
           <React.Fragment key={cIdx}>
-            {[1, 2, 3, 4].map(dIdx => (
-              <td key={dIdx} className="p-0 border-r border-slate-200 w-7">
-                 <select
-                    disabled={esEstudiante}
-                     value={notas[`${idUnico}-${cIdx}-${dIdx}`] || ""}
-                      onChange={(e) => setNotas(prev => ({ ...prev, [`${idUnico}-${cIdx}-${dIdx}`]: e.target.value }))}
-                       className={`w-full h-7 text-center font-bold outline-none appearance-none bg-green-50/50 text-[9px] ${getColorNota(notas[`${idUnico}-${cIdx}-${dIdx}`])}`}>
-                       <option value="">-</option>
-                       <option value="AD">AD</option>
-                       <option value="A">A</option>
-                       <option value="B">B</option>
-                       <option value="C">C</option>
-                  </select>
+              {[1, 2, 3, 4].map(dIdx => {
+                // 2. FILTRADO ATÓMICO: Aquí se usa el dniEst recuperado arriba
+                const llaveNota = `${dniEst}-${cIdx}-${dIdx}`; 
+                const notaActual = notas[llaveNota] || "";
+                return (
+               <td key={dIdx} className="p-0 border-r border-slate-200 w-7">
+               <select
+              disabled={esEstudiante}
+             value={notaActual} // <--- Usa la variable definida arriba
+            onChange={(e) => setNotas(prev => ({ 
+            ...prev, 
+            [llaveNota]: e.target.value // <--- Usa la llave definida arriba
+             }))}
+              className={`w-full h-7 text-center font-bold outline-none appearance-none text-[9px] ${getColorNota(notaActual)}`}
+               >
+                 <option value="">-</option>
+                 <option value="AD">AD</option>
+                 <option value="A">A</option>
+                 <option value="B">B</option>
+                 <option value="C">C</option>
+               </select>
                 </td>
-              ))}
-             <td className={`text-center font-black bg-green-100 border-r border-slate-200 text-[9px] w-8 ${getColorNota(calcularPromedio(nombre, cIdx))}`}>
-             {calcularPromedio(nombre, cIdx)}
+                );
+             })}
+             <td className={`text-center font-black bg-green-100 border-r border-slate-200 text-[9px] w-8 ${getColorNota(calcularPromedio(dniEst, cIdx))}`}>
+             {calcularPromedio(dniEst, cIdx)}
               </td>
                </React.Fragment>
                 ))}
-                 <td className={`text-center font-black bg-yellow-200 sticky right-0 z-20 border-l border-yellow-300 text-[9px] w-10 ${getColorNota(calcularLogroBimestral(nombre))}`}>
-                  {calcularLogroBimestral(nombre)}
+                 <td className={`text-center font-black bg-yellow-200 sticky right-0 z-20 border-l border-yellow-300 text-[9px] w-10 ${getColorNota(calcularLogroBimestral(dniEst))}`}>
+                  {calcularLogroBimestral(dniEst)}
                   </td>
                  </tr>
                  );

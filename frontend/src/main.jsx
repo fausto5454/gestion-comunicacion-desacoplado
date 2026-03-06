@@ -1,12 +1,13 @@
-// frontend/src/main.jsx
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+import { BrowserRouter } from 'react-router-dom'; // 1. Importación necesaria
 import App from './App.jsx';
-// ESTO ES CRÍTICO: Asegúrate de que esta línea esté presente.
 import './index.css'; 
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <App />
+    <BrowserRouter> {/* 2. Envolver App con el Router */}
+      <App />
+    </BrowserRouter>
   </React.StrictMode>,
 );

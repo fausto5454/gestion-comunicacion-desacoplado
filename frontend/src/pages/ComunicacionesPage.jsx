@@ -29,7 +29,7 @@ const ComunicacionesPage = ({ session }) => {
     const [showConfirm, setShowConfirm] = useState(false);
     const [confirmText, setConfirmText] = useState("");
     const [esDifusionGlobal, setEsDifusionGlobal] = useState(false);
-    const [toast, setToast] = useState({ visible: false, mensaje: '', tipo: '' });
+    const [avisoInterno, setAvisoInterno] = useState({ visible: false, mensaje: '', tipo: '' });
     const [busqueda, setBusqueda] = useState("");
     const [tipoEnvio, setTipoEnvio] = useState('grado');
     const [mensajesRecibidos, setMensajesRecibidos] = useState([]);
@@ -109,31 +109,36 @@ const ComunicacionesPage = ({ session }) => {
 
     useEffect(() => {
     const cargarIdentidadHibrida = async () => {
-        if (!userId) return;
+    if (!userId) return;
 
-        // Intentamos primero en 'usuarios' (Personal/Gmail)
-        const { data: userData } = await supabase
-            .from('usuarios')
-            .select('rol_id, seccion, grado')
-            .eq('id_usuario', userId)
+    // VÍA A: Personal
+    const { data: userData } = await supabase
+        .from('usuarios')
+        .select('rol_id,seccion,grado')
+        .eq('id_usuario', userId)
+        .maybeSingle();
+
+    if (userData) {
+        setUserRol(userData.rol_id);
+        setUserSeccion(userData.seccion);
+        setUserGrado(userData.grado); // No olvides setear el grado
+    } else {
+        // VÍA B: Estudiante (Usando el DNI que viene en el email)
+        const userEmail = session?.user?.email;
+        const dniExtraido = userEmail?.split('@')[0]; // Extrae el DNI real
+
+        const { data: matData } = await supabase
+            .from('matriculas')
+            .select('seccion, grado')
+            .eq('dni_estudiante', dniExtraido) // <-- Aquí usamos el DNI, no el UUID
             .single();
-
-        if (userData) {
-            setUserRol(userData.rol_id);
-            setUserSeccion(userData.seccion);
-        } else {
-            // Si no está, es un Estudiante (DNI en 'matriculas')
-            const { data: matData } = await supabase
-                .from('matriculas')
-                .select('seccion, grado')
-                .eq('dni_estudiante', userId)
-                .single();
-            
-            if (matData) {
-                setUserRol(6); // Asignamos rol de estudiante
-                setUserSeccion(matData.seccion);
-            }
-        }
+        
+        if (matData) {
+            setUserRol(6); 
+            setUserSeccion(matData.seccion);
+            setUserGrado(matData.grado);
+         }
+      }
     };
 
     cargarIdentidadHibrida();
@@ -150,22 +155,25 @@ const ComunicacionesPage = ({ session }) => {
             .from('usuarios')
             .select('grado')
             .eq('id_usuario', currentUserId)
-            .single();
+            .maybeSingle();
 
         // 2. Filtros dinámicos según tu tabla
-        let filtros = `usuario_destino_id.eq.${currentUserId},es_global.eq.true`;
-        if (perfil?.grado) {
-            filtros += `,grado_destino.eq.${perfil.grado}`;
+        let filtros = `es_global.eq.true`; // Todos ven los globales
+
+        if (userRol === 6) {
+        // Si es estudiante, sumamos su carril específico: "Grado Sección" (ej. "5° A")
+        const identificador = `${userGrado} ${userSeccion}`;
+        filtros += `,identificador_destino.eq."${identificador}"`;
+        } else {
+        // Si es personal, suma su ID individual
+        filtros += `,usuario_destino_id.eq.${userId}`;
         }
 
-        // 3. Cargar Recibidos (Bandeja de Entrada)
         const { data: recibidos, error: errR } = await supabase
             .from('comunicaciones')
             .select('*')
             .or(filtros)
-            // MEJORA CRÍTICA: Excluimos los mensajes que el usuario actual envió 
-            // para que no se auto-reciba en su bandeja
-            .neq('remitente_id', currentUserId) 
+            .neq('remitente_id', userId) 
             .order('fecha_envio', { ascending: false });
 
         if (errR) throw errR;
@@ -221,17 +229,15 @@ const ComunicacionesPage = ({ session }) => {
     }, [userId]);
 
      // 5. ACCIONES DE MENSAJERÍA
-   const mostrarToast = (mensaje, tipo = 'success') => {
-    setToast({ 
+    const mostrarToast = (mensaje, tipo = 'success') => {
+    setAvisoInterno({ 
         visible: true, 
         mensaje: mensaje, 
         tipo: tipo 
     });
-
-    setTimeout(() => {
-        setToast({ visible: false, mensaje: '', tipo: '' });
-    }, 3000);
-    };
+    setAvisoInterno({ visible: true, mensaje, tipo });
+    setTimeout(() => setAvisoInterno(prev => ({ ...prev, visible: false })), 3000);
+   };
 
    const abrirMensaje = async (msg) => {
     setMsgDetalle(msg);
@@ -270,6 +276,11 @@ const ComunicacionesPage = ({ session }) => {
   const handleEnviar = async (e) => {
   e.preventDefault();
   setLoading(true);
+
+  if (!userId) {
+  mostrarToast("⚠️ Error: Sesión no detectada. Por favor, recarga la página.", "error");
+  return;
+  }
 
   try {
     let urlPublica = null;
@@ -355,8 +366,7 @@ const ComunicacionesPage = ({ session }) => {
 
         if (error) throw error;
 
-        // 2. ACTUALIZACIÓN DE ESTADO (Corregido para evitar bucle)
-        setListaComunicaciones(data); // <--- Usa tu setter de estado, NO el nombre de la función
+        setMensajesRecibidos(data || []);
 
         // 3. AUDITORÍA CON DESCRIPCIÓN REAL Y VELOCIDAD
         const t1 = performance.now();
@@ -415,7 +425,7 @@ const ComunicacionesPage = ({ session }) => {
 
     const handleEliminar = async () => {
     if (confirmText !== "ELIMINAR") {
-        return setToast({ visible: true, mensaje: 'Escriba ELIMINAR para confirmar', tipo: 'error' });
+       return setNotificacion({ visible: true, mensaje: 'Escriba ELIMINAR para confirmar', tipo: 'error' });
     }
     setLoading(true);
     try {
@@ -516,6 +526,9 @@ const ComunicacionesPage = ({ session }) => {
     const indexOfLastItem = currentPage * itemsPerPage;
     const indexOfFirstItem = indexOfLastItem - itemsPerPage;
     const currentItems = filtrados.slice(indexOfFirstItem, indexOfLastItem);
+
+    const isStudent = userRol?.rol_id === 6;
+    if (!userRol) return <div className="text-white">Cargando comunicaciones...</div>;
 
     return (
     <div className="max-w-6xl mx-auto p-4 md:p-6 space-y-6">
@@ -792,15 +805,15 @@ const ComunicacionesPage = ({ session }) => {
                 </div>
             </div>
            )}
-         {toast.visible && (
-         <div className={`fixed bottom-5 right-5 z-50 p-4 rounded-lg shadow-lg text-white animate-bounce ${
-           toast.tipo === 'success' ? 'bg-green-600' : 'bg-red-600'
-             }`}>
-              <div className="flex items-center gap-2">
-                 <span>{toast.mensaje}</span>
+          {avisoInterno.visible && (
+          <div className={`fixed bottom-5 right-5 z-50 p-4 rounded-lg shadow-lg text-white animate-bounce ${
+            avisoInterno.tipo === 'success' ? 'bg-green-600' : 'bg-red-600'
+              }`}>
+               <div className="flex items-center gap-2">
+                <span>{avisoInterno.mensaje}</span>
                  </div>
-               </div>
-              )}
+                </div>
+               )}
            </div>
           );
        };

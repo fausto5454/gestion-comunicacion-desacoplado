@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { supabase } from '../config/supabaseClient';
 import { 
   Save, FileText, FileSpreadsheet, Loader2, 
@@ -25,24 +25,68 @@ const areasConfig = {
   "INGLÉS": ["SE COMUNICA ORALMENTE", "LEE TEXTOS ESCRITOS", "ESCRIBE TEXTOS"]
 };
 
-const AsistenciaAlumnos = ({ }) => {
+const AsistenciaAlumnos = ({ perfilUsuario, session }) => {
   const [estudiantes, setEstudiantes] = useState([]);
   const [asistencia, setAsistencia] = useState({});
   const [fecha, setFecha] = useState(new Date().toISOString().split('T')[0]);
-  const [areaSeleccionada, setAreaSeleccionada] = useState("MATEMÁTICA");
   const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Estos son los únicos estados oficiales para Grado y Sección
-  const [grado, setGrado] = useState("1");
-  const [seccion, setSeccion] = useState("A");
+  // --- CAMBIO: Estados dinámicos vinculados al perfil ---
+  const [grado, setGrado] = useState(""); 
+  const [seccion, setSeccion] = useState("");
+  const [areaSeleccionada, setAreaSeleccionada] = useState("");
 
-  // --- LÓGICA FUNCIONAL (Mantenida estrictamente) ---
+  // 1. EFECTO DE AUTO-CONFIGURACIÓN (Elimina lo estático)
+  useEffect(() => {
+    if (perfilUsuario?.asignaciones?.length > 0) {
+      const primera = perfilUsuario.asignaciones[0];
+      // Seteamos los valores reales de la base de datos
+      setGrado(primera.grado.toString());
+      setSeccion(primera.seccion);
+      setAreaSeleccionada(primera.area.toUpperCase());
+    }
+  }, [perfilUsuario]);
+
+ const opcionesPermitidas = useMemo(() => {
+    const esAdmin = Number(perfilUsuario?.rol_id) === 1;
+    const asignaciones = perfilUsuario?.asignaciones || [];
+
+    if (esAdmin) {
+        return {
+            grados: [
+                "1° A", "1° B", "1° C", "2° A", "2° B", "2° C", 
+                "3° A", "3° B", "4° A", "4° B", "5° A", "5° B"
+            ],
+            areas: Object.keys(areasConfig || {}).map(a => a.toUpperCase())
+          };
+        }
+
+        // Lógica para Docentes (Wendy/David)
+        const gradosUnicos = [...new Set(asignaciones.map(a => {
+            const gnum = a.grado.toString().replace('°', '');
+            return `${gnum}° ${a.seccion}`;
+        }))];
+
+        const gradoLimpio = grado?.toString().replace('°', '') || "";
+        const aulaActual = `${gradoLimpio}° ${seccion}`;
+        
+        const areasDocente = asignaciones
+            .filter(a => `${a.grado.toString().replace('°', '')}° ${a.seccion}` === aulaActual)
+            .map(a => a.area.toUpperCase());
+
+        return { grados: gradosUnicos, areas: areasDocente };
+    }, [perfilUsuario, grado, seccion, areasConfig]);
+
+    useEffect(() => {
+    }, [grado, seccion, areaSeleccionada]);
+
+  // --- LÓGICA DE RECUPERACIÓN (Sin cambios en tu lógica funcional) ---
   const fetchAsistenciaExistente = async (nomina, init) => {
     try {
       const idsMatricula = nomina.map(n => n.id_matricula);
       const { data, error } = await supabase
-        .from('asistencia') // Tabla correcta
+        .from('asistencia')
         .select('id_estudiante, estado')
         .in('id_estudiante', idsMatricula)
         .eq('fecha', fecha)
@@ -65,49 +109,71 @@ const AsistenciaAlumnos = ({ }) => {
     }
   };
 
-  // 3. DECLARAR FUNCIÓN PRINCIPAL (Uso de useCallback para evitar bucles)
+  // --- FUNCIÓN DE CARGA DE NÓMINA (Optimizada) ---
   const fetchNomina = useCallback(async () => {
-    if (!grado || !seccion) return;
+    // 1. Verificación preventiva para evitar el error 400
+    if (!grado || !seccion || !areaSeleccionada || !perfilUsuario) return;
+
     setLoading(true);
-
     try {
-      // Formateo para evitar Error 400 de Supabase
-      const gradoFormateado = grado.includes('°') ? grado : `${grado}°`;
+        // 2. NORMALIZACIÓN RADICAL: Aseguramos el formato "1°"
+        const soloNumero = grado.toString().replace(/\D/g, ''); 
+        const gradoQuery = `${soloNumero}°`;
+        const seccionQuery = seccion.trim().toUpperCase();
 
-      const { data, error } = await supabase
-        .from('matriculas')
-        .select('id_matricula, apellido_paterno, apellido_materno, nombres, genero')
-        .eq('grado', gradoFormateado)
-        .eq('seccion', seccion.trim())
-        .eq('anio_lectivo', 2026)
-        .eq('estado_estudiante', 'Activo')
-        .order('apellido_paterno', { ascending: true });
+        // 3. CONSULTA GLOBAL: El administrador no filtra por su propio ID
+        let query = supabase
+            .from('matriculas')
+            .select('id_matricula, apellido_paterno, apellido_materno, nombres, genero')
+            .eq('grado', gradoQuery)
+            .eq('seccion', seccionQuery)
+            .eq('anio_lectivo', 2026)
+            .eq('estado_estudiante', 'Activo');
 
-      if (error) throw error;
+        // IMPORTANTE: Para el rol administrativo omitimos cualquier eq('docente_id', ...)
 
-      if (data) {
-        setEstudiantes(data);
-        const init = {};
-        data.forEach(est => init[est.id_matricula] = 'Presente');
-        
-        // Llamada segura: la función ya existe en este punto
-        await fetchAsistenciaExistente(data, init);
-      }
+        const { data, error } = await query.order('apellido_paterno', { ascending: true });
+
+        if (error) throw error;
+
+        if (data && data.length > 0) {
+            setEstudiantes(data); // Esto llena la lista blanca
+            const init = {};
+            data.forEach(est => init[est.id_matricula] = 'Presente');
+            await fetchAsistenciaExistente(data, init);
+        } else {
+            setEstudiantes([]);
+            console.log("No hay alumnos para:", gradoQuery, seccionQuery);
+        }
     } catch (err) {
-      console.error("Error en nomina:", err);
-      toast.error("Error al cargar la lista de estudiantes");
+        console.error("Error crítico en nomina:", err);
     } finally {
-      setLoading(false);
+        setLoading(false);
     }
-   }, [grado, seccion, fecha, areaSeleccionada]);
+   }, [grado, seccion, areaSeleccionada, perfilUsuario, fecha]);
 
-   // 4. EFECTO DISPARADOR (Llamado después de todas las definiciones)
+   // EFECTO 1: Sincronización de la Lista (Solo dispara la carga)
    useEffect(() => {
-     fetchNomina();
+    fetchNomina();
   }, [fetchNomina]);
 
+   // EFECTO 2: Inicialización Automática (Solo para Administradores)
+   useEffect(() => {
+    const esAdmin = Number(perfilUsuario?.rol_id) === 1;
+    if (!esAdmin) return;
+
+    if (!grado && opcionesPermitidas.grados.length > 0) {
+        const [g, s] = opcionesPermitidas.grados[0].split(' ');
+        setGrado(g.replace('°', ''));
+        setSeccion(s);               
+    }
+
+    if (!areaSeleccionada && opcionesPermitidas.areas.length > 0) {
+        setAreaSeleccionada(opcionesPermitidas.areas[0]);
+     }
+  }, [perfilUsuario, opcionesPermitidas, grado, areaSeleccionada]);
+  
   const exportarExcel = async () => {
-  // 1. Crear instancia local (ayuda a la velocidad en descargas sucesivas)
   const workbook = new ExcelJS.Workbook();
   const worksheet = workbook.addWorksheet('Asistencia');
 
@@ -406,46 +472,62 @@ const AsistenciaAlumnos = ({ }) => {
  };
 
   return (
-    <div className="bg-white rounded-[1.5rem] md:rounded-[2rem] shadow-2xl border border-gray-100 overflow-hidden">
-      
-      {/* HEADER */}
-      <div className="p-4 md:p-8 bg-slate-500 border-b border-gray-100 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
-        <div className="flex items-center gap-3 md:gap-5 w-full lg:w-auto">
-          <div className="hidden sm:block bg-slate-900 p-4 rounded-3xl text-white shadow-lg">
-            <Bookmark size={24} />
+  <div className="bg-white rounded-[1.5rem] md:rounded-[2rem] shadow-2xl border border-gray-100 overflow-hidden">
+    
+    {/* HEADER */}
+    <div className="p-4 md:p-6 bg-slate-600 border-b border-gray-100 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
+      <div className="flex items-center gap-3 md:gap-5 w-full lg:w-auto">
+        <div className="hidden sm:block bg-slate-900 p-6 rounded-3xl text-white shadow-lg">
+          <Bookmark size={24} />
           </div>
-          <div className="flex-1">
-            <h2 className="text-lg md:text-2xl font-black text-green-400 tracking-tighter uppercase leading-none mb-2">Asistencia</h2>
-            <div className="flex flex-wrap gap-2">
-                <select 
-                 value={areaSeleccionada}
-                 onChange={(e) => setAreaSeleccionada(e.target.value)}
-                 className="bg-white border border-gray-200 rounded-xl px-3 py-1.5 text-[10px] md:text-[11px] font-black uppercase text-green-600 outline-none shadow-sm"
-                >
-                 {Object.keys(areasConfig).map(area => <option key={area} value={area}>{area}</option>)}
-                </select>
+        
+         {/* CONTENEDOR DE SELECTORES EN EL HEADER */}
+       <div className="flex-1">
+     <h2 className="text-lg md:text-2xl font-black text-green-400 tracking-tighter uppercase leading-none mb-4">Asistencia</h2>
+  
+     <div className="flex flex-wrap items-center gap-4">
+    
+      {/* SELECTOR DE AULA (Grado y Sección) */}
+       <div className="relative">
+         <select 
+           value={`${grado.toString().replace('°', '')}° ${seccion}`}
+            onChange={(e) => {
+              const partes = e.target.value.split(' ');
+              const soloNumero = partes[0].replace('°', '');
+              setGrado(soloNumero);
+              setSeccion(partes[1]);
+              }}
+             className="pl-5 pr-10 py-2 bg-green-50 text-gray-600 font-bold rounded-full border-none shadow-md appearance-none cursor-pointer hover:bg-green-100 transition-all text-[10px] md:text-[11px]"
+             >
+           {opcionesPermitidas.grados.map(g => (
+          <option key={g} value={g}>{g}</option>
+         ))}
+       </select>
+       <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-slate-400">
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
+          </svg>
+           </div>
+            </div>
 
-              {/* MEJORA APLICADA AQUÍ: Selector Combinado */}
-              <div className="flex items-center gap-1 bg-white border border-gray-200 rounded-xl px-2 py-1 shadow-sm">
-                <span className="text-[9px] font-black text-gray-400 uppercase ml-1">Aula:</span>
-                <select 
-                  value={`${grado}-${seccion}`} 
-                  onChange={(e) => {
-                    const [nuevoGrado, nuevaSeccion] = e.target.value.split('-');
-                    setGrado(nuevoGrado);
-                    setSeccion(nuevaSeccion);
-                  }}
-                  className="text-[11px] font-black text-slate-700 bg-transparent outline-none cursor-pointer"
-                >
-                  {[1, 2, 3, 4, 5].flatMap(g => 
-                    ['A', 'B', 'C'].map(s => (
-                      <option key={`${g}-${s}`} value={`${g}-${s}`}>
-                        {g}° {s}
-                      </option>
-                     ))
-                   )}
-                </select>
+           {/* SELECTOR DE ÁREA */}
+         <div className="relative">
+         <select 
+         value={areaSeleccionada}
+         onChange={(e) => setAreaSeleccionada(e.target.value)}
+        // Estética unificada con fondo verde suave y texto resaltado
+        className="pl-5 pr-10 py-2 bg-green-50 text-green-700 font-bold rounded-full border-none shadow-md appearance-none cursor-pointer hover:bg-green-50 transition-all text-[10px] md:text-[11px] uppercase"
+         >
+        {opcionesPermitidas.areas.map(area => (
+          <option key={area} value={area}>{area}</option>
+           ))}
+            </select>
+             <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-gray-600">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
+               </svg>
               </div>
+             </div>
             </div>
           </div>
         </div>

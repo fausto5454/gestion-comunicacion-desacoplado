@@ -1,63 +1,92 @@
-// frontend/src/context/AuthContext.jsx
 import { useState, createContext, useEffect, useContext } from 'react';
-import { supabase } from '../config/supabaseClient'; 
-// Asegúrate de que 'supabaseClient.js' apunte a tus claves
+import { supabase } from '../config/supabaseClient';
 
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
+  const [profile, setProfile] = useState(null); // Nuevo estado para DNI y Rol
   const [loading, setLoading] = useState(true);
 
+  // Función para obtener el perfil extendido desde la tabla 'usuarios'
+  const fetchProfile = async (user) => {
+  try {
+    // 1. Intentamos buscar primero en 'usuarios' (Docentes/Admin)
+    let { data, error } = await supabase
+      .from('usuarios')
+      .select('*, rol_id, dni') 
+      .eq('id_usuario', user.id)
+      .maybeSingle();
+    
+    // 2. Si no está en usuarios, buscamos en 'matriculas' (Estudiantes)
+    if (error || !data) {
+      const { data: studentData, error: studentError } = await supabase
+        .from('matriculas')
+        .select('*, dni_estudiante, grado, seccion') // Aquí está el DNI real del alumno
+        .eq('id_auth', user.id) // Asegúrate que 'id_auth' sea el campo que vincula con Supabase Auth
+        .maybeSingle();
+
+      if (studentError) throw studentError;
+      
+      // Normalizamos el objeto para que el resto de la app no se confunda
+      data = { 
+        ...studentData, 
+        rol_id: 'estudiante', 
+        dni: studentData.dni_estudiante 
+      };
+    }
+    
+    setProfile(data);
+  } catch (err) {
+    console.error("Error recuperando perfil híbrido:", err.message);
+    setProfile(null);
+  }
+  };
+
   useEffect(() => {
-    // 1. Obtener la sesión actual al cargar
-    const getSession = async () => {
+    const getInitialSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
+      if (session?.user) {
         setUser(session.user);
+        await fetchProfile(session.user.id);
       }
       setLoading(false);
     };
-    
-    // 2. Escuchar cambios en la autenticación (login, logout)
+
     const { data: authListener } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-          setUser(session?.user ?? null);
-        } else if (event === 'SIGNED_OUT') {
+      async (event, session) => {
+        if (session?.user) {
+          setUser(session.user);
+          await fetchProfile(session.user.id);
+        } else {
           setUser(null);
+          setProfile(null);
         }
         setLoading(false);
       }
     );
 
-    getSession();
-
-    return () => {
-      authListener.subscription.unsubscribe();
-    };
+    getInitialSession();
+    return () => authListener.subscription.unsubscribe();
   }, []);
 
-  // 3. Funciones de Autenticación
-  const signIn = async (email, password) => {
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  const signIn = async (emailOrDni, password) => {
+    // Si el usuario ingresa un DNI (solo números), podrías transformarlo a correo 
+    // si tu lógica de Supabase así lo requiere, o usarlo directamente.
+    const { data, error } = await supabase.auth.signInWithPassword({ 
+      email: emailOrDni, 
+      password 
+    });
     if (error) throw error;
     return data;
   };
 
   const signOut = async () => {
-    const { error } = await supabase.auth.signOut();
-    if (error) throw error;
-  };
-  
-  // Función de registro (si se permite)
-  const signUp = async (email, password) => {
-      const { data, error } = await supabase.auth.signUp({ email, password });
-      if (error) throw error;
-      return data;
+    await supabase.auth.signOut();
   };
 
-  const value = { user, loading, signIn, signOut, signUp };
+  // Exponemos 'profile' para que los componentes sepan el DNI y Rol del usuario
+  const value = { user, profile, loading, signIn, signOut };
 
   return (
     <AuthContext.Provider value={value}>
@@ -66,6 +95,4 @@ export const AuthProvider = ({ children }) => {
   );
 };
 
-export const useAuth = () => {
-  return useContext(AuthContext);
-};
+export const useAuth = () => useContext(AuthContext);

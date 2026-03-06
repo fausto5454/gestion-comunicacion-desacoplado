@@ -33,7 +33,7 @@ const App = () => {
             .from('usuarios')
             .select('rol_id, nombre_completo, correo_electronico')
             .eq('id_usuario', initialSession.user.id)
-            .single();
+            .maybeSingle();
 
           if (error) {
             console.error("Error al obtener perfil:", error.message);

@@ -41,8 +41,7 @@ const AsistenciaAlumnos = ({ perfilUsuario, session }) => {
   useEffect(() => {
     if (perfilUsuario?.asignaciones?.length > 0) {
       const primera = perfilUsuario.asignaciones[0];
-      // Seteamos los valores reales de la base de datos
-      setGrado(primera.grado.toString());
+      setGrado(primera.grado.toString().replace('°', ''));
       setSeccion(primera.seccion);
       setAreaSeleccionada(primera.area.toUpperCase());
     }
@@ -111,17 +110,14 @@ const AsistenciaAlumnos = ({ perfilUsuario, session }) => {
 
   // --- FUNCIÓN DE CARGA DE NÓMINA (Optimizada) ---
   const fetchNomina = useCallback(async () => {
-    // 1. Verificación preventiva para evitar el error 400
     if (!grado || !seccion || !areaSeleccionada || !perfilUsuario) return;
 
     setLoading(true);
     try {
-        // 2. NORMALIZACIÓN RADICAL: Aseguramos el formato "1°"
         const soloNumero = grado.toString().replace(/\D/g, ''); 
         const gradoQuery = `${soloNumero}°`;
         const seccionQuery = seccion.trim().toUpperCase();
 
-        // 3. CONSULTA GLOBAL: El administrador no filtra por su propio ID
         let query = supabase
             .from('matriculas')
             .select('id_matricula, apellido_paterno, apellido_materno, nombres, genero')
@@ -172,6 +168,10 @@ const AsistenciaAlumnos = ({ perfilUsuario, session }) => {
         setAreaSeleccionada(opcionesPermitidas.areas[0]);
      }
   }, [perfilUsuario, opcionesPermitidas, grado, areaSeleccionada]);
+
+  useEffect(() => {
+    fetchNomina();
+  }, [fetchNomina]);
   
   const exportarExcel = async () => {
   const workbook = new ExcelJS.Workbook();
@@ -471,155 +471,154 @@ const AsistenciaAlumnos = ({ perfilUsuario, session }) => {
   }
  };
 
-  return (
-  <div className="bg-white rounded-[1.5rem] md:rounded-[2rem] shadow-2xl border border-gray-100 overflow-hidden">
-    
-    {/* HEADER */}
-    <div className="p-4 md:p-6 bg-slate-600 border-b border-gray-100 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
-      <div className="flex items-center gap-3 md:gap-5 w-full lg:w-auto">
-        <div className="hidden sm:block bg-slate-900 p-6 rounded-3xl text-white shadow-lg">
-          <Bookmark size={24} />
-          </div>
-        
-         {/* CONTENEDOR DE SELECTORES EN EL HEADER */}
-       <div className="flex-1">
-     <h2 className="text-lg md:text-2xl font-black text-green-400 tracking-tighter uppercase leading-none mb-4">Asistencia</h2>
-  
-     <div className="flex flex-wrap items-center gap-4">
-    
-      {/* SELECTOR DE AULA (Grado y Sección) */}
-       <div className="relative">
-         <select 
-           value={`${grado.toString().replace('°', '')}° ${seccion}`}
-            onChange={(e) => {
-              const partes = e.target.value.split(' ');
-              const soloNumero = partes[0].replace('°', '');
-              setGrado(soloNumero);
-              setSeccion(partes[1]);
-              }}
-             className="pl-5 pr-10 py-2 bg-green-50 text-gray-600 font-bold rounded-full border-none shadow-md appearance-none cursor-pointer hover:bg-green-100 transition-all text-[10px] md:text-[11px]"
-             >
-           {opcionesPermitidas.grados.map(g => (
-          <option key={g} value={g}>{g}</option>
-         ))}
-       </select>
-       <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-slate-400">
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
-          </svg>
-           </div>
+   return (
+    <div className="bg-white rounded-[1.5rem] md:rounded-[2rem] shadow-2xl border border-gray-100 overflow-hidden">
+      {/* HEADER */}
+      <div className="p-4 md:p-6 bg-slate-600 border-b border-gray-100 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
+        <div className="flex items-center gap-3 md:gap-5 w-full lg:w-auto">
+          <div className="hidden sm:block bg-slate-900 p-6 rounded-3xl text-white shadow-lg">
+            <Bookmark size={24} />
             </div>
-
-           {/* SELECTOR DE ÁREA */}
+          
+           {/* CONTENEDOR DE SELECTORES EN EL HEADER */}
+         <div className="flex-1">
+       <h2 className="text-lg md:text-2xl font-black text-green-400 tracking-tighter uppercase leading-none mb-4">Asistencia</h2>
+    
+       <div className="flex flex-wrap items-center gap-4">
+      
+        {/* SELECTOR DE AULA (Grado y Sección) */}
          <div className="relative">
-         <select 
-         value={areaSeleccionada}
-         onChange={(e) => setAreaSeleccionada(e.target.value)}
-        // Estética unificada con fondo verde suave y texto resaltado
-        className="pl-5 pr-10 py-2 bg-green-50 text-green-700 font-bold rounded-full border-none shadow-md appearance-none cursor-pointer hover:bg-green-50 transition-all text-[10px] md:text-[11px] uppercase"
-         >
-        {opcionesPermitidas.areas.map(area => (
-          <option key={area} value={area}>{area}</option>
+           <select 
+             value={`${grado.toString().replace('°', '')}° ${seccion}`}
+              onChange={(e) => {
+                const partes = e.target.value.split(' ');
+                const soloNumero = partes[0].replace('°', '');
+                setGrado(soloNumero);
+                setSeccion(partes[1]);
+                }}
+               className="pl-5 pr-10 py-2 bg-green-50 text-gray-600 font-bold rounded-full border-none shadow-md appearance-none cursor-pointer hover:bg-green-100 transition-all text-[10px] md:text-[11px]"
+               >
+             {opcionesPermitidas.grados.map(g => (
+            <option key={g} value={g}>{g}</option>
            ))}
-            </select>
-             <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-gray-600">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
-               </svg>
-              </div>
+         </select>
+         <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-slate-400">
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
+            </svg>
              </div>
+              </div>
+  
+             {/* SELECTOR DE ÁREA */}
+           <div className="relative">
+           <select 
+           value={areaSeleccionada}
+           onChange={(e) => setAreaSeleccionada(e.target.value)}
+          // Estética unificada con fondo verde suave y texto resaltado
+          className="pl-5 pr-10 py-2 bg-green-50 text-green-700 font-bold rounded-full border-none shadow-md appearance-none cursor-pointer hover:bg-green-50 transition-all text-[10px] md:text-[11px] uppercase"
+           >
+          {opcionesPermitidas.areas.map(area => (
+            <option key={area} value={area}>{area}</option>
+             ))}
+              </select>
+               <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-gray-600">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
+                 </svg>
+                </div>
+               </div>
+              </div>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 md:gap-3 w-full lg:w-auto justify-end">
+          <button onClick={exportarExcel} className="p-2.5 text-green-600 bg-white border border-gray-100 rounded-xl hover:bg-green-50 shadow-sm transition-all active:scale-95">
+          <FileSpreadsheet size={18} />
+          </button>
+            <button onClick={exportarPDF} className="p-2.5 text-red-600 bg-white border border-gray-100 rounded-xl hover:bg-red-50 shadow-sm transition-all active:scale-95">
+             <FileText size={18} />
+              </button>
+              <div className="relative flex-1 md:flex-none min-w-[140px]">
+              <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
+              <input 
+                type="date" 
+                value={fecha} 
+                onChange={(e) => setFecha(e.target.value)}
+                className="w-full bg-white border-none rounded-xl pl-9 pr-3 py-2 text-xs font-bold text-gray-600 shadow-sm ring-1 ring-gray-200 outline-none" 
+              />
             </div>
           </div>
         </div>
-        <div className="flex flex-wrap items-center gap-2 md:gap-3 w-full lg:w-auto justify-end">
-        <button onClick={exportarExcel} className="p-2.5 text-green-600 bg-white border border-gray-100 rounded-xl hover:bg-green-50 shadow-sm transition-all active:scale-95">
-        <FileSpreadsheet size={18} />
-        </button>
-          <button onClick={exportarPDF} className="p-2.5 text-red-600 bg-white border border-gray-100 rounded-xl hover:bg-red-50 shadow-sm transition-all active:scale-95">
-           <FileText size={18} />
-            </button>
-            <div className="relative flex-1 md:flex-none min-w-[140px]">
-            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
-            <input 
-              type="date" 
-              value={fecha} 
-              onChange={(e) => setFecha(e.target.value)}
-              className="w-full bg-white border-none rounded-xl pl-9 pr-3 py-2 text-xs font-bold text-gray-600 shadow-sm ring-1 ring-gray-200 outline-none" 
-            />
-          </div>
-        </div>
-      </div>
-      {/* TABLA CON MARCO Y FILAS COMPACTAS */}
-      <div className="overflow-x-auto bg-white">
-        <table className="w-full border rounded-2xl overflow-hidden border border-gray-300 min-w-[450px]">
-          <thead>
-            <tr className="bg-gray-500">
-              <th className="border border-gray-300 px-3 py-2 text-left text-[10px] font-black text-green-400 bg-emerald-800 uppercase w-10">N°</th>
-              <th className="border border-gray-300 px-4 py-2 text-left text-[10px] font-black text-green-400 uppercase tracking-wider">Apellidos y Nombres</th>
-              <th className="border border-gray-300 px-2 py-2 text-center text-[10px] font-black text-green-400 bg-pink-700 uppercase w-40">Estado</th>
+        {/* TABLA CON MARCO Y FILAS COMPACTAS */}
+        <div className="overflow-x-auto bg-white">
+          <table className="w-full border rounded-2xl overflow-hidden border border-gray-300 min-w-[450px]">
+            <thead>
+              <tr className="bg-gray-500">
+                <th className="border border-gray-300 px-3 py-2 text-left text-[10px] font-black text-green-400 bg-emerald-800 uppercase w-10">N°</th>
+                <th className="border border-gray-300 px-4 py-2 text-left text-[10px] font-black text-green-400 uppercase tracking-wider">Apellidos y Nombres</th>
+                <th className="border border-gray-300 px-2 py-2 text-center text-[10px] font-black text-green-400 bg-pink-700 uppercase w-40">Estado</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-300">
+           {estudiantes.map((est, index) => (
+            <tr key={est.id_matricula} className="hover:bg-slate-50 transition-colors">
+              <td className="border border-gray-300 px-3 py-1.5 text-center text-[11px] font-bold text-slate-500 bg-emerald-100/60">
+                {index + 1}
+              </td>
+              <td className="border border-gray-300 px-4 py-1.5">
+                <span className="text-[11px] font-bold text-slate-700 uppercase tracking-tight leading-tight block">
+                  {est.apellido_paterno} {est.apellido_materno}, {est.nombres}
+                </span>
+              </td>
+              <td className="border border-gray-300 px-2 py-1.5 bg-emerald-100/60">
+                <div className="flex justify-center gap-1">
+                  {['P', 'A', 'T', 'J'].map((letra) => {
+                    const valorReal = letra === 'P' ? 'Presente' : letra === 'A' ? 'Ausente' : letra === 'T' ? 'Tardanza' : 'Justificado';
+                    const isActive = asistencia[est.id_matricula] === valorReal;
+  
+                    const activeStyle = {
+                      'P': 'text-slate-400 border-slate-200 bg-slate-50', 
+                      'A': 'text-red-400 border-red-200 bg-red-50',     
+                      'T': 'text-amber-400 border-amber-200 bg-amber-50', 
+                      'J': 'text-green-400 border-green-200 bg-green-50'  
+                    };
+                    return (
+                      <button
+                        key={letra}
+                        onClick={() => setAsistencia(p => ({ ...p, [est.id_matricula]: valorReal }))}
+                        className={`w-7 h-7 md:w-8 md:h-8 rounded-md text-[11px] font-black transition-all duration-200 border
+                          ${isActive
+                            ? `${activeStyle[letra]} shadow-sm scale-110 z-10`
+                            : 'bg-white border-transparent text-gray-300 hover:text-gray-400'
+                           }`}
+                           >
+                        {letra}
+                      </button>
+                    );
+                  })}
+                </div>
+              </td>
             </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-300">
-         {estudiantes.map((est, index) => (
-          <tr key={est.id_matricula} className="hover:bg-slate-50 transition-colors">
-            <td className="border border-gray-300 px-3 py-1.5 text-center text-[11px] font-bold text-slate-500 bg-emerald-100/60">
-              {index + 1}
-            </td>
-            <td className="border border-gray-300 px-4 py-1.5">
-              <span className="text-[11px] font-bold text-slate-700 uppercase tracking-tight leading-tight block">
-                {est.apellido_paterno} {est.apellido_materno}, {est.nombres}
-              </span>
-            </td>
-            <td className="border border-gray-300 px-2 py-1.5 bg-emerald-100/60">
-              <div className="flex justify-center gap-1">
-                {['P', 'A', 'T', 'J'].map((letra) => {
-                  const valorReal = letra === 'P' ? 'Presente' : letra === 'A' ? 'Ausente' : letra === 'T' ? 'Tardanza' : 'Justificado';
-                  const isActive = asistencia[est.id_matricula] === valorReal;
-
-                  const activeStyle = {
-                    'P': 'text-slate-900 border-slate-900 bg-slate-50', 
-                    'A': 'text-red-600 border-red-600 bg-red-50',     
-                    'T': 'text-amber-500 border-amber-500 bg-amber-50', 
-                    'J': 'text-green-600 border-green-600 bg-green-50'  
-                  };
-                  return (
-                    <button
-                      key={letra}
-                      onClick={() => setAsistencia(p => ({ ...p, [est.id_matricula]: valorReal }))}
-                      className={`w-7 h-7 md:w-8 md:h-8 rounded-md text-[11px] font-black transition-all duration-200 border
-                        ${isActive
-                          ? `${activeStyle[letra]} shadow-sm scale-110 z-10`
-                          : 'bg-white border-transparent text-gray-300 hover:text-gray-400'
-                         }`}
-                         >
-                      {letra}
-                    </button>
-                  );
-                })}
-              </div>
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  </div>
-  {/* FOOTER RESPONSIVO - Mantenido intacto */}
-  <div className="p-6 md:p-8 bg-slate-50 border-t border-gray-100 flex flex-col sm:flex-row justify-between items-center gap-4">
-    <div className="flex items-center gap-2 text-slate-400 order-2 sm:order-1">
-      <Users size={16} />
-       <p className="text-[10px] font-black uppercase tracking-widest">{estudiantes.length} Alumnos en lista</p>
-        </div>
-         <button
-         onClick={guardarAsistenciaTotal}
-         disabled={isSaving}
-         className="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white px-8 py-4 rounded-2xl md:rounded-[2rem] font-black text-xs flex items-center justify-center gap-3 shadow-xl transition-all active:scale-95 disabled:opacity-30 order-1 sm:order-2"
-         >
-         {isSaving ? <Loader2 className="animate-spin" size={16} /> : <Save size={16} />}
-         GUARDAR {areaSeleccionada}
-       </button>
-     </div>
+          ))}
+        </tbody>
+      </table>
     </div>
-   );
- };
-
-export default AsistenciaAlumnos;
+    {/* FOOTER RESPONSIVO - Mantenido intacto */}
+    <div className="p-6 md:p-8 bg-slate-50 border-t border-gray-100 flex flex-col sm:flex-row justify-between items-center gap-4">
+      <div className="flex items-center gap-2 text-slate-400 order-2 sm:order-1">
+        <Users size={16} />
+         <p className="text-[10px] font-black uppercase tracking-widest">{estudiantes.length} Alumnos en lista</p>
+          </div>
+           <button
+           onClick={guardarAsistenciaTotal}
+           disabled={isSaving}
+           className="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white px-8 py-4 rounded-2xl md:rounded-[2rem] font-black text-xs flex items-center justify-center gap-3 shadow-xl transition-all active:scale-95 disabled:opacity-30 order-1 sm:order-2"
+           >
+           {isSaving ? <Loader2 className="animate-spin" size={16} /> : <Save size={16} />}
+           GUARDAR {areaSeleccionada}
+         </button>
+       </div>
+      </div>
+     );
+   };
+  
+  export default AsistenciaAlumnos;

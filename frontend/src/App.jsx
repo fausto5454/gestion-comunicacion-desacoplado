@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from './config/supabaseClient';
 import { Toaster } from 'react-hot-toast';
 import AppLayout from './components/AppLayout';
@@ -21,44 +21,60 @@ const App = () => {
     
 
   // 1. Carga de Sesión y Perfil Sincronizada con la DB
+  const isInitialized = useRef(false);
+
   useEffect(() => {
+    // 🛡️ CERROJO: Evita que el código se ejecute dos veces y cause bucles
+    if (isInitialized.current) return;
+    isInitialized.current = true;
+
     const inicializarApp = async () => {
       try {
         const { data: { session: initialSession } } = await supabase.auth.getSession();
         setSession(initialSession);
 
-        if (initialSession) {
-          // Usamos 'nombre_completo' que es la columna real en tu tabla
+        if (initialSession?.user) {
+          // 🔍 BUSQUEDA POR CORREO: Evita el error 400 de IDs incompatibles
           const { data, error } = await supabase
             .from('usuarios')
-            .select('rol_id, nombre_completo, correo_electronico')
-            .eq('id_usuario', initialSession.user.id)
+            .select('id_usuario, rol_id, nombre_completo, correo_electronico')
+            .eq('correo_electronico', initialSession.user.email)
             .maybeSingle();
 
           if (error) {
-            console.error("Error al obtener perfil:", error.message);
-          } else {
-            // Confirmamos en consola que el Rol 1 ya no es null
-            console.log("Sistema - Perfil Cargado:", data);
-            setPerfilUsuario(data);
+            console.error("❌ Error de Supabase:", error.message);
+          } else if (data) {
+            // ✅ NORMALIZACIÓN: Mapeamos id_usuario a 'id' para que la App no falle
+            const perfilCompleto = { 
+              ...data, 
+              id: data.id_usuario,
+              correo: data.correo_electronico 
+            };
+            setPerfilUsuario(perfilCompleto);
+            console.log("✅ Sistema - Perfil Vinculado:", perfilCompleto.nombre_completo);
           }
         }
       } catch (err) {
-        console.error("Error inesperado:", err);
+        console.error("❌ Error crítico:", err);
       } finally {
+        // 🔓 LIBERACIÓN: Quita la pantalla de "Cargando"
         setLoading(false);
       }
     };
 
     inicializarApp();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      if (!session) setPerfilUsuario(null);
+    // 📡 SUSCRIPCIÓN: Maneja entradas y salidas de usuario
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_OUT') {
+        setSession(null);
+        setPerfilUsuario(null);
+        setLoading(false);
+      }
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+   }, []);
 
   if (loading) return (
     <div className="h-screen flex flex-col items-center justify-center bg-slate-50 font-sans">

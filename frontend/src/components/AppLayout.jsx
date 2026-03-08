@@ -17,6 +17,7 @@ import PanelAsistencia from './PanelAsistencia';
 import ConsolidadoAsistencia from './ConsolidadoAsistencia';
 import ImportarMatricula from './ImportarMatricula';
 import Sidebar from './Sidebar';
+import SecurityModal from './SecurityModal';
 
 const AppLayout = ({ session, onLogout, currentView, setCurrentView, onCursoSelect, cursoActivo }) => {
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -31,23 +32,33 @@ const AppLayout = ({ session, onLogout, currentView, setCurrentView, onCursoSele
     const userEmail = user?.email || 'N/A';
     const userName = user?.user_metadata?.nombre_completo || user?.email || 'Usuario';
 
-    const fetchUserData = useCallback(async () => {
-    // 1. Guardia de seguridad: No ejecutar si no hay email o la sesión es nula
-    if (!userEmail || userEmail === 'N/A' || userEmail === null) return;
+   const fetchUserData = useCallback(async () => {
+    const emailLimpio = userEmail?.trim().toLowerCase();
+    if (!emailLimpio || emailLimpio === 'n/a') return;
 
     try {
         // --- VÍA A: Datos básicos en 'usuarios' ---
-        // Simplificamos el SELECT para evitar el Error 406 (Not Acceptable)
         let { data: baseData, error: errorBase } = await supabase
             .from("usuarios")
-            .select("id_usuario, rol_id, nombre_completo, correo_electronico")
-            .eq("correo_electronico", userEmail)
+            .select("id_usuario, rol_id, nombre_completo, correo_electronico") 
+            .eq("correo_electronico", emailLimpio) 
             .maybeSingle();
+
+        if (errorBase) {
+            console.error("❌ Error de vinculación en Supabase:", errorBase.message);
+            return;
+        }
 
         let finalProfile = null;
 
         if (baseData) {
-            finalProfile = { ...baseData, asignaciones: [] };
+            // Inicializamos el perfil con mapeo de seguridad para evitar 'is.null'
+            finalProfile = { 
+                ...baseData, 
+                id: baseData.id_usuario, 
+                correo: baseData.correo_electronico,
+                asignaciones: [] 
+            };
 
             // --- CASO DOCENTE/ADMIN (Roles 1, 2, 3) ---
             if (baseData.rol_id !== 6) {
@@ -57,16 +68,15 @@ const AppLayout = ({ session, onLogout, currentView, setCurrentView, onCursoSele
                     .eq("id_usuario", baseData.id_usuario);
                 
                 finalProfile.asignaciones = asig || [];
-                // Para docentes, el grado/seccion principal suele ser el primero de su lista
                 finalProfile.grado = asig?.[0]?.grado || null;
                 finalProfile.seccion = asig?.[0]?.seccion || null;
             } 
-            // --- CASO ESTUDIANTE (Rol 6) ---
+            // --- CASO ESTUDIANTE (Rol 6 en tabla usuarios) ---
             else {
                 const { data: mat } = await supabase
                     .from("matriculas")
                     .select("grado, seccion, dni_estudiante")
-                    .eq("id_usuario", baseData.id_usuario) // O usa correo si el ID es NULL
+                    .eq("id_usuario", baseData.id_usuario)
                     .maybeSingle();
 
                 if (mat) {
@@ -76,9 +86,9 @@ const AppLayout = ({ session, onLogout, currentView, setCurrentView, onCursoSele
                 }
             }
         } 
-        // --- VÍA B: Si no existe en 'usuarios', buscar por DNI (Fallback Estudiantes) ---
+        // --- VÍA B: Fallback por DNI (Estudiantes no registrados en 'usuarios') ---
         else {
-            const dniEstudiante = userEmail.split('@')[0]; 
+            const dniEstudiante = emailLimpio.split('@')[0]; 
             const { data: matricula } = await supabase
                 .from("matriculas")
                 .select("id_matricula, nombres, apellido_paterno, apellido_materno, grado, seccion")
@@ -88,6 +98,7 @@ const AppLayout = ({ session, onLogout, currentView, setCurrentView, onCursoSele
             if (matricula) {
                 finalProfile = {
                     id_usuario: matricula.id_matricula,
+                    id: matricula.id_matricula,
                     rol_id: 6, 
                     nombre_completo: `${matricula.apellido_paterno} ${matricula.apellido_materno}, ${matricula.nombres}`.toUpperCase(),
                     grado: matricula.grado,
@@ -97,7 +108,7 @@ const AppLayout = ({ session, onLogout, currentView, setCurrentView, onCursoSele
             }
         }
 
-        // --- ACTUALIZACIÓN DE ESTADOS ---
+        // --- ACTUALIZACIÓN FINAL DE ESTADOS ---
         if (finalProfile) {
             setPerfilUsuario(finalProfile); 
             setRolID(finalProfile.rol_id);
@@ -111,7 +122,7 @@ const AppLayout = ({ session, onLogout, currentView, setCurrentView, onCursoSele
     } catch (err) {
         console.error("❌ Error en la operación quirúrgica de acceso:", err.message);
     }
-    }, [userEmail]);
+    }, [userEmail, supabase]);
 
     useEffect(() => {
        fetchUserData();
@@ -164,7 +175,7 @@ const AppLayout = ({ session, onLogout, currentView, setCurrentView, onCursoSele
         'iga-estadistica': IGAEstadistica,
         // Agregamos asistencia (usaremos una función para decidir qué mostrar)
         asistencia: cursoActivo ? AsistenciaAlumnos : PanelAsistencia,
-        consolidado: ConsolidadoAsistencia,
+        'consolidado-asistencia': ConsolidadoAsistencia,
         matricula: ImportarMatricula,
     };
 
@@ -193,7 +204,7 @@ const AppLayout = ({ session, onLogout, currentView, setCurrentView, onCursoSele
 
    return (
     <div className="flex h-screen bg-[#f1f5f9] text-slate-900 overflow-hidden font-sans">
-        
+        <SecurityModal />
         {/* Sidebar Desktop */}
         <div className="hidden md:block">
             <Sidebar 
@@ -210,7 +221,7 @@ const AppLayout = ({ session, onLogout, currentView, setCurrentView, onCursoSele
         {/* Sidebar Mobile */}
         {isSidebarOpen && (
             <div className="fixed inset-0 z-[60] md:hidden">
-                <div className="absolute inset-0 bg-gray-500/50 backdrop-blur-sm" onClick={() => setIsSidebarOpen(false)}></div>
+                <div className="absolute inset-0 bg-slate-200 backdrop-blur-sm" onClick={() => setIsSidebarOpen(false)}></div>
                 <div className="relative w-72 h-full">
                     <Sidebar 
                         rol_id={rolID} userName={userName} userEmail={userEmail} 

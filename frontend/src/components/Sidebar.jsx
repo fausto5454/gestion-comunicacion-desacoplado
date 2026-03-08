@@ -33,8 +33,8 @@ const Sidebar = ({ rol_id, userName, userEmail, setCurrentView, currentView, isS
             roles: [1, 2, 3, 5, 6],
             children: [
                 { name: 'Calificaciones', view: 'calificaciones', icon: GraduationCap, roles: [1, 3, 5, 6] },
-                { name: 'Asistencia', view: 'asistencia', icon: CalendarCheck, roles: [1, 3, 5, 6] },
-                { name: 'Consolidado', view: 'consolidado', icon: LayoutGrid, roles: [1, 2, 3, 5] },
+                { name: 'Asistencia', view: 'asistencia', icon: CalendarCheck, roles: [1, 3, 5] },
+                { name: 'Consolidado-Asistencia', view: 'consolidado-asistencia', icon: LayoutGrid, roles: [1, 2, 3, 5, 6] },
                 { name: 'Matrícula', view: 'matricula', icon: FileSpreadsheet, roles: [1] },
                 { name: 'IGA-Estadística', view: 'iga-estadistica', icon: BarChart, roles: [1, 2, 3, 5] },
             ]
@@ -86,13 +86,13 @@ const Sidebar = ({ rol_id, userName, userEmail, setCurrentView, currentView, isS
                 </button>
             </div>
             {/* Navegación */}
-            <nav className="flex-grow p-4 space-y-1 overflow-y-auto custom-scrollbar">
+            <nav className="flex-grow p-3 space-y-0 overflow-y-auto custom-scrollbar">
                 {filteredNavItems.map((item) => {
                     const hasChildren = !!item.children;
                     const isOpen = openMenus[item.name];
                     const isActive = currentView === item.view || (hasChildren && item.filteredChildren.some(c => c.view === currentView));
                     return (
-                        <div key={item.name} className="space-y-1">
+                        <div key={item.name} className="space-y-0">
                             <button
                                 onClick={() => {
                                     if (hasChildren) {
@@ -102,7 +102,7 @@ const Sidebar = ({ rol_id, userName, userEmail, setCurrentView, currentView, isS
                                         if (window.innerWidth < 768) setIsSidebarOpen(false);
                                     }
                                 }}
-                                className={`flex items-center w-full px-4 py-3 rounded-xl transition-all duration-200 group
+                                className={`flex items-center w-full px-2 py-3 rounded-xl transition-all duration-200 group
                                     ${isActive && !hasChildren ? 'bg-green-600 text-white shadow-lg shadow-green-900/20' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
                                 >
                                 <item.icon className={`w-5 h-5 mr-3 ${isActive ? 'text-white' : 'group-hover:text-white'}`} />
@@ -122,7 +122,7 @@ const Sidebar = ({ rol_id, userName, userEmail, setCurrentView, currentView, isS
                                                 setCurrentView(child.view);
                                                 if (window.innerWidth < 768) setIsSidebarOpen(false);
                                             }}
-                                            className={`flex items-center w-full px-3 py-2 rounded-lg text-xs font-medium transition-colors
+                                            className={`flex items-center w-full px-1 py-2 rounded-lg text-xs font-medium transition-colors
                                             ${currentView === child.view ? 'text-green-400 bg-gray-600' : 'text-gray-500 hover:text-gray-200 hover:bg-gray-800'}`}
                                             >
                                             <child.icon className="w-4 h-4 mr-2" />

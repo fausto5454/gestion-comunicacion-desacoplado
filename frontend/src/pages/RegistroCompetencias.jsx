@@ -489,7 +489,7 @@ const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion
     if (nota === 'AD') return 'text-green-600';
     return 'text-slate-700';
   };
-
+ 
   useEffect(() => {
   if (esEstudiante && perfilUsuario?.asignaciones?.length > 0) {
     const miAsignacion = perfilUsuario.asignaciones[0];

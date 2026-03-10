@@ -1,1 +1,36 @@
 @import "tailwindcss";
+
+/* 🎨 DEFINICIÓN DE VARIABLES: Esto hace que Tailwind reconozca los colores al instante */
+@theme {
+  --color-ie-yellow: #FFD700;
+  --color-ie-green: #1B5E20;
+  --color-primary-brand: #1e3a8a;
+  
+  --radius-3xl: 2rem;
+  --radius-4xl: 3rem;
+}
+
+/* 🚀 CAPA DE COMPONENTES */
+@layer components {
+  .btn-excel-institucional {
+    /* Usamos los nombres definidos arriba en el @theme */
+    @apply flex items-center gap-2 px-6 py-2.5 font-bold uppercase tracking-wider
+           bg-ie-yellow text-ie-green border-2 border-ie-green
+           rounded-full shadow-md transition-all duration-300
+           hover:bg-ie-green hover:text-ie-yellow hover:shadow-xl
+           active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+}
+
+/* 🛠️ OVERRIDES PARA SWEETALERT2 (Para que por fin se vea redondeado) */
+.swal2-popup {
+  border-radius: 32px !important;
+  font-family: inherit !important;
+}
+
+.swal2-confirm, .swal2-cancel {
+  border-radius: 999px !important; 
+  padding: 12px 35px !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+}

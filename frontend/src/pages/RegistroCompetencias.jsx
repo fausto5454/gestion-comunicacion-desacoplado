@@ -2,6 +2,7 @@ import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { Save, FileSpreadsheet, CheckCircle2, Loader2, Download, AlertCircle } from 'lucide-react';
 import { supabase } from '../config/supabaseClient'; 
 import XLSX from 'xlsx-js-style';
+import Swal from 'sweetalert2';
 
 const areasConfig = {
     "MATEMÁTICA": ["RESUELVE PROBLEMAS DE CANTIDAD", "RESUELVE PROBLEMAS DE REGULARIDAD", "FORMA Y MOVIMIENTO", "GESTIÓN DE DATOS"],
@@ -178,22 +179,16 @@ const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion
   }
   }, [grado, area, bimestre, perfilUsuario, esEstudiante]);
 
-  // --- 2. EFECTOS DE DISPARO (Trigger) ---
-  useEffect(() => {
-    cargarDatos();
-  }, [cargarDatos]);
-
-  // Sincronizar área cuando cambie el grado (seguridad de filtros)
-  useEffect(() => {
+   useEffect(() => {
     if (opcionesPermitidas.areas.length > 0 && (!area || !opcionesPermitidas.areas.includes(area))) {
       setArea(opcionesPermitidas.areas[0]);
-    }
-  }, [opcionesPermitidas.areas, grado]);
+      }
+    }, [opcionesPermitidas.areas, grado]);
 
     useEffect(() => {
     cargarDatos();
     }, [grado, area, bimestre]);
-  
+
   const alumnosOrdenados = useMemo(() => {
     return [...alumnos].map((nombre, originalIdx) => ({ nombre, originalIdx }))
       .sort((a, b) => {
@@ -226,18 +221,20 @@ const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion
   };
 
   // Restaurado y Mejorado: Función Excel Profesional
-  const exportarExcel = () => {
+ const exportarExcel = () => {
+    // 1. Estabilización de datos iniciales
     const alumnosParaExportar = (typeof matriculados !== 'undefined' ? matriculados : alumnosOrdenados);
     const alumnosValidos = alumnosParaExportar.filter(a => a.nombre || a.nombres);
     if (alumnosValidos.length === 0) return;
 
-    // Estadísticas (Ya confirmadas como perfectas)
+    // 2. Definición de variables globales de la función (Evita ReferenceError)
+    const totalRegistros = alumnosValidos.length; 
+    
     const nFinales = alumnosValidos.map(a => {
-        const nombreFull = a.nombre || `${a.apellido_paterno} ${a.apellido_materno}, ${a.nombres}`.toUpperCase();
+        const nombreFull = (a.nombre || `${a.apellido_paterno} ${a.apellido_materno}, ${a.nombres}`).toUpperCase();
         return calcularLogroBimestral(nombreFull);
     });
     
-    const totalRegistros = 20; 
     const stats = {
         AD: nFinales.filter(n => n === 'AD').length,
         A: nFinales.filter(n => n === 'A').length,
@@ -245,10 +242,9 @@ const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion
         C: nFinales.filter(n => n === 'C').length
     };
 
+    // 3. Configuración de Estilos (Definidos antes de su uso)
     const borderThin = { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } };
     const estiloBase = { font: { sz: 8 }, border: borderThin, alignment: { vertical: "center", horizontal: "center" } };
-    
-    // Estilos de Cabecera
     const estiloVerdeOscuro = { ...estiloBase, font: { bold: true, color: { rgb: "FFFFFF" }, sz: 8 }, fill: { fgColor: { rgb: "00A859" } }, alignment: { horizontal: "center", vertical: "center", wrapText: true } };
     const estiloNaranjaLogro = { ...estiloBase, font: { bold: true, color: { rgb: "FFFFFF" }, sz: 8 }, fill: { fgColor: { rgb: "F4A300" } } };
     const estiloAzulResumen = { ...estiloBase, font: { bold: true, color: { rgb: "FFFFFF" }, sz: 8 }, fill: { fgColor: { rgb: "64740B" } } };
@@ -267,8 +263,11 @@ const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion
     rows.push([]); 
 
     const h1 = [{ v: "N°", s: estiloVerdeOscuro }, { v: "SEXO", s: estiloVerdeOscuro }, { v: "APELLIDOS Y NOMBRES", s: estiloVerdeOscuro }];
-    competencias.forEach(c => { h1.push({ v: c.toUpperCase(), s: estiloVerdeOscuro }, "", "", "", ""); });
-    h1.push({ v: "LOGRO", s: estiloNaranjaLogro }, { v: "", s: {} }, { v: "RESUMEN ESTADÍSTICO", s: estiloAzulResumen }, "", "", "");
+    competencias.forEach(c => { 
+        h1.push({ v: c.toUpperCase(), s: estiloVerdeOscuro });
+        for(let i=0; i<4; i++) h1.push({ v: "", s: estiloVerdeOscuro }); 
+    });
+    h1.push({ v: "LOGRO", s: estiloNaranjaLogro }, { v: "", s: {} }, { v: "RESUMEN ESTADÍSTICO", s: estiloAzulResumen }, {v:"",s:estiloAzulResumen}, {v:"",s:estiloAzulResumen}, {v:"",s:estiloAzulResumen});
     rows.push(h1);
 
     const h2 = [{ v: "", s: estiloVerdeOscuro }, { v: "", s: estiloVerdeOscuro }, { v: "", s: estiloVerdeOscuro }];
@@ -276,13 +275,13 @@ const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion
     h2.push({ v: "", s: estiloNaranjaLogro }, { v: "", s: {} }, { v: "NIVELES", s: estiloAzulResumen }, { v: "NOTAS", s: estiloAzulResumen }, { v: "CANT.", s: estiloAzulResumen }, { v: "%", s: estiloAzulResumen });
     rows.push(h2);
 
-    // CUERPO CON MEJORAS DE COLOR
+    // 4. Cuerpo del Excel sincronizado por DNI
     alumnosValidos.forEach((alumno, idx) => {
-        const nombreFull = alumno.nombre || `${alumno.apellido_paterno} ${alumno.apellido_materno}, ${alumno.nombres}`.toUpperCase().trim();
-        const idEst = normalizarID(nombreFull);
+        const nombreFull = (alumno.nombre || `${alumno.apellido_paterno} ${alumno.apellido_materno}, ${alumno.nombres}`).toUpperCase().trim();
+        // Sincronización Híbrida: Priorizar DNI para buscar notas
+        const idEst = alumno.numero_dni || alumno.dni || normalizarID(nombreFull);
         
-        // Mejora 1: Color por Sexo (Azul para H, Fucsia para M)
-        const valSexo = (alumno.sexo || alumno.genero || generos[idEst] || generos[nombreFull] || "-").toUpperCase();
+        const valSexo = (alumno.sexo || "-").toUpperCase();
         const colorSexo = valSexo === 'M' ? "FF00FF" : (valSexo === 'H' ? "0000FF" : "000000");
 
         const row = [
@@ -295,169 +294,244 @@ const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion
         competencias.forEach((_, cIdx) => {
             [1, 2, 3, 4].forEach(d => {
                 const val = notas[`${idEst}-${cIdx}-${d}`] || "-";
-                const colorNota = val === 'AD' ? "00B050" : val === 'A'  ? "0070C0" : val === 'C'  ? "FF0000" : "000000";
-                row.push({ 
-                v: val, s: {  ...estiloBase, 
-                font: { sz: 8, color: { rgb: colorNota } }  } 
-                });
-    
-                });
-                const p = calcularPromedio(nombreFull, cIdx);
-                const colorPromedioFinal = p === 'AD' ? "00B050" : p === 'A' ? "0070C0" : p === 'C' ? "FF0000" : "000000";
-           row.push({ 
-                v: p, 
-                s: { ...estiloBase, 
-                fill: { fgColor: { rgb: "DCFCE7" } }, 
-                font: { bold: true, sz: 8, color: { rgb: colorPromedioFinal } } } });
-                });
-        // Mejora 2: Logro Final con C en Rojo
+                const colorNota = val === 'AD' ? "00B050" : val === 'A' ? "0070C0" : val === 'C' ? "FF0000" : "000000";
+                row.push({ v: val, s: { ...estiloBase, font: { sz: 8, color: { rgb: colorNota } } } });
+            });
+            const p = calcularPromedio(nombreFull, cIdx);
+            const colorProm = p === 'AD' ? "00B050" : p === 'A' ? "0070C0" : p === 'C' ? "FF0000" : "000000";
+            row.push({ v: p, s: { ...estiloBase, fill: { fgColor: { rgb: "DCFCE7" } }, font: { bold: true, sz: 8, color: { rgb: colorProm } } } });
+        });
+
         const lf = calcularLogroBimestral(nombreFull);
         row.push({ 
             v: lf, 
-            s: { 
-                ...estiloBase, 
-                fill: { fgColor: { rgb: "FEF08A" } }, 
-                font: { bold: true, sz: 8, color: { rgb: lf === 'AD' ? "00B050": lf === 'A'  ? "0070C0": lf === 'C'  ? "FF0000" : "000000" } } 
-            }
+            s: { ...estiloBase, fill: { fgColor: { rgb: "FEF08A" } }, font: { bold: true, sz: 8, color: { rgb: lf === 'AD' ? "00B050" : lf === 'C' ? "FF0000" : "000000" } } }
         });
         row.push({ v: "", s: {} }); 
 
-        // Resumen Estadístico (Manteniendo el éxito previo)
+        // 5. Resumen Estadístico (Corrección de totalRegistros y stats)
         if (idx < 4) {
-            const item = [{ n: "DESTACADO", k: "AD", c: "00CC00" }, { n: "LOGRADO", k: "A", c: "2563EB" }, { n: "EN PROCESO", k: "B", c: "FFFF00" }, { n: "EN INICIO", k: "C", c: "FF0000" }][idx];
+            const items = [
+                { n: "DESTACADO", k: "AD", c: "00CC00" },
+                { n: "LOGRADO", k: "A", c: "2563EB" },
+                { n: "EN PROCESO", k: "B", c: "FFFF00" },
+                { n: "EN INICIO", k: "C", c: "FF0000" }
+            ];
+            const item = items[idx];
             row.push(
-                { v: item.n, s: { ...estiloBase, fill: { fgColor: { rgb: item.c } }, font: { bold: true, sz: 8, color: { rgb: item.k === 'B' ? "000000" : "FFFFFF" } } } },
-                { v: item.k, s: { ...estiloBase, font: { bold: true, sz: 8 } } },
+                { v: item.n, s: { ...estiloBase, fill: { fgColor: { rgb: item.c } }, font: { bold: true, color: { rgb: item.k === 'B' ? "000000" : "FFFFFF" } } } },
+                { v: item.k, s: { ...estiloBase, font: { bold: true } } },
                 { v: stats[item.k] || 0, s: estiloBase },
-                { v: `${(((stats[item.k] || 0) / totalRegistros) * 100).toFixed(0)}%`, s: estiloBase }
+                { v: `${totalRegistros > 0 ? (((stats[item.k] || 0) / totalRegistros) * 100).toFixed(0) : 0}%`, s: estiloBase }
             );
         } else if (idx === 4) {
-            const estiloTotal = { ...estiloBase, font: { bold: true, sz: 8 }, fill: { fgColor: { rgb: "E0F2FE" } } };
+            const estiloTotal = { ...estiloBase, font: { bold: true }, fill: { fgColor: { rgb: "E0F2FE" } } };
             row.push({ v: "TOTAL", s: estiloTotal }, { v: "", s: estiloTotal }, { v: totalRegistros, s: estiloTotal }, { v: "100%", s: estiloTotal });
         }
         rows.push(row);
     });
 
     const ws = XLSX.utils.aoa_to_sheet(rows);
-    
-    // Merges y Alturas (Configuración estable)
-    ws['!merges'] = [
-        { s: { r: 0, c: 0 }, e: { r: 0, c: colLogroIdx + 5 } },
-        { s: { r: 1, c: 0 }, e: { r: 1, c: 5 } }, { s: { r: 1, c: 8 }, e: { r: 1, c: 13 } },
-        { s: { r: 1, c: colLogroIdx - 4 }, e: { r: 1, c: colLogroIdx + 1 } },
-        { s: { r: 3, c: 0 }, e: { r: 4, c: 0 } }, { s: { r: 3, c: 1 }, e: { r: 4, c: 1 } },
-        { s: { r: 3, c: 2 }, e: { r: 4, c: 2 } }, { s: { r: 3, c: colLogroIdx }, e: { r: 4, c: colLogroIdx } },
-        { s: { r: 3, c: colLogroIdx + 2 }, e: { r: 3, c: colLogroIdx + 5 } },
-        { s: { r: 9, c: colLogroIdx + 2 }, e: { r: 9, c: colLogroIdx + 3 } }
-    ];
-
-    let currCol = 3;
-    competencias.forEach(() => {
-        ws['!merges'].push({ s: { r: 3, c: currCol }, e: { r: 3, c: currCol + 4 } });
-        currCol += 5;
-    });
-
-    ws['!cols'] = [{ wch: 4 }, { wch: 4 }, { wch: 32 }, ...Array(competencias.length * 5).fill({ wch: 4 }), { wch: 6 }, { wch: 2 }, { wch: 15 }, { wch: 5 }, { wch: 5 }, { wch: 5 }];
-
-    ws['!rows'] = [];
-    ws['!rows'][0] = { hpt: 30 }; 
-    ws['!rows'][3] = { hpt: 28 }; 
-    ws['!rows'][4] = { hpt: 22 }; 
-
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "REGISTRO");
-    XLSX.writeFile(wb, `Registro_Auxiliar_2026_${grado}_${area}.xlsx`);
-  };
-
+     
+     // Merges y Alturas (Configuración estable)
+     ws['!merges'] = [
+         { s: { r: 0, c: 0 }, e: { r: 0, c: colLogroIdx + 5 } },
+         { s: { r: 1, c: 0 }, e: { r: 1, c: 5 } }, { s: { r: 1, c: 8 }, e: { r: 1, c: 13 } },
+         { s: { r: 1, c: colLogroIdx - 4 }, e: { r: 1, c: colLogroIdx + 1 } },
+         { s: { r: 3, c: 0 }, e: { r: 4, c: 0 } }, { s: { r: 3, c: 1 }, e: { r: 4, c: 1 } },
+         { s: { r: 3, c: 2 }, e: { r: 4, c: 2 } }, { s: { r: 3, c: colLogroIdx }, e: { r: 4, c: colLogroIdx } },
+         { s: { r: 3, c: colLogroIdx + 2 }, e: { r: 3, c: colLogroIdx + 5 } },
+         { s: { r: 9, c: colLogroIdx + 2 }, e: { r: 9, c: colLogroIdx + 3 } }
+     ];
+ 
+     let currCol = 3;
+     competencias.forEach(() => {
+         ws['!merges'].push({ s: { r: 3, c: currCol }, e: { r: 3, c: currCol + 4 } });
+         currCol += 5;
+     });
+ 
+     ws['!cols'] = [{ wch: 4 }, { wch: 4 }, { wch: 32 }, ...Array(competencias.length * 5).fill({ wch: 4 }), { wch: 6 }, { wch: 2 }, { wch: 15 }, { wch: 5 }, { wch: 5 }, { wch: 5 }];
+ 
+     ws['!rows'] = [];
+     ws['!rows'][0] = { hpt: 30 }; 
+     ws['!rows'][3] = { hpt: 28 }; 
+     ws['!rows'][4] = { hpt: 22 }; 
+ 
+     const wb = XLSX.utils.book_new();
+     XLSX.utils.book_append_sheet(wb, ws, "REGISTRO");
+     XLSX.writeFile(wb, `Registro_Auxiliar_2026_${''}_${''}.xlsx`);
+   };
+ 
    const handleGuardarTodo = async () => {
-    if (!grado || !area || !bimestre || loading) return; 
-    setLoading(true);
-    const t0 = performance.now(); 
+  if (!grado || !area || !bimestre || loading) return;
+  setLoading(true);
 
-    try {
-        const { data: { user } } = await supabase.auth.getUser();
-        const correoResponsable = user?.email || 'usuario_desconocido';
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    const correoResponsable = user?.email || 'usuario_desconocido';
 
-        const [numGrado, letraSeccion] = grado.split(" ");
-        const seccionFinal = letraSeccion?.trim() || "A";
-        const areaNormalizada = area.toUpperCase().trim();
-        const bimestreInt = parseInt(bimestre);
+    const [numGrado, letraSeccion] = grado.split(" ");
+    const seccionFinal = letraSeccion?.trim() || "A";
+    const areaNormalizada = area.toUpperCase().trim();
+    const bimestreInt = parseInt(bimestre);
 
-        const batchCalificaciones = [];
+    const batchCalificaciones = [];
+    const alumnosOmitidos = [];
 
-       alumnos.forEach((nombre) => {
-    const nombreLimpio = (nombre || "").toUpperCase().trim();
-    const idEst = normalizarID(nombreLimpio);
-    const dni = dnis[idEst] ? dnis[idEst].toString().trim() : null;
+    // 1. PREPARACIÓN DE DATOS (Lógica de DNI)
+    alumnos.forEach((nombre) => {
+      const nombreKey = (nombre || "").toUpperCase().trim();
+      const dni = dnis[nombreKey];
 
-    if (!dni) return;
+      if (!dni) {
+        alumnosOmitidos.push({ nombre: nombreKey, razon: "DNI no vinculado" });
+        return;
+      }
 
-    // 1. Extraer notas directamente del estado actual para este DNI
-    const obtenerNotasPorCompetencia = (compIdx) => {
-        // Buscamos d1, d2, d3, d4 para la competencia compIdx
+      const obtenerNotasPorComp = (compIdx) => {
         return [1, 2, 3, 4]
-            .map(d => notas[`${dni}-${compIdx}-${d}`])
-            .filter(n => n && n !== '-' && n !== '');
-    };
+          .map(d => notas[`${dni}-${compIdx}-${d}`])
+          .filter(n => n && n !== '-' && n !== '');
+      };
 
-    // 2. Calcular los promedios de cada competencia (C1 a C4)
-    // Usamos la última nota ingresada (o lógica de promedio que prefieras)
-    const p1 = obtenerNotasPorCompetencia(0).pop() || '-';
-    const p2 = obtenerNotasPorCompetencia(1).pop() || '-';
-    const p3 = obtenerNotasPorCompetencia(2).pop() || '-';
-    const p4 = obtenerNotasPorCompetencia(3).pop() || '-';
+      const p1 = obtenerNotasPorComp(0).pop() || '-';
+      const p2 = obtenerNotasPorComp(1).pop() || '-';
+      const p3 = obtenerNotasPorComp(2).pop() || '-';
+      const p4 = obtenerNotasPorComp(3).pop() || '-';
 
-    // 3. Determinar el Logro Bimestral (la nota más reciente de todas las competencias)
-    const todasLasNotasValidas = [p1, p2, p3, p4].filter(p => p !== '-');
-    const logroFinal = todasLasNotasValidas.length > 0 ? todasLasNotasValidas[todasLasNotasValidas.length - 1] : '-';
+      const logroFinal = calcularLogroBimestral(dni);
 
-    const registroCalificacion = {
+      if (logroFinal === '-') {
+        alumnosOmitidos.push({ nombre: nombreKey, razon: "Sin calificaciones" });
+        return;
+      }
+
+      const registro = {
         dni_estudiante: dni,
-        nombre_estudiante: nombreLimpio,
+        nombre_estudiante: nombreKey,
         grado: numGrado,
         seccion: seccionFinal,
         area: areaNormalizada,
         bimestre: bimestreInt,
-        // ASIGNACIÓN EXPLÍCITA: Esto llena las columnas vacías en Supabase
         promedio_c1: p1,
         promedio_c2: p2,
         promedio_c3: p3,
         promedio_c4: p4,
-        logro_bimestral: logroFinal
-    };
+        logro_bimestral: logroFinal,
+        correo_electronico: correoResponsable
+      };
 
-       // 4. Mapeo de columnas de desempeño individual (c1_d1, etc.)
       for (let c = 1; c <= 4; c++) {
         for (let d = 1; d <= 4; d++) {
-            const val = notas[`${dni}-${c - 1}-${d}`];
-            registroCalificacion[`c${c}_d${d}`] = (val && val !== '-') ? val.toUpperCase() : null;
+          const val = notas[`${dni}-${c - 1}-${d}`];
+          registro[`c${c}_d${d}`] = (val && val !== '-') ? val.toUpperCase() : null;
         }
-    }
-
-    batchCalificaciones.push(registroCalificacion);
+      }
+      batchCalificaciones.push(registro);
     });
 
-        // 4. ENVÍO A SUPABASE
-        const { error } = await supabase
-            .from('calificaciones')
-            .upsert(batchCalificaciones, { onConflict: 'dni_estudiante,area,bimestre' });
-
-        if (error) throw error;
-
-        // ... resto de lógica de asistencia, matricula y auditoría ...
-
-        setMensaje({ texto: "¡SINCRONIZACIÓN COMPLETA EN SUPABASE!", tipo: 'success' });
-        setShowConfirm(false);
-
-    } catch (error) {
-        console.error("Error al sincronizar:", error);
-        setMensaje({ texto: "Error: " + error.message, tipo: 'error' });
-    } finally {
-        setLoading(false);
-        setTimeout(() => setMensaje(null), 3000);
+  // 2. MODAL DE CONFIRMACIÓN PROFESIONAL
+  const result = await Swal.fire({
+  title: '<span style="color:#1e293b; font-weight:800; font-size:22px;">CONFIRMAR REGISTRO</span>',
+  html: `
+    <div style="text-align: left; font-size: 14px; color: #475569; padding: 0 10px;">
+      <p style="margin-bottom: 15px;">Se enviará la información oficial de <b>${areaNormalizada}</b> al servidor central.</p>
+      
+      <div style="background: #f1f5f9; padding: 20px; border-radius: 24px; border: 1px solid #e2e8f0; margin-bottom: 10px;">
+        <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+          <span style="font-weight: 500;">✅ Estudiantes listos:</span>
+          <span style="font-weight: 800; color: #10b981; background: #d1fae5; padding: 4px 15px; border-radius: 50px;">${batchCalificaciones.length}</span>
+        </div>
+        <div style="display: flex; justify-content: space-between;">
+             <span style="font-weight: 500;">⚠️ Registros omitidos:</span>
+            <span style="font-weight: 800; color: #f43f5e; background: #fee2e2; padding: 4px 15px; border-radius: 50px;">${alumnosOmitidos.length}</span>
+           </div>
+         </div>
+      
+        <p style="font-size: 11px; color: #94a3b8; text-align: center; margin-top: 15px;">
+          Responsable de envío: <br/> <b>${correoResponsable}</b>
+        </p>
+      </div>
+     `,
+     icon: 'question',
+     iconColor: '#0f172a',
+     showCancelButton: true,
+     confirmButtonColor: '#0f172a',
+     cancelButtonColor: '#0cad07',
+     confirmButtonText: 'SÍ, GUARDAR AHORA',
+     cancelButtonText: 'REVISAR',
+     reverseButtons: true,
+  
+     // --- CONFIGURACIÓN DE REDONDEO CRÍTICA ---
+     background: '#ffffff',
+     borderRadius: '60px', // REDONDEO DEL CUADRO PRINCIPAL
+  
+    customClass: {
+       popup: 'shadow-xl',
+       confirmButton: 'boton-redondeado',
+       cancelButton: 'boton-redondeado'
+     },
+  
+    // Inyectamos CSS directamente para asegurar que los botones sean pastillas
+    didOpen: () => {
+      const confirmBtn = Swal.getConfirmButton();
+      const cancelBtn = Swal.getCancelButton();
+    
+    // Forzamos el estilo de los botones
+    if (confirmBtn) {
+      confirmBtn.style.borderRadius = '50px';
+      confirmBtn.style.padding = '12px 30px';
+      confirmBtn.style.fontSize = '14px';
+      confirmBtn.style.fontWeight = 'bold';
+      confirmBtn.style.textTransform = 'uppercase';
+    }
+    if (cancelBtn) {
+      cancelBtn.style.borderRadius = '50px';
+      cancelBtn.style.padding = '12px 30px';
+      cancelBtn.style.fontSize = '14px';
+      cancelBtn.style.fontWeight = 'bold';
+      cancelBtn.style.textTransform = 'uppercase';
      }
-   };
+    }
+   });
 
+    // 3. ENVÍO A SUPABASE
+    const { data, error } = await supabase
+      .from('calificaciones')
+      .upsert(batchCalificaciones, { onConflict: 'dni_estudiante,area,bimestre' })
+      .select();
+
+    if (error) throw error;
+
+    // 4. MODAL DE ÉXITO DE IMPACTO
+    Swal.fire({
+     icon: 'success',
+     title: '<span style="color:#10b981; font-weight:800">¡SINCRO EXITOSA!</span>',
+     text: `Se actualizaron ${data.length} registros en la nube.`,
+     timer: 2000,
+     showConfirmButton: false,
+     timerProgressBar: true,
+     customClass: {
+        popup: 'rounded-3xl' // Mantenemos la coherencia en el éxito
+      }
+    });
+
+    if (typeof setShowConfirm === 'function') setShowConfirm(false);
+
+   } catch (error) {
+     console.error("Error crítico:", error);
+     Swal.fire({
+       icon: 'error',
+       title: 'ERROR DE CARGA',
+       text: error.message,
+       confirmButtonColor: '#f43f5e'
+    });
+  } finally {
+    setLoading(false);
+    setTimeout(() => setMensaje(null), 5000);
+  }
+  };
+        
   const getColorNota = (nota) => {
     if (nota === 'C') return 'text-red-600';
     if (nota === 'A') return 'text-blue-600';
@@ -606,28 +680,22 @@ const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion
   <tbody className={`text-[10px] ${perfilUsuario?.rol_id === 6 ? 'pointer-events-none' : ''}`}>
    {alumnosOrdenados
     .filter(({ nombre }) => {
-      const rolUsuario = Number(perfilUsuario?.rol_id);
+     const rolUsuario = Number(perfilUsuario?.rol_id);
       if (rolUsuario === 1 || rolUsuario === 3) return true;
-      const idFila = normalizarID(nombre);
-      const idUsuario = normalizarID(perfilUsuario?.nombre_completo);
-      return idFila.includes(idUsuario) || idUsuario.includes(idFila);
-      })
-      .map(({ nombre, originalIdx }, displayIdx) => {
-       const nombreEst = (nombre || "").toUpperCase().trim();
-       const generoActual = generos[nombreEst] || "";
-       const nombreKey = (nombre || "").toUpperCase().trim();
-       const dniEst = dnis[nombreKey];
-       if (!dniEst) return null;
-       console.log(`Buscando nota para ${nombreKey}:`, {
-       dniEncontrado: dniEst,
-       llaveGenerada: `${dniEst}-0-1`,
-       valorEnEstado: notas[`${dniEst}-0-1`]
-       });
-        return (
-        <tr key={originalIdx} className="border-b border-slate-200 hover:bg-green-50/50 h-8">
-          {/* NÚMERO DE ORDEN */}
-          <td className="text-center sticky left-0 z-20 bg-green-200 font-bold border-r border-slate-300 text-gray-600 w-6 text-[10px]">
-            {displayIdx + 1}
+       const idFila = normalizarID(nombre);
+       const idUsuario = normalizarID(perfilUsuario?.nombre_completo);
+        return idFila.includes(idUsuario) || idUsuario.includes(idFila);
+        })
+       .map(({ nombre, originalIdx }, displayIdx) => {
+     const nombreKey = (nombre || "").toUpperCase().trim();
+    const dniEst = dnis[nombreKey];
+    const generoActual = generos[nombreKey] || "";
+    if (!dniEst) return null;
+    return (
+      <tr key={originalIdx} className="border-b border-slate-200 hover:bg-green-50/50 h-8">
+        {/* NÚMERO DE ORDEN */}
+        <td className="text-center sticky left-0 z-20 bg-green-200 font-bold border-r border-slate-300 text-gray-600 w-6 text-[10px]">
+          {displayIdx + 1}
           </td>
           {/* COLUMNA SEXO */}
          <td className="hidden md:table-cell p-0 sticky left-7 z-20 bg-gray-200 border-r border-slate-300 w-8">

@@ -190,7 +190,7 @@ const DashboardPage = ({ session }) => {
                 labels: {
                     usePointStyle: true,
                     padding: 30, // Más espacio entre gráfico y leyenda
-                    font: { size: 14, weight: 'semibold' },
+                    font: { size: 14, weight: '600' },
                     generateLabels: (chart) => {
                         const { data } = chart;
                         return data.labels.map((label, i) => ({

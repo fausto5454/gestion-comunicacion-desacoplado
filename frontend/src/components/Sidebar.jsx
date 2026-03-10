@@ -71,9 +71,9 @@ const Sidebar = ({ rol_id, userName, userEmail, setCurrentView, currentView, isS
 
     const filteredNavItems = filterByRole(navItems);
     return (
-        <div className={`flex flex-col h-full bg-gray-900 text-white w-64 fixed md:relative z-40 shadow-2xl transition-transform duration-300 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
+        <div className={`flex flex-col h-full bg-gray-900 text-white w-70 fixed md:relative z-40 shadow-2xl transition-transform duration-300 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
             {/* Header */}
-            <div className="p-5 flex items-center justify-between border-b border-gray-800">
+            <div className="p-5 flex items-center justify-between border-b-2 border-green-500 border-gl">
                 <div className="flex items-center justify-center w-full">
                  <img 
                    src="/sigescom.png" 
@@ -86,13 +86,13 @@ const Sidebar = ({ rol_id, userName, userEmail, setCurrentView, currentView, isS
                 </button>
             </div>
             {/* Navegación */}
-            <nav className="flex-grow p-3 space-y-0 overflow-y-auto custom-scrollbar">
+            <nav className="flex-grow p-6 space-y-1 overflow-y-auto custom-scrollbar">
                 {filteredNavItems.map((item) => {
                     const hasChildren = !!item.children;
                     const isOpen = openMenus[item.name];
                     const isActive = currentView === item.view || (hasChildren && item.filteredChildren.some(c => c.view === currentView));
                     return (
-                        <div key={item.name} className="space-y-0">
+                        <div key={item.name} className="space-y-1">
                             <button
                                 onClick={() => {
                                     if (hasChildren) {
@@ -114,7 +114,7 @@ const Sidebar = ({ rol_id, userName, userEmail, setCurrentView, currentView, isS
 
                             {/* Submenús */}
                             {hasChildren && isOpen && (
-                                <div className="ml-9 space-y-1 border-l border-gray-800 pl-2 transition-all duration-300">
+                                <div className="ml-10 space-y-1 border-l border-gray-800 pl-2 transition-all duration-300">
                                     {item.filteredChildren.map((child) => (
                                         <button
                                             key={child.view}

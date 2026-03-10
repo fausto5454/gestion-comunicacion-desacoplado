@@ -119,10 +119,11 @@ const ConsolidadoAsistencia = () => {
           setPerfilUsuario({ ...perfil, rol_id: 6, dni_estudiante: matri.dni_estudiante });
           setSeleccion(prev => ({ ...prev, grado: g, seccion: s, area: areasFinales[0] }));
         } else if (perfil) {
+          
           // Lógica Admin/Docente
           setPerfilUsuario(perfil);
-          if (Number(perfil.rol_id) === 1) { // Admin
-             gradosFinales = ['1-A', '1-B', '2-A', '2-B', '3-A', '3-B', '4-A', '4-B', '5-A', '5-B'];
+          if (Number(perfil.rol_id) === 1, 3) { // Admin
+             gradosFinales = ['1-A', '1-B', '1-C', '2-A', '2-B', '2-C', '3-A', '3-B', '4-A', '4-B', '5-A', '5-B'];
           }
           const [initG, initS] = gradosFinales[0]?.split('-') || ['1', 'A'];
           setSeleccion(prev => ({ ...prev, grado: initG, seccion: initS, area: areasFinales[0] }));

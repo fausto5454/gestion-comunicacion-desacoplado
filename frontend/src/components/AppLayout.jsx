@@ -221,7 +221,7 @@ const AppLayout = ({ session, onLogout, currentView, setCurrentView, onCursoSele
         {/* Sidebar Mobile */}
         {isSidebarOpen && (
             <div className="fixed inset-0 z-[60] md:hidden">
-                <div className="absolute inset-0 bg-slate-200 backdrop-blur-sm" onClick={() => setIsSidebarOpen(false)}></div>
+                <div className="absolute inset-0 bg-slate-300 backdrop-blur-sm" onClick={() => setIsSidebarOpen(false)}></div>
                 <div className="relative w-72 h-full">
                     <Sidebar 
                         rol_id={rolID} userName={userName} userEmail={userEmail} 

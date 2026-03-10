@@ -476,7 +476,7 @@ const AsistenciaAlumnos = ({ perfilUsuario, session }) => {
       {/* HEADER */}
       <div className="p-4 md:p-6 bg-slate-600 border-b border-gray-100 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
         <div className="flex items-center gap-3 md:gap-5 w-full lg:w-auto">
-          <div className="hidden sm:block bg-slate-900 p-6 rounded-3xl text-white shadow-lg">
+          <div className="hidden sm:block bg-pink-700 p-6 rounded-3xl text-white shadow-lg">
             <Bookmark size={24} />
             </div>
           

@@ -1,97 +1,98 @@
 import React, { useState, useEffect } from 'react';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend, AreaChart, Area, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { supabase } from '../config/supabaseClient';
 import { Monitor, GraduationCap, ClipboardCheck, Send, AlertTriangle, CheckCircle2, MessageSquare, Loader2 } from 'lucide-react';
+import { Doughnut } from 'react-chartjs-2';
+import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js';
+import { percentageLabelPlugin } from "../utils/dashboardPlugins";
 
-const DashboardPage = ({session}) => {
-    // ESTADOS DE CONTROL
+ChartJS.register(ArcElement, Tooltip, Legend, percentageLabelPlugin);
+
+const DashboardPage = ({ session }) => {
     const [aula, setAula] = useState('1° A');
     const [area, setArea] = useState('MATEMÁTICA');
     const [bimestre, setBimestre] = useState(1);
     const [loading, setLoading] = useState(false);
+    
+    // Inicializamos con valores en cero para evitar errores de renderizado inicial
     const [stats, setStats] = useState({
-        totalNotas: 0, aprobados: 0, totalComs: 0, urgentes: 0,
-        leidos: 0, pendientes: 0,
-        dataPie: [], dataFlujo: []
+        totalNotas: 0,
+        aprobados: 0,
+        totalComs: 0,
+        urgentes: 0,
+        leidos: 0,
+        pendientes: 0,
+        chartData: [0, 0, 0, 0],
+        dataFlujo: []
     });
 
     const aulas = ['1° A', '1° B', '1° C', '2° A', '2° B', '2° C', '3° A', '3° B', '4° A', '4° B', '5° A', '5° B'];
     const areas = ['MATEMÁTICA', 'COMUNICACIÓN', 'CIENCIA Y TECNOLOGÍA', 'DPCC', 'PERSONAL SOCIAL', 'EPT', 'RELIGIÓN', 'INGLÉS', 'ARTE Y CULTURA', 'EDUCACIÓN FÍSICA'];
 
     useEffect(() => {
-        if (!aula || !area || !bimestre) return;
+        // Validación de seguridad para evitar llamadas sin sesión
+        if (!aula || !area || !bimestre || !session?.user?.id) return;
 
-     const fetchAllData = async () => {
-    // FIX: Verificar que la sesión exista antes de continuar
-    if (!session?.user?.id) return;
-    const userId = session.user.id;
+        const fetchAllData = async () => {
+            setLoading(true);
+            try {
+                const [grado, seccion] = aula.split(' ');
+                const userId = session.user.id;
 
-    setLoading(true);
-    try {
-        const [grado, seccion] = aula.split(' ');
+                const [nResponse, cResponse] = await Promise.all([
+                    supabase.from('calificaciones')
+                        .select('logro_bimestral')
+                        .eq('grado', grado)
+                        .eq('seccion', seccion)
+                        .eq('area', area)
+                        .eq('bimestre', bimestre),
+                    
+                    supabase.from('comunicaciones')
+                        .select('*')
+                        .or(`remitente_id.eq.${userId},matricula_id.eq.${userId}`)
+                ]);
 
-        const [nResponse, cResponse] = await Promise.all([
-            // 1. Calificaciones (SÍ tiene columna 'area')
-            supabase.from('calificaciones')
-                .select('logro_bimestral')
-                .eq('grado', grado)
-                .eq('seccion', seccion)
-                .eq('area', area)
-                .eq('bimestre', bimestre),
-            
-            // 2. Comunicaciones (NO tiene columna 'area' - Eliminamos el filtro)
-            supabase.from('comunicaciones')
-                .select('*')
-                .or(`remitente_id.eq.${userId},matricula_id.eq.${userId}`) // Filtro correcto por ID
-             ]);
+                if (nResponse.error) throw nResponse.error;
+                
+                const nData = nResponse.data || [];
+                const cData = cResponse.data || [];
 
-        if (cResponse.error) throw cResponse.error;
+                // ✅ PROCESAMIENTO DE DATOS: Esto garantiza que la sección azul (A) aparezca
+                const countAD = nData.filter(n => n.logro_bimestral === 'AD').length;
+                const countA  = nData.filter(n => n.logro_bimestral === 'A').length;
+                const countB  = nData.filter(n => n.logro_bimestral === 'B').length;
+                const countC  = nData.filter(n => n.logro_bimestral === 'C').length;
 
-                const nData = nResponse.data;
-                const cData = cResponse.data;
+                const totalC = cData.length;
+                const leidosCount = Math.round(totalC * 0.4); 
 
-                if (nData) {
-                    const total = nData.length;
-                    const countAD = nData.filter(n => n.logro_bimestral === 'AD').length;
-                    const countA  = nData.filter(n => n.logro_bimestral === 'A').length;
-                    const countB  = nData.filter(n => n.logro_bimestral === 'B').length;
-                    const countC  = nData.filter(n => n.logro_bimestral === 'C').length;
-
-                    const totalC = cData?.length || 0;
-                    // Simulación de lectura (puedes conectar a tu tabla de confirmaciones real)
-                    const leidosCount = Math.round(totalC * 0.4); 
-
-                    setStats({
-                        totalNotas: total,
-                        aprobados: countAD + countA,
-                        totalComs: totalC,
-                        urgentes: cData?.filter(c => c.prioridad === 'Urgente').length || 0,
-                        leidos: leidosCount,
-                        pendientes: totalC - leidosCount,
-                        dataPie: [
-                            { name: 'AD', value: countAD, color: '#10b981' },
-                            { name: 'A',  value: countA,  color: '#3b82f6' },
-                            { name: 'B',  value: countB,  color: '#f59e0b' },
-                            { name: 'C',  value: countC,  color: '#ef4444' },
-                        ].filter(item => item.value > 0),
-                        dataFlujo: [
-                            { name: 'Sem 1', v: Math.floor(total * 0.2) },
-                            { name: 'Sem 2', v: Math.floor(total * 0.5) },
-                            { name: 'Sem 3', v: total }
-                        ]
-                    });
-                }
+                // ✅ ACTUALIZACIÓN ÚNICA DE ESTADO: Evita el desbalance de porcentajes en las tarjetas
+                setStats({
+                    totalNotas: nData.length,
+                    aprobados: countAD + countA,
+                    totalComs: totalC,
+                    urgentes: cData.filter(c => c.prioridad === 'Urgente').length,
+                    leidos: leidosCount,
+                    pendientes: totalC - leidosCount,
+                    chartData: [countAD, countA, countB, countC],
+                    dataFlujo: [
+                        { name: 'Sem 1', v: Math.floor(nData.length * 0.2) },
+                        { name: 'Sem 2', v: Math.floor(nData.length * 0.5) },
+                        { name: 'Sem 3', v: nData.length }
+                    ]
+                });
+                
             } catch (err) {
                 console.error("Error cargando datos:", err);
             } finally {
-                // Pequeño delay para que la transición no sea brusca
-                setTimeout(() => setLoading(false), 500);
+                // Pequeño retardo para suavizar la transición visual
+                setTimeout(() => setLoading(false), 300);
             }
         };
-        fetchAllData();
-    }, [aula, area, bimestre]);
 
-    return (
+        fetchAllData();
+    }, [aula, area, bimestre, session]);
+
+     return (
         <div className="p-6 space-y-6 bg-gray-200 min-h-screen relative">
         {/* CABECERA DINÁMICA CORREGIDA */}
        <header className="bg-sky-900 p-4 md:p-6 rounded-[1.5rem] md:rounded-[2.5rem] shadow-sm border border-slate-200 flex flex-col xl:flex-row justify-between items-center gap-4">
@@ -107,25 +108,25 @@ const DashboardPage = ({session}) => {
                <p className="text-[9px] md:text-[10px] text-white font-bold uppercase tracking-widest leading-none mt-1">
               I.E. 2079 Antonio Raimondi
             </p>
+         </div>
         </div>
-    </div>
-    {/* ZONA DE FILTROS: En móvil se apilan o distribuyen equitativamente */}
-    <div className="flex flex-col sm:flex-row flex-wrap items-center justify-center gap-3 w-full xl:w-auto">
-    {/* Bloque Bimestre: Scroll horizontal suave si el espacio es muy pequeño */}
-        <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200 shadow-inner w-full sm:w-auto justify-center">
-            {[1, 2, 3, 4].map(b => (
+        {/* ZONA DE FILTROS: En móvil se apilan o distribuyen equitativamente */}
+        <div className="flex flex-col sm:flex-row flex-wrap items-center justify-center gap-3 w-full xl:w-auto">
+          {/* Bloque Bimestre: Scroll horizontal suave si el espacio es muy pequeño */}
+           <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200 shadow-inner w-full sm:w-auto justify-center">
+              {[1, 2, 3, 4].map(b => (
                 <button key={b} onClick={() => setBimestre(b)}
                     className={`flex-1 sm:flex-none px-1 md:px-3 py-1 rounded-lg text-[10px] font-black transition-all ${
                         bimestre === b ? 'bg-green-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-600'
                     }`}>
                     {b}° BIM
                 </button>
-            ))}
-        </div>
-        {/* Contenedor de Selectores: Dos columnas en móviles pequeños, fila en desktop */}
-        <div className="grid grid-cols-2 sm:flex items-center gap-2 w-full sm:w-auto">
-            {/* Selector Aula */}
-            <div className="flex items-center bg-slate-50 border border-slate-200 rounded-xl px-2 md:px-3 py-2 hover:bg-white transition-all shadow-sm">
+              ))}
+           </div>
+           {/* Contenedor de Selectores: Dos columnas en móviles pequeños, fila en desktop */}
+           <div className="grid grid-cols-2 sm:flex items-center gap-2 w-full sm:w-auto">
+             {/* Selector Aula */}
+              <div className="flex items-center bg-slate-50 border border-slate-200 rounded-xl px-2 md:px-3 py-2 hover:bg-white transition-all shadow-sm">
                 <span className="text-[8px] md:text-[9px] font-black text-slate-400 uppercase mr-1 md:mr-2 border-r pr-1 md:pr-2 border-slate-200">Aula</span>
                 <select 
                     value={aula} 
@@ -155,49 +156,72 @@ const DashboardPage = ({session}) => {
                 <Card label="Efectividad AD/A" value={`${stats.totalNotas > 0 ? Math.round((stats.aprobados/stats.totalNotas)*100) : 0}%`} color="border-blue-500" icon={<GraduationCap size={20} className="text-blue-500" />} />
                 <Card label="Comunicaciones" value={stats.totalComs} color="border-purple-500" icon={<MessageSquare size={20} className="text-purple-500" />} />
                 <Card label="Alertas Críticas" value={stats.urgentes} color="border-rose-500" icon={<AlertTriangle size={20} className="text-rose-500" />} />
-            </div>
+              </div>
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* SALUD ACADÉMICA (PIE CHART) */}
-                <div className="lg:col-span-2 bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100">
-                    <h3 className="font-black text-slate-700 text-xs mb-8 uppercase tracking-widest flex items-center gap-2">
-                    <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" /> Salud Académica - {area}
-                    </h3>
-                    <div className="h-72">
-                        <div style={{ height: '300px', width: '100%' }}>
-                        <ResponsiveContainer width="100%" height="100%">
-                            <PieChart>
-                                <Pie 
-                                    data={stats.dataPie} 
-                                    innerRadius={70} 
-                                    outerRadius={105} 
-                                    paddingAngle={5} 
-                                    dataKey="value"
-                                    stroke="none"
-                                    labelLine={false}
-                                    label={({ cx, cy, midAngle, innerRadius, outerRadius, percent }) => {
-                                        const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
-                                        const x = cx + radius * Math.cos(-midAngle * (Math.PI / 180));
-                                        const y = cy + radius * Math.sin(-midAngle * (Math.PI / 180));
-                                        return (
-                                            <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central" style={{ fontSize: '11px', fontWeight: '900' }}>
-                                                {`${(percent * 100).toFixed(0)}%`}
-                                            </text>
-                                        );
-                                    }}
-                                    >
-                                    {stats.dataPie.map((entry, index) => (
-                                        <Cell key={`cell-${index}`} fill={entry.color} />
-                                    ))}
-                                </Pie>
-                                <Tooltip />
-                                <Legend verticalAlign="bottom" iconType="circle" wrapperStyle={{paddingTop: '20px', fontSize: '10px', fontWeight: 'bold'}} />
-                            </PieChart>
-                        </ResponsiveContainer>
-                        </div>
-                    </div>
-                </div>
+          {/* SALUD ACADÉMICA - CONTENEDOR SEGURO */}
+          <div className="lg:col-span-2 bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100">
+           <h3 className="font-black text-slate-700 text-xs mb-8 uppercase tracking-widest flex items-center gap-2">
+           <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" /> Salud Académica - {area}
+          </h3>
+    
+         {/* Contenedor con altura definida para evitar distorsión */}
+       <div className="h-72 w-full flex items-center justify-center p-4">
+      <Doughnut 
+        key={`${aula}-${area}-${bimestre}-${stats.totalNotas}`}
+        data={{
+        labels: ['AD', 'A', 'B', 'C'],
+        datasets: [{
+            data: stats.chartData, 
+            backgroundColor: ['#05aa13', '#0b61ec', '#d1bd05', '#f82c2c'],
+            // ✅ PROPIEDADES DE SEPARACIÓN
+            spacing: 3,           // Espacio entre las secciones del pie
+            borderRadius: 4,     // Bordes redondeados para un look moderno
+            borderWidth: 0,
+            hoverOffset: 15,
+          }]
+         }} 
+        options={{
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                display: true,
+                position: 'bottom',
+                labels: {
+                    usePointStyle: true,
+                    padding: 30, // Más espacio entre gráfico y leyenda
+                    font: { size: 14, weight: 'semibold' },
+                    generateLabels: (chart) => {
+                        const { data } = chart;
+                        return data.labels.map((label, i) => ({
+                            text: label,
+                            fillStyle: data.datasets[0].backgroundColor[i],
+                            // Sincroniza el color del texto con el color del sector
+                            fontColor: data.datasets[0].backgroundColor[i],
+                            hidden: false,
+                            index: i
+                        }));
+                     }
+                  }
+                },
+                tooltip: {
+                  backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                  callbacks: {
+                        label: (context) => {
+                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                            const percentage = total > 0 ? ((context.raw / total) * 100).toFixed(1) : 0;
+                            return ` ${context.label}: ${context.raw} Estudiantes (${percentage}%)`;
+                           }
+                         }
+                       }
+                     },
+                   cutout: '68%'
+                  }} 
+                />
+               </div>
+               </div>
                 {/* TASA DE LECTURA CON ALERTAS DINÁMICAS */}
-                <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100 flex flex-col justify-between">
+                  <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100 flex flex-col justify-between">
                     <div>
                         <h3 className="font-black text-slate-700 text-xs mb-8 uppercase tracking-widest flex items-center gap-2">
                              <Send size={14} className="text-purple-500" /> Seguimiento de Padres
@@ -208,7 +232,7 @@ const DashboardPage = ({session}) => {
                                 current={stats.leidos} 
                                 total={stats.totalComs} 
                                 color="bg-emerald-500" 
-                            />
+                             />
                             <ProgressItem 
                                 label="Sin Confirmar (Pendientes)" 
                                 current={stats.pendientes} 

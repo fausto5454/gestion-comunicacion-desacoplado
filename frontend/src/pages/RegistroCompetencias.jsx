@@ -644,7 +644,7 @@ const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion
       <button 
          onClick={() => setShowConfirm(true)} 
           disabled={loading} 
-           className="bg-pink-700 hover:bg-slate-800 text-white px-7 py-4 rounded-xl text-[10px] font-black flex items-center justify-center gap-2 transition-all active:scale-95 shadow-xl shadow-slate-200 disabled:bg-slate-400 flex-1 sm:flex-none"
+           className="bg-slate-900 hover:bg-slate-800 text-white px-7 py-4 rounded-xl text-[10px] font-black flex items-center justify-center gap-2 transition-all active:scale-95 shadow-xl shadow-slate-200 disabled:bg-slate-400 flex-1 sm:flex-none"
             >
             {loading ? <Loader2 className="w-2 h-2 animate-spin" /> : <Save className="w-4 h-4 text-green-100" />} 
             <span>GUARDAR</span>

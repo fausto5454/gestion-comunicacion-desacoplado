@@ -71,7 +71,7 @@ const Sidebar = ({ rol_id, userName, userEmail, setCurrentView, currentView, isS
 
     const filteredNavItems = filterByRole(navItems);
     return (
-        <div className={`flex flex-col h-full bg-gray-900 text-white w-70 fixed md:relative z-40 shadow-2xl transition-transform duration-300 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
+        <div className={`flex flex-col h-full bg-gray-900 text-white w-75 fixed md:relative z-40 shadow-2xl transition-transform duration-300 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
             {/* Header */}
             <div className="p-5 flex items-center justify-between border-b-2 border-gray-400 border-gl">
                 <div className="flex items-center justify-center w-full">
@@ -86,7 +86,7 @@ const Sidebar = ({ rol_id, userName, userEmail, setCurrentView, currentView, isS
                 </button>
             </div>
             {/* Navegación */}
-            <nav className="flex-grow p-6 space-y-1 overflow-y-auto custom-scrollbar">
+            <nav className="flex-grow p-8 space-y-1 overflow-y-auto custom-scrollbar">
                 {filteredNavItems.map((item) => {
                     const hasChildren = !!item.children;
                     const isOpen = openMenus[item.name];

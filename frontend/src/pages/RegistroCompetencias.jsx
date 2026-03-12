@@ -220,21 +220,49 @@ const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion
     return contComp === 0 ? "-" : inversa[Math.round(sumaLetras / contComp)] || "-";
   };
 
-  // Restaurado y Mejorado: Función Excel Profesional
- const exportarExcel = () => {
-    // 1. Estabilización de datos iniciales
-    const alumnosParaExportar = (typeof matriculados !== 'undefined' ? matriculados : alumnosOrdenados);
-    const alumnosValidos = alumnosParaExportar.filter(a => a.nombre || a.nombres);
+  const obtenerTextoBimestre = (num) => {
+    const bimestres = {
+        1: "1° BIMESTRE",
+        2: "2° BIMESTRE",
+        3: "3° BIMESTRE",
+        4: "4° BIMESTRE"
+    };
+    return bimestres[num] || "1° BIMESTRE";
+   };
+
+  const exportarExcel = (bimestreSeleccionado = 1) => {
+    // 1. OBTENCIÓN Y FILTRADO DE DATOS (Mantenido original)
+    const alumnosParaExportar = (typeof matriculados !== 'undefined' ? matriculados : (typeof alumnosOrdenados !== 'undefined' ? alumnosOrdenados : alumnos));
+    const alumnosValidos = alumnosParaExportar.filter(a => a && (a.nombre || a.nombres || a.apellido_paterno));
+  
     if (alumnosValidos.length === 0) return;
 
-    // 2. Definición de variables globales de la función (Evita ReferenceError)
-    const totalRegistros = alumnosValidos.length; 
-    
+    const numComp = competencias.length;
+    const colLogroIdx = 3 + (numComp * 5);
+
+    // 2. ESTILOS BASE
+    const borderThin = { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } };
+    const estiloBase = { font: { sz: 8 }, border: borderThin, alignment: { vertical: "center", horizontal: "center" } };
+    const estiloVerdeEncabezado = { ...estiloBase, font: { bold: true, color: { rgb: "FFFFFF" }, sz: 9 }, fill: { fgColor: { rgb: "00A859" } } };
+    const estiloNaranjaLogro = { ...estiloBase, font: { bold: true, sz: 8 }, fill: { fgColor: { rgb: "F4A300" } } };
+    const estiloTotalGris = { ...estiloBase, font: { bold: true, sz: 8 }, fill: { fgColor: { rgb: "D1D5DB" } } };
+
+    // Mapeo de colores para las notas (AD: Verde, A: Azul, B: Ámbar, C: Rojo)
+    const coloresCalificaciones = {
+        "AD": "00A859",
+        "A": "0000FF",
+        "B": "000000",
+        "C": "FF0000"
+    };
+
+    // 3. CÁLCULO DE ESTADÍSTICAS
     const nFinales = alumnosValidos.map(a => {
-        const nombreFull = (a.nombre || `${a.apellido_paterno} ${a.apellido_materno}, ${a.nombres}`).toUpperCase();
-        return calcularLogroBimestral(nombreFull);
+        const nombreFull = (a.nombre || `${a.apellido_paterno || ''} ${a.apellido_materno || ''}, ${a.nombres || ''}`).toUpperCase().trim();
+        const idBusqueda = dnis[nombreFull] || (typeof normalizarID !== 'undefined' ? normalizarID(nombreFull) : nombreFull);
+        return calcularLogroBimestral(idBusqueda);
     });
     
+    const totalRegistros = alumnosValidos.length;
     const stats = {
         AD: nFinales.filter(n => n === 'AD').length,
         A: nFinales.filter(n => n === 'A').length,
@@ -242,46 +270,38 @@ const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion
         C: nFinales.filter(n => n === 'C').length
     };
 
-    // 3. Configuración de Estilos (Definidos antes de su uso)
-    const borderThin = { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } };
-    const estiloBase = { font: { sz: 8 }, border: borderThin, alignment: { vertical: "center", horizontal: "center" } };
-    const estiloVerdeOscuro = { ...estiloBase, font: { bold: true, color: { rgb: "FFFFFF" }, sz: 8 }, fill: { fgColor: { rgb: "00A859" } }, alignment: { horizontal: "center", vertical: "center", wrapText: true } };
-    const estiloNaranjaLogro = { ...estiloBase, font: { bold: true, color: { rgb: "FFFFFF" }, sz: 8 }, fill: { fgColor: { rgb: "F4A300" } } };
-    const estiloAzulResumen = { ...estiloBase, font: { bold: true, color: { rgb: "FFFFFF" }, sz: 8 }, fill: { fgColor: { rgb: "64740B" } } };
-
     const rows = [];
-    const colLogroIdx = 3 + (competencias.length * 5); 
 
-    // Encabezados
-    rows.push([{ v: "REGISTRO AUXILIAR 2026", s: { font: { bold: true, sz: 14 }, alignment: { horizontal: "center" } } }]);
+    // --- ENCABEZADOS DINÁMICOS ---
+    const textoBimestre = obtenerTextoBimestre(bimestreSeleccionado);
+    rows.push([{ v: `REGISTRO AUXILIAR 2026 - ${textoBimestre}`, s: { font: { bold: true, sz: 14 }, alignment: { horizontal: "center" } } }]);
+    
     const filaInfo = Array(colLogroIdx + 6).fill({ v: "", s: {} });
     filaInfo[0] = { v: `ÁREA: ${area.toUpperCase()}`, s: { font: { bold: true, sz: 8 } } };
     filaInfo[8] = { v: `GRADO: ${grado}`, s: { font: { bold: true, sz: 8 } } };
-    const docenteFinal = nombreDocenteAsignado || (perfilUsuario?.nombre_completo || "").toUpperCase();
-    filaInfo[colLogroIdx - 4] = { v: `DOCENTE: ${docenteFinal}`, s: { font: { bold: true, sz: 8 } } };
+    
+    const docenteReal = (typeof nombreDocenteAsignado !== 'undefined' && nombreDocenteAsignado 
+                        ? nombreDocenteAsignado 
+                        : (perfilUsuario?.nombre_completo || "SIN ASIGNAR")).toUpperCase();
+    filaInfo[colLogroIdx - 4] = { v: `DOCENTE: ${docenteReal}`, s: { font: { bold: true, sz: 8 } } };
     rows.push(filaInfo);
     rows.push([]); 
 
-    const h1 = [{ v: "N°", s: estiloVerdeOscuro }, { v: "SEXO", s: estiloVerdeOscuro }, { v: "APELLIDOS Y NOMBRES", s: estiloVerdeOscuro }];
-    competencias.forEach(c => { 
-        h1.push({ v: c.toUpperCase(), s: estiloVerdeOscuro });
-        for(let i=0; i<4; i++) h1.push({ v: "", s: estiloVerdeOscuro }); 
-    });
-    h1.push({ v: "LOGRO", s: estiloNaranjaLogro }, { v: "", s: {} }, { v: "RESUMEN ESTADÍSTICO", s: estiloAzulResumen }, {v:"",s:estiloAzulResumen}, {v:"",s:estiloAzulResumen}, {v:"",s:estiloAzulResumen});
+    const h1 = [{ v: "N°", s: estiloVerdeEncabezado }, { v: "SEXO", s: estiloVerdeEncabezado }, { v: "APELLIDOS Y NOMBRES", s: estiloVerdeEncabezado }];
+    competencias.forEach(c => { h1.push({ v: c.toUpperCase(), s: estiloVerdeEncabezado }, "", "", "", ""); });
+    h1.push({ v: "LOGRO", s: estiloNaranjaLogro }, { v: "", s: {} }, { v: "RESUMEN ESTADÍSTICO", s: estiloVerdeEncabezado }, "", "", "");
     rows.push(h1);
 
-    const h2 = [{ v: "", s: estiloVerdeOscuro }, { v: "", s: estiloVerdeOscuro }, { v: "", s: estiloVerdeOscuro }];
-    competencias.forEach(() => ["D1", "D2", "D3", "D4", "PROM"].forEach(t => h2.push({ v: t, s: estiloVerdeOscuro })));
-    h2.push({ v: "", s: estiloNaranjaLogro }, { v: "", s: {} }, { v: "NIVELES", s: estiloAzulResumen }, { v: "NOTAS", s: estiloAzulResumen }, { v: "CANT.", s: estiloAzulResumen }, { v: "%", s: estiloAzulResumen });
+    const h2 = [{ v: "", s: estiloVerdeEncabezado }, { v: "", s: estiloVerdeEncabezado }, { v: "", s: estiloVerdeEncabezado }];
+    competencias.forEach(() => ["D1", "D2", "D3", "D4", "PROM"].forEach(t => h2.push({ v: t, s: estiloVerdeEncabezado })));
+    h2.push({ v: "", s: estiloNaranjaLogro }, { v: "", s: {} }, { v: "NIVELES", s: estiloVerdeEncabezado }, { v: "NOTAS", s: estiloVerdeEncabezado }, { v: "CANT.", s: estiloVerdeEncabezado }, { v: "%", s: estiloVerdeEncabezado });
     rows.push(h2);
 
-    // 4. Cuerpo del Excel sincronizado por DNI
+    // --- CUERPO ---
     alumnosValidos.forEach((alumno, idx) => {
-        const nombreFull = (alumno.nombre || `${alumno.apellido_paterno} ${alumno.apellido_materno}, ${alumno.nombres}`).toUpperCase().trim();
-        // Sincronización Híbrida: Priorizar DNI para buscar notas
-        const idEst = alumno.numero_dni || alumno.dni || normalizarID(nombreFull);
-        
-        const valSexo = (alumno.sexo || "-").toUpperCase();
+        const nombreFull = (alumno.nombre || `${alumno.apellido_paterno || ''} ${alumno.apellido_materno || ''}, ${alumno.nombres || ''}`).toUpperCase().trim();
+        const idBusqueda = dnis[nombreFull] || (typeof normalizarID !== 'undefined' ? normalizarID(nombreFull) : nombreFull);
+        const valSexo = (alumno.sexo || alumno.genero || (typeof generos !== 'undefined' ? generos[nombreFull] : "-") || "-").toUpperCase();
         const colorSexo = valSexo === 'M' ? "FF00FF" : (valSexo === 'H' ? "0000FF" : "000000");
 
         const row = [
@@ -290,79 +310,86 @@ const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion
             { v: nombreFull, s: { ...estiloBase, alignment: { horizontal: "left" } } }
         ];
 
-        // Notas de competencias
         competencias.forEach((_, cIdx) => {
             [1, 2, 3, 4].forEach(d => {
-                const val = notas[`${idEst}-${cIdx}-${d}`] || "-";
-                const colorNota = val === 'AD' ? "00B050" : val === 'A' ? "0070C0" : val === 'C' ? "FF0000" : "000000";
+                const val = notas[`${idBusqueda}-${cIdx}-${d}`] || "-";
+                const colorNota = coloresCalificaciones[val] || "000000";
                 row.push({ v: val, s: { ...estiloBase, font: { sz: 8, color: { rgb: colorNota } } } });
             });
-            const p = calcularPromedio(nombreFull, cIdx);
-            const colorProm = p === 'AD' ? "00B050" : p === 'A' ? "0070C0" : p === 'C' ? "FF0000" : "000000";
-            row.push({ v: p, s: { ...estiloBase, fill: { fgColor: { rgb: "DCFCE7" } }, font: { bold: true, sz: 8, color: { rgb: colorProm } } } });
+            const p = calcularPromedio(idBusqueda, cIdx);
+            const colorP = coloresCalificaciones[p] || "000000";
+            row.push({ v: p, s: { ...estiloBase, fill: { fgColor: { rgb: "DCFCE7" } }, font: { sz: 8, bold: true, color: { rgb: colorP } } } });
         });
 
-        const lf = calcularLogroBimestral(nombreFull);
-        row.push({ 
-            v: lf, 
-            s: { ...estiloBase, fill: { fgColor: { rgb: "FEF08A" } }, font: { bold: true, sz: 8, color: { rgb: lf === 'AD' ? "00B050" : lf === 'C' ? "FF0000" : "000000" } } }
-        });
+        const lf = nFinales[idx];
+        const colorLf = coloresCalificaciones[lf] || "000000";
+        row.push({ v: lf, s: { ...estiloBase, fill: { fgColor: { rgb: "FEF08A" } }, font: { sz: 8, bold: true, color: { rgb: colorLf } } } });
         row.push({ v: "", s: {} }); 
 
-        // 5. Resumen Estadístico (Corrección de totalRegistros y stats)
+        // --- RESUMEN ESTADÍSTICO CON MEJORA DE COLORES ---
+        const nivelesResumen = [
+            { l: "DESTACADO", n: "AD", c: "00FF00", f: "000000" },
+            { l: "LOGRADO",   n: "A",  c: "0000FF", f: "FFFFFF" },
+            { l: "EN PROCESO", n: "B",  c: "FFFF00", f: "000000" },
+            { l: "EN INICIO",  n: "C",  c: "FF0000", f: "FFFFFF" }
+        ];
+
         if (idx < 4) {
-            const items = [
-                { n: "DESTACADO", k: "AD", c: "00CC00" },
-                { n: "LOGRADO", k: "A", c: "2563EB" },
-                { n: "EN PROCESO", k: "B", c: "FFFF00" },
-                { n: "EN INICIO", k: "C", c: "FF0000" }
-            ];
-            const item = items[idx];
-            row.push(
-                { v: item.n, s: { ...estiloBase, fill: { fgColor: { rgb: item.c } }, font: { bold: true, color: { rgb: item.k === 'B' ? "000000" : "FFFFFF" } } } },
-                { v: item.k, s: { ...estiloBase, font: { bold: true } } },
-                { v: stats[item.k] || 0, s: estiloBase },
-                { v: `${totalRegistros > 0 ? (((stats[item.k] || 0) / totalRegistros) * 100).toFixed(0) : 0}%`, s: estiloBase }
-            );
+            const item = nivelesResumen[idx];
+            const cant = stats[item.n] || 0;
+            const porc = totalRegistros > 0 ? ((cant / totalRegistros) * 100).toFixed(0) : 0;
+            const colorLetraNota = coloresCalificaciones[item.n]; // Conecta el color dinámico
+
+            row.push({ v: item.l, s: { ...estiloBase, fill: { fgColor: { rgb: item.c } }, font: { bold: true, sz: 8, color: { rgb: item.f } }, alignment: { horizontal: "left" } } });
+            row.push({ v: item.n, s: { ...estiloBase, font: { bold: true, color: { rgb: colorLetraNota } } } }); // Mejora aplicada
+            row.push({ v: cant, s: estiloBase });
+            row.push({ v: `${porc}%`, s: estiloBase });
         } else if (idx === 4) {
-            const estiloTotal = { ...estiloBase, font: { bold: true }, fill: { fgColor: { rgb: "E0F2FE" } } };
-            row.push({ v: "TOTAL", s: estiloTotal }, { v: "", s: estiloTotal }, { v: totalRegistros, s: estiloTotal }, { v: "100%", s: estiloTotal });
+            row.push({ v: "TOTAL", s: estiloTotalGris }, { v: "", s: estiloTotalGris }, { v: totalRegistros, s: estiloTotalGris }, { v: "100%", s: estiloTotalGris });
         }
         rows.push(row);
-    });
+      });
 
-    const ws = XLSX.utils.aoa_to_sheet(rows);
+      const ws = XLSX.utils.aoa_to_sheet(rows);
      
-     // Merges y Alturas (Configuración estable)
-     ws['!merges'] = [
-         { s: { r: 0, c: 0 }, e: { r: 0, c: colLogroIdx + 5 } },
-         { s: { r: 1, c: 0 }, e: { r: 1, c: 5 } }, { s: { r: 1, c: 8 }, e: { r: 1, c: 13 } },
-         { s: { r: 1, c: colLogroIdx - 4 }, e: { r: 1, c: colLogroIdx + 1 } },
-         { s: { r: 3, c: 0 }, e: { r: 4, c: 0 } }, { s: { r: 3, c: 1 }, e: { r: 4, c: 1 } },
-         { s: { r: 3, c: 2 }, e: { r: 4, c: 2 } }, { s: { r: 3, c: colLogroIdx }, e: { r: 4, c: colLogroIdx } },
-         { s: { r: 3, c: colLogroIdx + 2 }, e: { r: 3, c: colLogroIdx + 5 } },
-         { s: { r: 9, c: colLogroIdx + 2 }, e: { r: 9, c: colLogroIdx + 3 } }
-     ];
+      // Merges y Alturas (Configuración estable)
+      // 4. MERGES ESTRATÉGICOS (PARA EVITAR DATOS OCULTOS)
+      ws['!merges'] = [
+          { s: { r: 0, c: 0 }, e: { r: 0, c: colLogroIdx + 5 } }, // Título Principal
+          { s: { r: 1, c: 0 }, e: { r: 1, c: 5 } },             // ÁREA (Visible)
+          { s: { r: 1, c: 8 }, e: { r: 1, c: 13 } },            // GRADO (Visible)
+          { s: { r: 1, c: colLogroIdx - 4 }, e: { r: 1, c: colLogroIdx + 2 } }, // DOCENTE (Visible)
+          { s: { r: 3, c: 0 }, e: { r: 4, c: 0 } },             // N°
+          { s: { r: 3, c: 1 }, e: { r: 4, c: 1 } },             // SEXO
+          { s: { r: 3, c: 2 }, e: { r: 4, c: 2 } },             // APELLIDOS Y NOMBRES
+          { s: { r: 3, c: colLogroIdx }, e: { r: 4, c: colLogroIdx } }, // LOGRO FINAL (Vertical Única)
+          { s: { r: 3, c: colLogroIdx + 2 }, e: { r: 3, c: colLogroIdx + 5 } } // RESUMEN ESTADÍSTICO (Título)
+      ];
  
      let currCol = 3;
-     competencias.forEach(() => {
-         ws['!merges'].push({ s: { r: 3, c: currCol }, e: { r: 3, c: currCol + 4 } });
-         currCol += 5;
-     });
- 
-     ws['!cols'] = [{ wch: 4 }, { wch: 4 }, { wch: 32 }, ...Array(competencias.length * 5).fill({ wch: 4 }), { wch: 6 }, { wch: 2 }, { wch: 15 }, { wch: 5 }, { wch: 5 }, { wch: 5 }];
- 
-     ws['!rows'] = [];
-     ws['!rows'][0] = { hpt: 30 }; 
-     ws['!rows'][3] = { hpt: 28 }; 
-     ws['!rows'][4] = { hpt: 22 }; 
- 
-     const wb = XLSX.utils.book_new();
-     XLSX.utils.book_append_sheet(wb, ws, "REGISTRO");
-     XLSX.writeFile(wb, `Registro_Auxiliar_2026_${''}_${''}.xlsx`);
+         competencias.forEach(() => {
+             ws['!merges'].push({ s: { r: 3, c: currCol }, e: { r: 3, c: currCol + 4 } });
+             currCol += 5;
+         });
+     
+         ws['!cols'] = [{ wch: 4 }, { wch: 4 }, { wch: 32 }, ...Array(competencias.length * 5).fill({ wch: 4 }), { wch: 6 }, { wch: 2 }, { wch: 15 }, { wch: 5 }, { wch: 5 }, { wch: 5 }];
+     
+         ws['!rows'] = [];
+         ws['!rows'][0] = { hpt: 30 }; 
+         ws['!rows'][3] = { hpt: 28 }; 
+         ws['!rows'][4] = { hpt: 22 }; 
+
+         // Configuración de MERGES para el TOTAL
+        if (!ws['!merges']) ws['!merges'] = [];
+        const filaResumenTotal = 5 + 4; // Fila del cuerpo donde está el total
+        ws['!merges'].push({ s: { r: filaResumenTotal, c: colLogroIdx + 2 }, e: { r: filaResumenTotal, c: colLogroIdx + 3 } });
+     
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "REGISTRO");
+    XLSX.writeFile(wb, `Registro_Auxiliar_2026_${''}_${''}.xlsx`);
    };
  
-   const handleGuardarTodo = async () => {
+  const handleGuardarTodo = async () => {
   if (!grado || !area || !bimestre || loading) return;
   setLoading(true);
 
@@ -378,26 +405,28 @@ const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion
     const batchCalificaciones = [];
     const alumnosOmitidos = [];
 
-    // 1. PREPARACIÓN DE DATOS (Lógica de DNI)
+    // 1. PREPARACIÓN DE DATOS (Mapeo de notas y DNI)
     alumnos.forEach((nombre) => {
       const nombreKey = (nombre || "").toUpperCase().trim();
       const dni = dnis[nombreKey];
+      const gen = generos[nombreKey] || null;
 
       if (!dni) {
         alumnosOmitidos.push({ nombre: nombreKey, razon: "DNI no vinculado" });
         return;
       }
 
-      const obtenerNotasPorComp = (compIdx) => {
-        return [1, 2, 3, 4]
+      const obtenerUltimaNota = (compIdx) => {
+        const notasValidas = [1, 2, 3, 4]
           .map(d => notas[`${dni}-${compIdx}-${d}`])
           .filter(n => n && n !== '-' && n !== '');
+        return notasValidas.length > 0 ? notasValidas[notasValidas.length - 1] : '-';
       };
 
-      const p1 = obtenerNotasPorComp(0).pop() || '-';
-      const p2 = obtenerNotasPorComp(1).pop() || '-';
-      const p3 = obtenerNotasPorComp(2).pop() || '-';
-      const p4 = obtenerNotasPorComp(3).pop() || '-';
+      const p1 = obtenerUltimaNota(0);
+      const p2 = obtenerUltimaNota(1);
+      const p3 = obtenerUltimaNota(2);
+      const p4 = obtenerUltimaNota(3);
 
       const logroFinal = calcularLogroBimestral(dni);
 
@@ -406,131 +435,124 @@ const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion
         return;
       }
 
-      const registro = {
+      const desempenos = {};
+      for (let c = 1; c <= 4; c++) {
+        for (let d = 1; d <= 4; d++) {
+          const valor = notas[`${dni}-${c - 1}-${d}`];
+          desempenos[`c${c}_d${d}`] = (valor === '-' || !valor) ? null : valor;
+        }
+      }
+
+      batchCalificaciones.push({
         dni_estudiante: dni,
         nombre_estudiante: nombreKey,
         grado: numGrado,
         seccion: seccionFinal,
         area: areaNormalizada,
         bimestre: bimestreInt,
+        genero: gen,
+        ...desempenos,
         promedio_c1: p1,
         promedio_c2: p2,
         promedio_c3: p3,
         promedio_c4: p4,
         logro_bimestral: logroFinal,
         correo_electronico: correoResponsable
-      };
-
-      for (let c = 1; c <= 4; c++) {
-        for (let d = 1; d <= 4; d++) {
-          const val = notas[`${dni}-${c - 1}-${d}`];
-          registro[`c${c}_d${d}`] = (val && val !== '-') ? val.toUpperCase() : null;
-        }
-      }
-      batchCalificaciones.push(registro);
+      });
     });
 
-  // 2. MODAL DE CONFIRMACIÓN PROFESIONAL
-  const result = await Swal.fire({
-  title: '<span style="color:#1e293b; font-weight:800; font-size:22px;">CONFIRMAR REGISTRO</span>',
-  html: `
-    <div style="text-align: left; font-size: 14px; color: #475569; padding: 0 10px;">
-      <p style="margin-bottom: 15px;">Se enviará la información oficial de <b>${areaNormalizada}</b> al servidor central.</p>
-      
-      <div style="background: #f1f5f9; padding: 20px; border-radius: 24px; border: 1px solid #e2e8f0; margin-bottom: 10px;">
-        <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
-          <span style="font-weight: 500;">✅ Estudiantes listos:</span>
-          <span style="font-weight: 800; color: #10b981; background: #d1fae5; padding: 4px 15px; border-radius: 50px;">${batchCalificaciones.length}</span>
-        </div>
-        <div style="display: flex; justify-content: space-between;">
-             <span style="font-weight: 500;">⚠️ Registros omitidos:</span>
-            <span style="font-weight: 800; color: #f43f5e; background: #fee2e2; padding: 4px 15px; border-radius: 50px;">${alumnosOmitidos.length}</span>
-           </div>
-         </div>
-      
-        <p style="font-size: 11px; color: #94a3b8; text-align: center; margin-top: 15px;">
-          Responsable de envío: <br/> <b>${correoResponsable}</b>
-        </p>
-      </div>
-     `,
-     icon: 'question',
-     iconColor: '#0f172a',
-     showCancelButton: true,
-     confirmButtonColor: '#0f172a',
-     cancelButtonColor: '#0cad07',
-     confirmButtonText: 'SÍ, GUARDAR AHORA',
-     cancelButtonText: 'REVISAR',
-     reverseButtons: true,
-  
-     // --- CONFIGURACIÓN DE REDONDEO CRÍTICA ---
-     background: '#ffffff',
-     borderRadius: '60px', // REDONDEO DEL CUADRO PRINCIPAL
-  
-    customClass: {
-       popup: 'shadow-xl',
-       confirmButton: 'boton-redondeado',
-       cancelButton: 'boton-redondeado'
-     },
-  
-    // Inyectamos CSS directamente para asegurar que los botones sean pastillas
-    didOpen: () => {
-      const confirmBtn = Swal.getConfirmButton();
-      const cancelBtn = Swal.getCancelButton();
-    
-    // Forzamos el estilo de los botones
-    if (confirmBtn) {
-      confirmBtn.style.borderRadius = '50px';
-      confirmBtn.style.padding = '12px 30px';
-      confirmBtn.style.fontSize = '14px';
-      confirmBtn.style.fontWeight = 'bold';
-      confirmBtn.style.textTransform = 'uppercase';
+    if (batchCalificaciones.length === 0) {
+      Swal.fire({ icon: 'info', title: 'SIN DATOS', text: 'No hay calificaciones válidas para guardar.' });
+      setLoading(false);
+      return;
     }
-    if (cancelBtn) {
-      cancelBtn.style.borderRadius = '50px';
-      cancelBtn.style.padding = '12px 30px';
-      cancelBtn.style.fontSize = '14px';
-      cancelBtn.style.fontWeight = 'bold';
-      cancelBtn.style.textTransform = 'uppercase';
-     }
-    }
-   });
 
-    // 3. ENVÍO A SUPABASE
-    const { data, error } = await supabase
-      .from('calificaciones')
-      .upsert(batchCalificaciones, { onConflict: 'dni_estudiante,area,bimestre' })
-      .select();
-
-    if (error) throw error;
-
-    // 4. MODAL DE ÉXITO DE IMPACTO
-    Swal.fire({
-     icon: 'success',
-     title: '<span style="color:#10b981; font-weight:800">¡SINCRO EXITOSA!</span>',
-     text: `Se actualizaron ${data.length} registros en la nube.`,
-     timer: 2000,
-     showConfirmButton: false,
-     timerProgressBar: true,
-     customClass: {
-        popup: 'rounded-3xl' // Mantenemos la coherencia en el éxito
-      }
+    // 2. MODAL DE CONFIRMACIÓN
+    const result = await Swal.fire({
+      title: '<span style="color:#1e293b; font-weight:800; font-size:22px;">CONFIRMAR REGISTRO</span>',
+      html: `
+        <div style="text-align: left; font-size: 14px; color: #475569; padding: 0 10px;">
+          <p style="margin-bottom: 15px;">Se enviará la información oficial de <b>${areaNormalizada}</b> al servidor central.</p>
+          <div style="background: #f1f5f9; padding: 20px; border-radius: 24px; border: 1px solid #e2e8f0; margin-bottom: 10px;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+              <span style="font-weight: 500;">✅ Estudiantes listos:</span>
+              <span style="font-weight: 800; color: #10b981; background: #d1fae5; padding: 4px 15px; border-radius: 50px;">${batchCalificaciones.length}</span>
+            </div>
+            <div style="display: flex; justify-content: space-between;">
+              <span style="font-weight: 500;">⚠️ Registros omitidos:</span>
+              <span style="font-weight: 800; color: #f43f5e; background: #fee2e2; padding: 4px 15px; border-radius: 50px;">${alumnosOmitidos.length}</span>
+            </div>
+          </div>
+          <p style="font-size: 11px; color: #94a3b8; text-align: center; margin-top: 15px;">
+            Responsable de envío: <br/> <b>${correoResponsable}</b>
+          </p>
+        </div>`,
+      icon: 'question',
+      iconColor: '#0f172a',
+      showCancelButton: true,
+      confirmButtonColor: '#0f172a',
+      cancelButtonColor: '#0cad07',
+      confirmButtonText: 'SÍ, GUARDAR AHORA',
+      cancelButtonText: 'REVISAR',
+      reverseButtons: true,
+      background: '#ffffff',
+      borderRadius: '30px'
     });
 
-    if (typeof setShowConfirm === 'function') setShowConfirm(false);
+    if (result.isConfirmed) {
+      // 3. ENVÍO A TABLA PRINCIPAL
+      const { data, error } = await supabase
+        .from('calificaciones')
+        .upsert(batchCalificaciones, { onConflict: 'dni_estudiante,area,bimestre' })
+        .select();
+
+      if (error) throw error;
+
+      // 4. GENERACIÓN DE BACKUP HISTÓRICO
+      const nombreParaBackup = (typeof nombreDocenteAsignado !== 'undefined' && nombreDocenteAsignado) 
+    ? nombreDocenteAsignado 
+    : (perfilUsuario?.nombre_completo || user?.email || "DOCENTE NO IDENTIFICADO");
+
+    // 2. Ejecución del Backup con datos forzados
+    const { error: errorBackup } = await supabase
+        .from('registro_backups')
+        .insert([{
+           docente_id: user?.id,
+           nombre_docente: nombreParaBackup.toUpperCase(), // Asegura que no llegue EMPTY
+           grado: grado || "SIN GRADO",
+           area: areaNormalizada || "SIN AREA",
+           bimestre: `${bimestreInt}° BIMESTRE`,
+           datos_notas: notas, // El JSON que contiene el "fiel reflejo"
+           // ENVIAMOS LA HORA EXACTA DE TU PC
+           fecha_registro_lima: new Date().toISOString(),
+           metadatos: {
+               correo: correoResponsable,
+               version: "2.0-LIMA"
+          }
+       }]);
+
+      if (errorBackup) console.warn("Backup fallido:", errorBackup.message);
+
+      // 5. ÉXITO FINAL
+      Swal.fire({
+        icon: 'success',
+        title: '<span style="color:#10b981; font-weight:800">¡SINCRO EXITOSA!</span>',
+        text: `Se actualizaron ${data.length} registros y se generó un respaldo en la nube.`,
+        timer: 2500,
+        showConfirmButton: false,
+        timerProgressBar: true
+      });
+
+      if (typeof setShowConfirm === 'function') setShowConfirm(false);
+    }
 
    } catch (error) {
      console.error("Error crítico:", error);
-     Swal.fire({
-       icon: 'error',
-       title: 'ERROR DE CARGA',
-       text: error.message,
-       confirmButtonColor: '#f43f5e'
-    });
-  } finally {
-    setLoading(false);
-    setTimeout(() => setMensaje(null), 5000);
-  }
-  };
+     Swal.fire({ icon: 'error', title: 'ERROR DE CARGA', text: error.message, confirmButtonColor: '#f43f5e' });
+   } finally {
+     setLoading(false);
+   }
+   };
         
   const getColorNota = (nota) => {
     if (nota === 'C') return 'text-red-600';
@@ -613,16 +635,16 @@ const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion
      {!esEstudiante && (
       <>
         <button 
-          onClick={exportarExcel} 
-           className="bg-gray-900 hover:bg-green-600 text-white px-4 py-2.5 rounded-xl text-[10px] font-black flex items-center justify-center gap-2 transition-all active:scale-95 shadow-lg shadow-green-100 flex-1 sm:flex-none"
-            >
-          <Download className="w-4 h-4" /> 
+         onClick={() => exportarExcel(bimestre)} 
+         className="bg-green-600 hover:bg-green-600 text-white px-4 py-2.5 rounded-xl text-[10px] font-black flex items-center justify-center gap-2 transition-all active:scale-95 shadow-lg shadow-green-100 flex-1 sm:flex-none"
+          >
+        <Download className="w-4 h-4" /> 
         <span className="inline">EXCEL</span>
       </button>
       <button 
          onClick={() => setShowConfirm(true)} 
           disabled={loading} 
-           className="bg-gray-900 hover:bg-slate-800 text-white px-7 py-4 rounded-xl text-[10px] font-black flex items-center justify-center gap-2 transition-all active:scale-95 shadow-xl shadow-slate-200 disabled:bg-slate-400 flex-1 sm:flex-none"
+           className="bg-pink-700 hover:bg-slate-800 text-white px-7 py-4 rounded-xl text-[10px] font-black flex items-center justify-center gap-2 transition-all active:scale-95 shadow-xl shadow-slate-200 disabled:bg-slate-400 flex-1 sm:flex-none"
             >
             {loading ? <Loader2 className="w-2 h-2 animate-spin" /> : <Save className="w-4 h-4 text-green-100" />} 
             <span>GUARDAR</span>

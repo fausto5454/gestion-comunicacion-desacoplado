@@ -73,7 +73,7 @@ const Sidebar = ({ rol_id, userName, userEmail, setCurrentView, currentView, isS
     return (
         <div className={`flex flex-col h-full bg-gray-900 text-white w-70 fixed md:relative z-40 shadow-2xl transition-transform duration-300 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
             {/* Header */}
-            <div className="p-5 flex items-center justify-between border-b-2 border-green-500 border-gl">
+            <div className="p-5 flex items-center justify-between border-b-2 border-gray-400 border-gl">
                 <div className="flex items-center justify-center w-full">
                  <img 
                    src="/sigescom.png" 

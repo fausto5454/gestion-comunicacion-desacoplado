@@ -26,7 +26,7 @@ const DashboardPage = ({ session }) => {
     });
 
     const aulas = ['1° A', '1° B', '1° C', '2° A', '2° B', '2° C', '3° A', '3° B', '4° A', '4° B', '5° A', '5° B'];
-    const areas = ['MATEMÁTICA', 'COMUNICACIÓN', 'CIENCIA Y TECNOLOGÍA', 'DPCC', 'PERSONAL SOCIAL', 'EPT', 'RELIGIÓN', 'INGLÉS', 'ARTE Y CULTURA', 'EDUCACIÓN FÍSICA'];
+    const areas = ['MATEMÁTICA', 'COMUNICACIÓN', 'CIENCIA Y TECNOLOGÍA', 'DPCC', 'CIENCIAS SOCIALES', 'EPT', 'RELIGIÓN', 'INGLÉS', 'ARTE Y CULTURA', 'EDUCACIÓN FÍSICA'];
 
     useEffect(() => {
         // Validación de seguridad para evitar llamadas sin sesión

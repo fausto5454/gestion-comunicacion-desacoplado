@@ -16,7 +16,7 @@ const areasConfig = {
   "MATEMÁTICA": ["RESUELVE PROBLEMAS DE CANTIDAD", "RESUELVE PROBLEMAS DE REGULARIDAD", "FORMA Y MOVIMIENTO", "GESTIÓN DE DATOS"],
   "COMUNICACIÓN": ["SE COMUNICA ORALMENTE", "LEE TEXTOS ESCRITOS", "ESCRIBE TEXTOS"],
   "CIENCIA Y TECNOLOGÍA": ["INDAGA MEDIANTE MÉTODOS", "EXPLICA EL MUNDO FÍSICO", "DISEÑA SOLUCIONES"],
-  "PERSONAL SOCIAL": ["CONSTRUYE SU IDENTIDAD", "CONVIVE Y PARTICIPA", "CONSTRUYE INTERPRETACIONES HISTÓRICAS"],
+  "CIENCIAS SOCIALES": ["CONSTRUYE INTERPRETACIONES HISTÓRICAS", "GESTIONA RESPONSABLEMENTE EL ESPACIO Y EL AMBIENTE", "GESTIONA RESPONSABLEMENTE LOS RECURSOS ECONÓMICOS"],
   "DPCC": ["CONSTRUYE SU IDENTIDAD", "CONVIVE Y PARTICIPA DEMOCRÁTICAMENTE"],
   "ARTE Y CULTURA": ["APRECIA MANIFESTACIONES", "CREA PROYECTOS"],
   "EDUCACION FÍSICA": ["SE DESENVUELVE DE MANERA AUTÓNOMA", "ASUME UNA VIDA SALUDABLE"],
@@ -83,11 +83,11 @@ const AsistenciaAlumnos = ({ perfilUsuario, session }) => {
   // --- LÓGICA DE RECUPERACIÓN (Sin cambios en tu lógica funcional) ---
   const fetchAsistenciaExistente = async (nomina, init) => {
     try {
-      const idsMatricula = nomina.map(n => n.id_matricula);
+      const dnis = nomina.map(n => n.dni_estudiante);
       const { data, error } = await supabase
         .from('asistencia')
-        .select('id_estudiante, estado')
-        .in('id_estudiante', idsMatricula)
+        .select('dni_estudiante, estado')
+        .in('dni_estudiante', dnis)
         .eq('fecha', fecha)
         .eq('observaciones', areaSeleccionada);
 
@@ -96,7 +96,7 @@ const AsistenciaAlumnos = ({ perfilUsuario, session }) => {
       if (data && data.length > 0) {
         const guardada = { ...init };
         data.forEach(reg => {
-          guardada[reg.id_estudiante] = reg.estado;
+          guardada[reg.dni_estudiante] = reg.estado;
         });
         setAsistencia(guardada);
       } else {
@@ -120,7 +120,7 @@ const AsistenciaAlumnos = ({ perfilUsuario, session }) => {
 
         let query = supabase
             .from('matriculas')
-            .select('id_matricula, apellido_paterno, apellido_materno, nombres, genero')
+            .select('id_matricula, dni_estudiante, apellido_paterno, apellido_materno, nombres, genero')
             .eq('grado', gradoQuery)
             .eq('seccion', seccionQuery)
             .eq('anio_lectivo', 2026)
@@ -135,7 +135,7 @@ const AsistenciaAlumnos = ({ perfilUsuario, session }) => {
         if (data && data.length > 0) {
             setEstudiantes(data); // Esto llena la lista blanca
             const init = {};
-            data.forEach(est => init[est.id_matricula] = 'Presente');
+            data.forEach(est => init[est.dni_estudiante] = 'Presente');
             await fetchAsistenciaExistente(data, init);
         } else {
             setEstudiantes([]);
@@ -257,7 +257,7 @@ const AsistenciaAlumnos = ({ perfilUsuario, session }) => {
 
   // --- 4. DATOS DE ESTUDIANTES ---
   estudiantes.forEach((est, i) => {
-    const estadoActual = asistencia[est.id_matricula] || 'Presente';
+    const estadoActual = asistencia[est.dni_estudiante] || 'Presente';
     const row = worksheet.addRow([
       null,
       i + 1,
@@ -315,7 +315,7 @@ const AsistenciaAlumnos = ({ perfilUsuario, session }) => {
   const presentes = Object.values(asistencia).filter(v => v === 'Presente').length;
   const ausentes = Object.values(asistencia).filter(v => v === 'Ausente').length;
   const tardanzas = Object.values(asistencia).filter(v => v === 'Tardanza').length;
-  const justificado = Object.values(asistencia).filter(v => v === 'justificado').length;
+  const justificado = Object.values(asistencia).filter(v => v === 'Justificado').length;
 
   // --- CABECERA ESTILO EXCEL ---
   doc.setFont("helvetica", "bold");
@@ -428,48 +428,68 @@ const AsistenciaAlumnos = ({ perfilUsuario, session }) => {
       return;
     }
 
-    // MEJORA: Verificar si ya existen registros para preguntar antes de sobrescribir
-    const { data: existente } = await supabase
-      .from('asistencia')
-      .select('id_asistencia')
-      .eq('fecha', fecha)
-      .limit(1);
+      const gradoFmt = `${grado.toString().replace('°', '')}°`;
+      const seccionFmt = seccion.trim().toUpperCase();
+
+      const { data: existente } = await supabase
+         .from('asistencia')
+         .select('id_asistencia')
+         .eq('fecha', fecha)
+         .eq('observaciones', areaSeleccionada)
+         .eq('grado', gradoFmt)
+         .eq('seccion', seccionFmt)
+         .limit(1);
 
     if (existente && existente.length > 0) {
       const confirmar = window.confirm("Ya existe asistencia para este día. ¿Deseas actualizar los registros?");
       if (!confirmar) return; // Si cancela, salimos de la función
     }
 
-    // Preparación de registros
-    const records = estudiantes.map(est => ({
-      id_estudiante: est.id_matricula, 
-      fecha: fecha,
-      estado: asistencia[est.id_matricula] || 'Presente', 
-      id_auxiliar: user.id, 
-      observaciones: areaSeleccionada // O la columna 'area' según tu tabla
-    }));
+   const records = estudiantes.map(est => {
+   // Verificamos que el DNI exista para evitar registros nulos
+   const dniValido = est.dni_estudiante || est.id_estudiante;
+  
+   if (!dniValido) {
+     console.error("Estudiante sin DNI detectado:", est);
+   }
 
-    // Upsert con restricción de conflicto
-    const { error } = await supabase
-      .from('asistencia')
-      .upsert(records, { 
-      onConflict: 'id_estudiante, fecha' // Esta línea evita el desorden de 40 alumnos en 2 días
+   return {
+        // Columnas obligatorias según tus capturas de Supabase
+        dni_estudiante: String(dniValido).trim(),
+        id_estudiante: String(dniValido).trim(), // Duplicamos por seguridad si tu DB usa ambos
+        fecha: fecha, // 'YYYY-MM-DD'
+        estado: asistencia[dniValido] || 'Presente',
+        observaciones: areaSeleccionada.toUpperCase().trim(), // 'MATEMÁTICA'
+    
+        // Estos campos estaban llegando NULL, ahora los forzamos:
+         grado: `${grado.toString().replace('°', '')}°`, // Asegura el formato '1°'
+         seccion: seccion.trim().toUpperCase(),          // Asegura el formato 'A'
+         id_auxiliar: perfilUsuario?.id_usuario || null
+      };
+     }).filter(r => r.dni_estudiante !== "undefined"); // Filtramos errores
+
+     console.log("📤 Datos listos para enviar a Supabase:", records);
+
+    // Ejecutamos el guardado
+    const { data, error } = await supabase
+        .from('asistencia')
+        .upsert(records, { 
+        onConflict: 'dni_estudiante, fecha, observaciones' 
      });
-
+    
     if (error) throw error;
-    toast.success("¡Asistencia guardada correctamente!");
-  } catch (err) {
-    console.error("Error capturado:", err);
-    // Manejo específico del error de Foreign Key visto en consola
-    if (err.code === '23503') {
-       toast.error("Error: Algunos IDs de estudiantes no coinciden con la matrícula.");
-    } else {
-       toast.error("Error al guardar en la base de datos");
+    
+     alert("¡Asistencia guardada correctamente!");
+   } catch (error) {
+     console.error("Error capturado al guardar:", error);
+     alert("Error al guardar: " + error.message);
+   } finally {
+      setTimeout(() => {
+      setIsSaving(false);
+      console.log("Botón desbloqueado");
+      }, 500); 
     }
-  } finally {
-    setIsSaving(false);
-  }
- };
+  };
 
    return (
     <div className="bg-white rounded-[1.5rem] md:rounded-[2rem] shadow-2xl border border-gray-100 overflow-hidden">
@@ -560,7 +580,7 @@ const AsistenciaAlumnos = ({ perfilUsuario, session }) => {
             </thead>
             <tbody className="divide-y divide-gray-300">
            {estudiantes.map((est, index) => (
-            <tr key={est.id_matricula} className="hover:bg-slate-50 transition-colors">
+            <tr key={est.dni_estudiante} className="hover:bg-slate-50 transition-colors">
               <td className="border border-gray-300 px-3 py-1.5 text-center text-[11px] font-bold text-slate-500 bg-emerald-100/60">
                 {index + 1}
               </td>
@@ -576,24 +596,27 @@ const AsistenciaAlumnos = ({ perfilUsuario, session }) => {
                     const isActive = asistencia[est.id_matricula] === valorReal;
   
                     const activeStyle = {
-                      'P': 'text-slate-400 border-slate-200 bg-slate-50', 
+                      'P': 'text-slate-500 border-slate-200 bg-slate-50', 
                       'A': 'text-red-400 border-red-200 bg-red-50',     
                       'T': 'text-amber-400 border-amber-200 bg-amber-50', 
                       'J': 'text-green-400 border-green-200 bg-green-50'  
                     };
                     return (
-                      <button
-                        key={letra}
-                        onClick={() => setAsistencia(p => ({ ...p, [est.id_matricula]: valorReal }))}
-                        className={`w-7 h-7 md:w-8 md:h-8 rounded-md text-[11px] font-black transition-all duration-200 border
-                          ${isActive
-                            ? `${activeStyle[letra]} shadow-sm scale-110 z-10`
-                            : 'bg-white border-transparent text-gray-300 hover:text-gray-400'
-                           }`}
-                           >
-                        {letra}
-                      </button>
-                    );
+                     <button
+                      key={letra}
+                       onClick={() => {
+                       console.log("Cambiando DNI:", est.dni_estudiante, "a:", valorReal);
+                       setAsistencia(p => ({ ...p, [est.dni_estudiante]: valorReal }));
+                       }}
+                       className={`w-7 h-7 md:w-8 md:h-8 rounded-md text-[11px] font-black transition-all duration-200 border
+                       ${asistencia[est.dni_estudiante] === valorReal
+                       ? `${activeStyle[letra]} shadow-sm scale-110 z-10`
+                      : 'bg-white border-transparent text-gray-300 hover:text-gray-400'
+                      }`}
+                      >
+                      {letra}
+                     </button>
+                     );
                   })}
                 </div>
               </td>

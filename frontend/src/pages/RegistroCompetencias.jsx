@@ -8,7 +8,7 @@ const areasConfig = {
     "MATEMÁTICA": ["RESUELVE PROBLEMAS DE CANTIDAD", "RESUELVE PROBLEMAS DE REGULARIDAD", "FORMA Y MOVIMIENTO", "GESTIÓN DE DATOS"],
     "COMUNICACIÓN": ["SE COMUNICA ORALMENTE", "LEE TEXTOS ESCRITOS", "ESCRIBE TEXTOS"],
     "CIENCIA Y TECNOLOGÍA": ["INDAGA MEDIANTE MÉTODOS", "EXPLICA EL MUNDO FÍSICO", "DISEÑA SOLUCIONES"],
-    "PERSONAL SOCIAL": ["CONSTRUYE SU IDENTIDAD", "CONVIVE Y PARTICIPA", "CONSTRUYE INTERPRETACIONES HISTÓRICAS", "GESTIONA EL ESPACIO", "GESTIONA RECURSOS ECONÓMICOS"],
+    "CIENCIAS SOCIALES": ["CONSTRUYE INTERPRETACIONES HISTÓRICAS", "GESTIONA RESPONSABLEMENTE EL ESPACIO Y EL AMBIENTE", "GESTIONA RESPONSABLEMENTE LOS RECURSOS ECONÓMICOS"],
     "DPCC": ["CONSTRUYE SU IDENTIDAD", "CONVIVE Y PARTICIPA DEMOCRÁTICAMENTE"],
     "ARTE Y CULTURA": ["APRECIA MANIFESTACIONES", "CREA PROYECTOS DESDE LENGUAJES"],
     "EDUCACION FÍSICA": ["SE DESENVUELVE DE MANERA AUTÓNOMA", "ASUME UNA VIDA SALUDABLE", "INTERACTÚA A TRAVÉS DE HABILIDADES"],
@@ -35,6 +35,8 @@ const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion
   const [conclusiones, setConclusiones] = useState({});
   const [asistenciaReferencia, setAsistenciaReferencia] = useState({});
   const [dnis, setDnis] = useState({});
+  const [filtroEstado, setFiltroEstado] = useState('Todos');
+  const [estadosAlumnos, setEstadosAlumnos] = useState({});
  
   const competencias = areasConfig[area] || [];
   const rolActual = Number(perfilUsuario?.rol_id || session?.user?.user_metadata?.rol_id);
@@ -83,28 +85,26 @@ const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion
         }
     }, [opcionesPermitidas.grados]);
 
-   const cargarDatos = useCallback(async () => {
-   if (!grado || !area || !bimestre || !perfilUsuario?.id_usuario) return;
+  const cargarDatos = useCallback(async () => {
+  if (!grado || !area || !bimestre || !perfilUsuario?.id_usuario) return;
 
-   setLoading(true);
-   try {
+  setLoading(true);
+  try {
     const partes = grado.split(" ");
     const gradoDB = partes[0].trim();
     const seccionDB = partes[1]?.trim() || "A";
-    const areaLimpia = area.toUpperCase().trim();
-
+    
     // --- PASO A: OBTENCIÓN DIRECTA DEL DNI ---
-    // Eliminamos el rescate por nombre; usamos el DNI que viene del perfil/login
     let dniFinal = perfilUsuario?.dni || perfilUsuario?.dni_estudiante;
 
-    // --- PASO B: CARGAR MATRICULADOS (Sincronización de Género y DNI) ---
+    // --- PASO B: CARGAR MATRICULADOS (Sincronización de Género, DNI y ESTADO) ---
+    // INTEGRACIÓN: Se añade 'estado_estudiante' a la selección para evitar el ReferenceError
     let queryMat = supabase
       .from('matriculas')
-      .select('dni_estudiante, apellido_paterno, apellido_materno, nombres, genero')
+      .select('dni_estudiante, apellido_paterno, apellido_materno, nombres, genero, estado_estudiante')
       .eq('grado', gradoDB)
       .eq('seccion', seccionDB);
 
-    // Si es estudiante, filtramos la tabla de matrículas SOLO por su DNI real
     if (esEstudiante && dniFinal) {
       queryMat = queryMat.eq('dni_estudiante', dniFinal);
     } else {
@@ -114,26 +114,31 @@ const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion
     const { data: matriculados, error: matError } = await queryMat;
     if (matError) throw matError;
 
-    // Sincronizamos la lista de alumnos y sus géneros
+    // Sincronizamos la lista de alumnos, géneros y estados
     const listaAlumnosFinal = [];
     const mapaDnis = {};
-    const mapaGeneros = {}; // Para llenar la columna "SEXO" automáticamente
+    const mapaGeneros = {}; 
+    const mapaEstados = {}; // <--- NUEVO: Objeto para almacenar la situación académica
 
     matriculados?.forEach(m => {
       const nombreFull = `${m.apellido_paterno} ${m.apellido_materno}, ${m.nombres}`.toUpperCase().trim();
-      // Usamos el DNI como ID interno para evitar errores de nombres
+      const dniKey = String(m.dni_estudiante).trim();
+
       listaAlumnosFinal.push(nombreFull);
-      mapaDnis[nombreFull] = m.dni_estudiante;
-      mapaGeneros[nombreFull] = m.genero; // Aquí se guarda "H" o "M"
+      mapaDnis[nombreFull] = dniKey;
+      mapaGeneros[nombreFull] = m.genero; 
+      
+      // Mapeamos el estado usando el DNI como llave (coincide con tu lógica del JSX)
+      mapaEstados[dniKey] = m.estado_estudiante || 'Activo'; 
     });
 
+    // Actualización de estados de React
     setAlumnos(listaAlumnosFinal);
     setDnis(mapaDnis);
     setGeneros(mapaGeneros);
+    setEstadosAlumnos(mapaEstados); // <--- CORRECCIÓN: Define la variable que faltaba en la consola
 
     if (matriculados?.length > 0) {
-      const dnisGrupo = matriculados.map(m => m.dni_estudiante);
-      const bimestreQuery = parseInt(bimestre);
       const areaQuery = area.normalize("NFC").toUpperCase().trim(); 
 
       const { data: califData, error } = await supabase
@@ -142,35 +147,27 @@ const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion
           .eq('area', areaQuery)
           .eq('bimestre', parseInt(bimestre));
 
-      if (!califData || califData.length === 0) {
-      const { data: debugData } = await supabase
-          .from('calificaciones')
-          .select('area')
-          .limit(1);
-          console.log("Área detectada en BD es exactamente:", debugData?.[0]?.area);
-      }
+      const nuevasNotas = {};
 
-     const nuevasNotas = {};
-
-     if (califData && califData.length > 0) {
+      if (califData && califData.length > 0) {
         matriculados.forEach(m => {
-        const dniBusqueda = String(m.dni_estudiante).trim();
-
-       const reg = califData.find(r => String(r.dni_estudiante).trim() === dniBusqueda);
-        if (reg) {
-          for (let c = 1; c <= 4; c++) {
-            for (let d = 1; d <= 4; d++) {
-              const val = reg[`c${c}_d${d}`];
-                if (val) {
-                nuevasNotas[`${dniBusqueda}-${c-1}-${d}`] = val;
-               }
-             }
-           }
-          console.log(`✅ Notas vinculadas para DNI: ${dniBusqueda}`);
-         }
-       });
+          const dniBusqueda = String(m.dni_estudiante).trim();
+          const reg = califData.find(r => String(r.dni_estudiante).trim() === dniBusqueda);
+          
+          if (reg) {
+            for (let c = 1; c <= 4; c++) {
+              for (let d = 1; d <= 4; d++) {
+                const val = reg[`c${c}_d${d}`];
+                if (val && val !== '-') {
+                  // Mantenemos tu estructura de llaves para el estado 'notas'
+                  nuevasNotas[`${dniBusqueda}-${c-1}-${d}`] = val;
+                }
+              }
+            }
+          }
+        });
       }
-     setNotas(nuevasNotas);
+      setNotas(nuevasNotas);
     }
   } catch (err) {
     console.error("❌ Error en sincronización por DNI:", err.message);
@@ -389,27 +386,39 @@ const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion
     XLSX.writeFile(wb, `Registro_Auxiliar_2026_${''}_${''}.xlsx`);
    };
  
-  const handleGuardarTodo = async () => {
+ const handleGuardarTodo = async () => {
   if (!grado || !area || !bimestre || loading) return;
   setLoading(true);
+  const batchCalificaciones = [];
+  const alumnosOmitidos = []; 
 
   try {
     const { data: { user } } = await supabase.auth.getUser();
     const correoResponsable = user?.email || 'usuario_desconocido';
 
-    const [numGrado, letraSeccion] = grado.split(" ");
-    const seccionFinal = letraSeccion?.trim() || "A";
+    const gradoLimpio = grado.replace("°", ""); 
+    const partes = gradoLimpio.split(" ");
+    const numGrado = partes[0]?.trim(); // "1", "2", etc.
+    const seccionFinal = partes[1]?.trim() || "A";
+    
     const areaNormalizada = area.toUpperCase().trim();
     const bimestreInt = parseInt(bimestre);
 
-    const batchCalificaciones = [];
-    const alumnosOmitidos = [];
-
-    // 1. PREPARACIÓN DE DATOS (Mapeo de notas y DNI)
     alumnos.forEach((nombre) => {
       const nombreKey = (nombre || "").toUpperCase().trim();
       const dni = dnis[nombreKey];
-      const gen = generos[nombreKey] || null;
+      
+      if (!dni) {
+        alumnosOmitidos.push({ nombre: nombreKey, razon: "Sin DNI" });
+        return;
+      }
+
+      const gen = generos[nombreKey] || ""; 
+      const situacionAcademica = estadosAlumnos[dni] || 'Activo';
+
+      if (situacionAcademica === 'Retirado' || situacionAcademica === 'Trasladado') {
+        return; 
+      }
 
       if (!dni) {
         alumnosOmitidos.push({ nombre: nombreKey, razon: "DNI no vinculado" });
@@ -457,6 +466,7 @@ const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion
         promedio_c3: p3,
         promedio_c4: p4,
         logro_bimestral: logroFinal,
+        estado_estudiante: situacionAcademica,
         correo_electronico: correoResponsable
       });
     });
@@ -568,228 +578,221 @@ const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion
   }
   }, [esEstudiante, perfilUsuario]);
 
-  return (
-    <div className="flex flex-col min-h-screen bg-slate-50 font-sans text-slate-900">
-      {/* NOTIFICACIÓN */}
-      {mensaje && (
-        <div className="fixed top-6 right-6 z-[100] bg-slate-900 text-white px-8 py-4 rounded-2xl shadow-2xl flex items-center gap-3">
-          <CheckCircle2 className="w-5 h-5 text-green-400" />
-           <span className="text-[10px] font-black uppercase tracking-widest">{mensaje.texto}</span>
-           </div>
-          )}
-        {/* HEADER */}
-      <div className="bg-slate-600 border-b border-emerald-600 rounded-b-[2.5rem] p-4 md:p-6 shadow-sm z-40">
+return (
+  <div className="flex flex-col min-h-screen bg-slate-50 font-sans text-slate-900">
+    {/* NOTIFICACIÓN */}
+    {mensaje && (
+      <div className="fixed top-6 right-6 z-[100] bg-slate-900 text-white px-8 py-4 rounded-2xl shadow-2xl flex items-center gap-3">
+        <CheckCircle2 className="w-5 h-5 text-green-400" />
+        <span className="text-[10px] font-black uppercase tracking-widest">{mensaje.texto}</span>
+      </div>
+    )}
+
+    {/* HEADER */}
+    <div className="bg-slate-600 border-b border-emerald-600 rounded-b-[2.5rem] p-4 md:p-6 shadow-sm z-40">
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-     {/* SECCIÓN IZQUIERDA: Ícono, Título y Selectores */}
-     <div className="flex items-start md:items-center gap-4">
-      {/* Contenedor del ícono con más espacio (padding mejorado) */}
-      <div className="bg-green-600 p-3.5 rounded-[1.5rem] text-white shadow-lg shadow-green-100 flex-shrink-0">
-        <FileSpreadsheet className="w-7 h-7" />
+        
+        {/* LADO IZQUIERDO: Identidad y Selectores de Configuración */}
+        <div className="flex items-start md:items-center gap-4">
+          <div className="bg-green-600 p-3.5 rounded-[1.5rem] text-white shadow-lg shadow-green-100 flex-shrink-0">
+            <FileSpreadsheet className="w-7 h-7" />
+          </div>
+          <div className="flex flex-col gap-2">
+            <h1 className="text-2xl md:text-3xl font-black text-green-400 tracking-tighter leading-none">
+              Registro 2026
+            </h1>
+            <div className="flex flex-wrap items-center gap-2">
+              <select 
+                value={grado} 
+                onChange={(e) => setGrado(e.target.value)}
+                disabled={esEstudiante} 
+                className="bg-green-50 border-slate-100 text-[10px] font-bold px-3 py-2 rounded-xl outline-none focus:ring-2 focus:ring-green-500 transition-all">
+                {opcionesPermitidas.grados.map(g => <option key={g} value={g}>{g}</option>)}
+              </select>
+              <select 
+                value={area} 
+                onChange={(e) => setArea(e.target.value)}
+                className="bg-green-50 text-green-700 border border-green-200 text-[10px] font-bold px-3 py-2 rounded-xl outline-none focus:ring-2 focus:ring-green-500 transition-all">
+                {opcionesPermitidas.areas.map(a => <option key={a} value={a}>{a}</option>)}
+              </select>
+
+              {/* Selector de ESTADOS (Estadística eliminada como solicitaste) */}
+              <div className="flex items-center bg-slate-900 border border-slate-400 rounded-2xl h-[40px] overflow-hidden shadow-lg">
+                <select 
+                  value={filtroEstado}
+                  onChange={(e) => setFiltroEstado(e.target.value)}
+                  className="bg-slate-800 hover:bg-emerald-500 text-white text-[10px] font-bold px-4 outline-none cursor-pointer uppercase tracking-tight h-full transition-colors"
+                >
+                  <option value="Todos" className="bg-slate-800">TODOS</option>
+                  <option value="Activo" className="bg-slate-800">ACTIVO</option>
+                  <option value="Retirado" className="bg-slate-800">RETIRADO</option>
+                  <option value="Trasladado" className="bg-slate-800">TRASLADADO</option>
+                  <option value="Ingresante" className="bg-slate-800">INGRESANTE</option>
+                </select>
+              </div>
+            </div>
+          </div>
         </div>
-        <div className="flex flex-col gap-2">
-        <h1 className="text-2xl md:text-3xl font-black text-green-400 tracking-tighter leading-none">
-          Registro 2026
-        </h1>
-        {/* Selectores con mejor espaciado y responsividad */}
-        <div className="flex flex-wrap gap-2">
-          <select 
-            value={grado} 
-               onChange={(e) => setGrado(e.target.value)}
-               disabled={esEstudiante} 
-               className="bg-green-50 border-slate-100 text-[10px] font-bold px-3 py-2 rounded-xl outline-none focus:ring-2 focus:ring-green-500 transition-all">
-              {opcionesPermitidas.grados.length > 0 ? (
-              opcionesPermitidas.grados.map(g => <option key={g} value={g}>{g}</option>)
-           ) : (
-       <option value="">Cargando grados...</option>
-      )}
-     </select>
-     <select 
-      value={area} 
-        onChange={(e) => setArea(e.target.value)}
-          className="bg-green-50 text-green-700 border border-green-200 text-[10px] font-bold px-3 py-2 rounded-xl outline-none focus:ring-2 focus:ring-green-500 transition-all">
-          {opcionesPermitidas.areas.length > 0 ? (
-           opcionesPermitidas.areas.map(a => <option key={a} value={a}>{a}</option>)
-            ) : (
-            <option value="">Cargando áreas...</option>
-            )}
-          </select>
+        {/* LADO DERECHO: Bimestres y Botones de Acción */}
+        <div className="flex flex-wrap items-center gap-3 lg:justify-end">
+          {/* Selector de Bimestre */}
+          <div className="flex bg-gray-50 p-1.5 rounded-[1.25rem] border border-slate-200 shadow-inner">
+            {[1, 2, 3, 4].map(n => (
+              <button 
+                key={n} 
+                onClick={() => setBimestre(n)} 
+                className={`px-4 py-2 rounded-xl text-[10px] font-black whitespace-nowrap transition-all ${
+                  bimestre === n ? 'bg-slate-800 text-white shadow-md' : 'text-slate-400 hover:text-slate-600'
+                }`}>
+                {n}° BIM
+              </button>
+            ))}
+          </div>
+          
+          {/* Botones de Guardado y Exportación */}
+          <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+            {!esEstudiante && (
+              <>
+                <button 
+                  onClick={() => exportarExcel(bimestre)} 
+                  className="bg-green-600 hover:bg-green-500 text-white px-4 py-2.5 rounded-xl text-[10px] font-black flex items-center gap-2 transition-all shadow-lg flex-1 sm:flex-none border border-green-500 active:scale-95"
+                  >
+                  <Download className="w-4 h-4" /> EXCEL
+                </button>
+                <button 
+                  onClick={() => setShowConfirm(true)} 
+                  disabled={loading} 
+                  className="bg-slate-900 hover:bg-slate-700 text-white px-7 py-3 border border-slate-400 rounded-xl text-[10px] font-black flex items-center gap-2 transition-all shadow-xl disabled:bg-slate-400 flex-1 sm:flex-none active:scale-95"
+                  >
+                  {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4 text-green-100" />} 
+                  <span>GUARDAR</span>
+                </button>
+              </>
+             )}
+           </div>
+         </div>
         </div>
       </div>
-    </div>
-    {/* SECCIÓN DERECHA: Bimestres y Acciones */}
-    <div className="flex flex-wrap items-center gap-3">
-      {/* Selector de Bimestres (Scroll horizontal en móvil para evitar saltos de línea) */}
-      <div className="flex bg-gray-50 p-1.5 rounded-[1.25rem] overflow-x-auto">
-        {[1, 2, 3, 4].map(n => (
-          <button 
-            key={n} 
-            onClick={() => setBimestre(n)} 
-            className={`px-4 py-2 rounded-xl text-[10px] font-black whitespace-nowrap transition-all ${
-              bimestre === n ? 'bg-slate-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-600'
-            }`}>
-            {n}° BIM
-          </button>
-        ))}
-      </div>
-      <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
-     {!esEstudiante && (
-      <>
-        <button 
-         onClick={() => exportarExcel(bimestre)} 
-         className="bg-green-600 hover:bg-green-600 text-white px-4 py-2.5 rounded-xl text-[10px] font-black flex items-center justify-center gap-2 transition-all active:scale-95 shadow-lg shadow-green-100 flex-1 sm:flex-none"
-          >
-        <Download className="w-4 h-4" /> 
-        <span className="inline">EXCEL</span>
-      </button>
-      <button 
-         onClick={() => setShowConfirm(true)} 
-          disabled={loading} 
-           className="bg-slate-900 hover:bg-slate-800 text-white px-7 py-4 rounded-xl text-[10px] font-black flex items-center justify-center gap-2 transition-all active:scale-95 shadow-xl shadow-slate-200 disabled:bg-slate-400 flex-1 sm:flex-none"
-            >
-            {loading ? <Loader2 className="w-2 h-2 animate-spin" /> : <Save className="w-4 h-4 text-green-100" />} 
-            <span>GUARDAR</span>
-           </button>
-           </>
-          )}
-       </div>
-      </div>
-     </div>
-    </div>
-      {/* TABLA: SOLUCIÓN AL DESPLAZAMIENTO */}
+      {/* TABLA */}
       <div className="p-4 flex-1">
         <div className="bg-white border border-slate-200 shadow-2xl rounded-[1.5rem] overflow-hidden">
-          {/* Contenedor con scroll horizontal SOLAMENTE */}
           <div className="overflow-x-auto custom-scrollbar shadow-xl rounded-lg">
             <table className="w-max md:w-full border-collapse table-auto">
-            <thead>
-           <tr className="bg-slate-600 text-white text-[9px] uppercase font-bold h-10">
-         {/* N° - Ancho fijo w-7 coincide con left-7 de los nombres */}
-       <th rowSpan="2" className="p-1 w-10 sticky left-0 z-50 bg-emerald-700 border-r border-b border-green-500 text-center">
-      N°
-    </th>
-    {/* SEXO - Solo escritorio */}
-    <th rowSpan="2" className="hidden md:table-cell p-1 w-8 sticky left-7 z-50 bg-pink-700 border-r border-b border-green-500 text-center">
-     SEXO
-      </th>
-       {/* APELLIDOS Y NOMBRES - Desplazamiento coordinado */}
-        <th rowSpan="2" className="w-[100px] md:w-[300px] sticky left-7 md:left-15 z-40 bg-slate-600 border-r border-b border-slate-400 text-center px-1 shadow-[3px_0_3px_-2px_rgba(0,0,0,0.3)]">
-         <div className="text-[10px] md:text-[10px] leading-tight whitespace-normal md:whitespace-nowrap flex items-center justify-center h-full">
-        APELLIDOS Y NOMBRES
-      </div>
-    </th>
-    {competencias.map((c, i) => (
-    <th key={i} colSpan="5" className="p-1 border-r border-b border-slate-400 bg-slate-600 text-center min-w-[60px] text-[8px]">
-      {c}
-       </th>
-        ))}
-       <th rowSpan="2" className="p-0.5 w-10 sticky right-0 z-50 bg-yellow-400 text-slate-800 font-black border-l border-b border-yellow-500 text-center text-[9px]">
-      LOGRO
-    </th>
-  </tr>
-  <tr className="bg-slate-800 text-white text-[9px] text-center uppercase h-7">
-    {competencias.map((_, i) => (
-      <React.Fragment key={i}>
-       {/* Columnas D1-D4 más anchas en escritorio */}
-        <th className="w-8 border-r border-green-600/50">D1</th>
-        <th className="w-8 border-r border-green-600/50">D2</th>
-        <th className="w-8 border-r border-green-600/50">D3</th>
-        <th className="w-8 border-r border-green-600/50">D4</th>
-        <th className="w-8 bg-emerald-500 font-bold border-r border-green-600">PROM</th>
-      </React.Fragment>
-    ))}
-  </tr>
-  </thead>
-  <tbody className={`text-[10px] ${perfilUsuario?.rol_id === 6 ? 'pointer-events-none' : ''}`}>
-   {alumnosOrdenados
-    .filter(({ nombre }) => {
-     const rolUsuario = Number(perfilUsuario?.rol_id);
-      if (rolUsuario === 1 || rolUsuario === 3) return true;
-       const idFila = normalizarID(nombre);
-       const idUsuario = normalizarID(perfilUsuario?.nombre_completo);
-        return idFila.includes(idUsuario) || idUsuario.includes(idFila);
-        })
-       .map(({ nombre, originalIdx }, displayIdx) => {
-     const nombreKey = (nombre || "").toUpperCase().trim();
-    const dniEst = dnis[nombreKey];
-    const generoActual = generos[nombreKey] || "";
-    if (!dniEst) return null;
-    return (
-      <tr key={originalIdx} className="border-b border-slate-200 hover:bg-green-50/50 h-8">
-        {/* NÚMERO DE ORDEN */}
-        <td className="text-center sticky left-0 z-20 bg-green-200 font-bold border-r border-slate-300 text-gray-600 w-6 text-[10px]">
-          {displayIdx + 1}
-          </td>
-          {/* COLUMNA SEXO */}
-         <td className="hidden md:table-cell p-0 sticky left-7 z-20 bg-gray-200 border-r border-slate-300 w-8">
-        <select
-       disabled={esEstudiante}
-      value={generoActual}
-      // CAMBIO: Usamos dniEst en lugar de nombreEst para la máxima eficiencia
-      onChange={(e) => setGeneros(prev => ({ ...prev, [dniEst]: e.target.value }))}
-      className={`w-full h-full text-center font-bold outline-none appearance-none bg-transparent ${
-        generoActual === 'H' ? 'text-blue-600' :
-        generoActual === 'M' ? 'text-pink-500' : 'text-gray-400'
-         }`}
-          >
-          <option value="">-</option>
-          <option value="M">M</option>
-          <option value="H">H</option>
-          </select>
-          </td>
-          {/* COLUMNA NOMBRE - Sincronizada con left-7 y altura ajustada */}
-        <td className="p-0 sticky left-7 md:left-15 z-30 bg-white border-r border-slate-200 min-w-[80px] md:min-w-[250px] h-8 shadow-[3px_0_3px_-2px_rgba(0,0,0,0.1)]">
-      <div
-     contentEditable={!esEstudiante}
-     suppressContentEditableWarning={true}
-      onBlur={(e) => {
-      if (esEstudiante) return;
-      const next = [...alumnos];
-      next[originalIdx] = e.currentTarget.innerText;
-      setAlumnos(next);
-      {/* TEX TAREA: interlineado de móviles y centrado vertical de nombres en escritorio */}
-     }}
-     className="w-full h-full px-1.5 md:pl-5 md:pr-2 outline-none font-bold text-slate-700 uppercase bg-transparent cursor-text overflow-hidden text-[8px] md:text-[9px] leading-[1.4] md:leading-normal whitespace-normal md:whitespace-nowrap flex items-center justify-start">
-    {nombre || ""}
-     </div>
-      </td>
-        {competencias.map((comp, cIdx) => (
-          <React.Fragment key={cIdx}>
-              {[1, 2, 3, 4].map(dIdx => {
-                // 2. FILTRADO ATÓMICO: Aquí se usa el dniEst recuperado arriba
-                const llaveNota = `${dniEst}-${cIdx}-${dIdx}`; 
-                const notaActual = notas[llaveNota] || "";
-                return (
-               <td key={dIdx} className="p-0 border-r border-slate-200 w-7">
-               <select
-              disabled={esEstudiante}
-             value={notaActual} // <--- Usa la variable definida arriba
-            onChange={(e) => setNotas(prev => ({ 
-            ...prev, 
-            [llaveNota]: e.target.value // <--- Usa la llave definida arriba
-             }))}
-              className={`w-full h-7 text-center font-bold outline-none appearance-none text-[9px] ${getColorNota(notaActual)}`}
-               >
-                 <option value="">-</option>
-                 <option value="AD">AD</option>
-                 <option value="A">A</option>
-                 <option value="B">B</option>
-                 <option value="C">C</option>
-               </select>
-                </td>
-                );
-             })}
-             <td className={`text-center font-black bg-green-100 border-r border-slate-200 text-[9px] w-8 ${getColorNota(calcularPromedio(dniEst, cIdx))}`}>
-             {calcularPromedio(dniEst, cIdx)}
+              <thead>
+                <tr className="bg-slate-600 text-white text-[9px] uppercase font-bold h-10">
+                  <th rowSpan="2" className="p-1 w-10 sticky left-0 z-50 bg-emerald-700 border-r border-b border-green-500 text-center">N°</th>
+                  <th rowSpan="2" className="hidden md:table-cell p-1 w-8 sticky left-7 z-50 bg-pink-700 border-r border-b border-green-500 text-center">SEXO</th>
+                  <th rowSpan="2" className="w-[100px] md:w-[300px] sticky left-7 md:left-15 z-40 bg-slate-600 border-r border-b border-slate-400 text-center px-1 shadow-[3px_0_3px_-2px_rgba(0,0,0,0.3)]">
+                    APELLIDOS Y NOMBRES
+                  </th>
+                  {competencias.map((c, i) => (
+                    <th key={i} colSpan="5" className="p-1 border-r border-b border-slate-400 bg-slate-600 text-center text-[8px]">{c}</th>
+                  ))}
+                  <th rowSpan="2" className="p-0.5 w-10 sticky right-0 z-50 bg-yellow-400 text-slate-800 font-black border-l border-b border-yellow-500 text-center text-[9px]">LOGRO</th>
+                </tr>
+                <tr className="bg-slate-800 text-white text-[9px] text-center h-7">
+                  {competencias.map((_, i) => (
+                    <React.Fragment key={i}>
+                      <th className="w-8 border-r border-green-600/50">D1</th>
+                      <th className="w-8 border-r border-green-600/50">D2</th>
+                      <th className="w-8 border-r border-green-600/50">D3</th>
+                      <th className="w-8 border-r border-green-600/50">D4</th>
+                      <th className="w-8 bg-emerald-500 font-bold border-r border-green-600">PROM</th>
+                    </React.Fragment>
+                  ))}
+                </tr>
+              </thead>
+             <tbody className={`text-[10px] ${perfilUsuario?.rol_id === 6 ? 'pointer-events-none' : ''}`}>
+             {alumnosOrdenados
+             .filter(({ nombre }) => {
+              const nombreKey = (nombre || "").toUpperCase().trim();
+               const dniEst = dnis[nombreKey];
+               // Lógica híbrida: Filtro por Rol + Filtro por Estado
+                const rolUsuario = Number(perfilUsuario?.rol_id);
+                 const coincideDocente = (rolUsuario === 1 || rolUsuario === 3) || 
+                             normalizarID(nombre).includes(normalizarID(perfilUsuario?.nombre_completo));
+                  const estadoEst = estadosAlumnos[dniEst] || 'Activo';
+                  // Corrección: usamos estadoEst para la validación del filtro
+                   const coincideEstado = (filtroEstado === 'Todos' || estadoEst === filtroEstado);
+                   return coincideDocente && coincideEstado;
+                   })
+                .map(({ nombre, originalIdx }, displayIdx) => {
+               const nombreKey = (nombre || "").toUpperCase().trim();
+              const dniEst = dnis[nombreKey];
+              const generoActual = generos[nombreKey] || "";
+              const estadoActual = estadosAlumnos[dniEst] || 'Activo';
+            // Definimos si es editable: Solo Activos e Ingresantes pueden tener notas nuevas
+            const esEditable = estadoActual === 'Activo' || estadoActual === 'Ingresante';
+          return (
+            <tr key={originalIdx} className={`border-b border-slate-200 hover:bg-green-50/50 h-8 ${!esEditable ? 'bg-slate-50/50' : ''}`}>
+             <td className="text-center sticky left-0 z-20 bg-green-200 font-bold border-r border-slate-300 text-gray-600 w-6 text-[10px]">
+              {displayIdx + 1}
               </td>
-               </React.Fragment>
-                ))}
-                 <td className={`text-center font-black bg-yellow-200 sticky right-0 z-20 border-l border-yellow-300 text-[9px] w-10 ${getColorNota(calcularLogroBimestral(dniEst))}`}>
-                  {calcularLogroBimestral(dniEst)}
-                  </td>
-                 </tr>
-                 );
-               })}
-             </tbody>
+             <td className="hidden md:table-cell p-0 sticky left-7 z-20 bg-gray-200 border-r border-slate-300 w-8">
+               <select
+                disabled={esEstudiante || !esEditable}
+                value={generoActual}
+                onChange={(e) => setGeneros(prev => ({ ...prev, [nombreKey]: e.target.value }))}
+                className={`w-full h-full text-center font-bold outline-none appearance-none bg-transparent ${
+                generoActual === 'H' ? 'text-blue-600' : generoActual === 'M' ? 'text-pink-500' : 'text-gray-400'
+                }`}
+                >
+                  <option value="">-</option>
+                  <option value="M">M</option>
+                  <option value="H">H</option>
+                 </select>
+              </td>
+
+              <td className="p-0 sticky left-7 md:left-15 z-30 bg-white border-r border-slate-200 min-w-[80px] md:min-w-[250px] h-8 shadow-[3px_0_3px_-2px_rgba(0,0,0,0.1)]">
+               <div className="flex flex-col px-2 justify-center h-full overflow-hidden">
+                <span className={`font-bold uppercase text-[9px] truncate ${!esEditable ? 'text-slate-400' : 'text-slate-700'}`}>
+                  {nombre}
+                 </span>
+                  <span className={`text-[7px] font-black tracking-tighter uppercase ${
+                    estadoActual === 'Activo' ? 'text-emerald-500' : 
+                    estadoActual === 'Ingresante' ? 'text-blue-500' : 
+                    estadoActual === 'Retirado' ? 'text-red-500' : 'text-amber-500'
+                    }`}>
+                   {estadoActual}
+                  </span>
+                </div>
+              </td>
+
+              {competencias.map((comp, cIdx) => (
+               <React.Fragment key={cIdx}>
+                 {[1, 2, 3, 4].map(dIdx => {
+                   const llaveNota = `${dniEst}-${cIdx}-${dIdx}`; 
+                   const notaActual = notas[llaveNota] || "";
+                    return (
+                      <td key={dIdx} className="p-0 border-r border-slate-200 w-7">
+                       <select
+                         disabled={esEstudiante || !esEditable}
+                         value={notaActual}
+                         onChange={(e) => setNotas(prev => ({ ...prev, [llaveNota]: e.target.value }))}
+                         className={`w-full h-7 text-center font-bold outline-none appearance-none text-[9px] ${getColorNota(notaActual)} ${!esEditable ? 'bg-gray-100 opacity-50 cursor-not-allowed' : 'bg-transparent'}`}
+                         >
+                         <option value="">-</option>
+                         <option value="AD">AD</option>
+                         <option value="A">A</option>
+                         <option value="B">B</option>
+                         <option value="C">C</option>
+                       </select>
+                     </td>
+                     );
+                  })}
+                 <td className={`text-center font-black bg-green-100 border-r border-slate-200 text-[9px] w-8 ${getColorNota(calcularPromedio(dniEst, cIdx))}`}>
+                  {esEditable ? calcularPromedio(dniEst, cIdx) : '-'}
+                   </td>
+                    </React.Fragment>
+                     ))}
+          
+                      <td className={`text-center font-black bg-yellow-200 sticky right-0 z-20 border-l border-yellow-300 text-[9px] w-10 ${getColorNota(calcularLogroBimestral(dniEst))}`}>
+                       {esEditable ? calcularLogroBimestral(dniEst) : '-'}
+                        </td>
+                      </tr>
+                     );
+                  })}
+              </tbody>
             </table>
           </div>
         </div>

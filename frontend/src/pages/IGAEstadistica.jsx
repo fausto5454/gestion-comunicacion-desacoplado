@@ -355,7 +355,7 @@ const IGAEstadistica = () => {
                         <option value="MATEMÁTICA">Matemática</option>
                         <option value="COMUNICACIÓN">Comunicación</option>
                         <option value="ARTE Y CULTURA">Arte y Cultura</option>
-                        <option value="PERSONAL SOCIAL">Personal Social</option>
+                        <option value="CIENCIAS SOCIALES">Ciencias Sociales</option>
                         <option value="DPCC">DPCC</option>
                         <option value="CIENCIA Y TECNOLOGÍA">Ciencia y Tecnología</option>
                         <option value="EDUCACIÓN FÍSICA">Educación Física</option>

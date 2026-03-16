@@ -579,42 +579,51 @@ const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion
   }, [esEstudiante, perfilUsuario]);
 
 return (
-  <div className="flex flex-col min-h-screen bg-slate-50 font-sans text-slate-900">
-    {/* NOTIFICACIÓN */}
-    {mensaje && (
-      <div className="fixed top-6 right-6 z-[100] bg-slate-900 text-white px-8 py-4 rounded-2xl shadow-2xl flex items-center gap-3">
-        <CheckCircle2 className="w-5 h-5 text-green-400" />
-        <span className="text-[10px] font-black uppercase tracking-widest">{mensaje.texto}</span>
-      </div>
-    )}
-
-    {/* HEADER */}
-    <div className="bg-slate-600 border-b border-emerald-600 rounded-b-[2.5rem] p-4 md:p-6 shadow-sm z-40">
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-        
-        {/* LADO IZQUIERDO: Identidad y Selectores de Configuración */}
-        <div className="flex items-start md:items-center gap-4">
-          <div className="bg-green-600 p-3.5 rounded-[1.5rem] text-white shadow-lg shadow-green-100 flex-shrink-0">
-            <FileSpreadsheet className="w-7 h-7" />
+   <div className="flex flex-col min-h-screen bg-slate-50 font-sans text-slate-900">
+        {/* NOTIFICACIÓN */}
+        {mensaje && (
+          <div className="fixed top-6 right-6 z-[100] bg-slate-900 text-white px-8 py-4 rounded-2xl shadow-2xl flex items-center gap-3">
+            <CheckCircle2 className="w-5 h-5 text-green-400" />
+             <span className="text-[10px] font-black uppercase tracking-widest">{mensaje.texto}</span>
+             </div>
+            )}
+          {/* HEADER */}
+        <div className="bg-slate-600 border-b border-emerald-600 rounded-b-[2.5rem] p-4 md:p-6 shadow-sm z-40">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+       {/* SECCIÓN IZQUIERDA: Ícono, Título y Selectores */}
+       <div className="flex items-start md:items-center gap-4">
+        {/* Contenedor del ícono con más espacio (padding mejorado) */}
+        <div className="bg-green-600 p-3.5 rounded-[1.5rem] text-white shadow-lg shadow-green-100 flex-shrink-0">
+          <FileSpreadsheet className="w-7 h-7" />
           </div>
           <div className="flex flex-col gap-2">
-            <h1 className="text-2xl md:text-3xl font-black text-green-400 tracking-tighter leading-none">
-              Registro 2026
-            </h1>
-            <div className="flex flex-wrap items-center gap-2">
-              <select 
-                value={grado} 
-                onChange={(e) => setGrado(e.target.value)}
-                disabled={esEstudiante} 
-                className="bg-green-50 border-slate-100 text-[10px] font-bold px-3 py-2 rounded-xl outline-none focus:ring-2 focus:ring-green-500 transition-all">
-                {opcionesPermitidas.grados.map(g => <option key={g} value={g}>{g}</option>)}
-              </select>
-              <select 
-                value={area} 
-                onChange={(e) => setArea(e.target.value)}
-                className="bg-green-50 text-green-700 border border-green-200 text-[10px] font-bold px-3 py-2 rounded-xl outline-none focus:ring-2 focus:ring-green-500 transition-all">
-                {opcionesPermitidas.areas.map(a => <option key={a} value={a}>{a}</option>)}
-              </select>
+          <h1 className="text-2xl md:text-3xl font-black text-green-400 tracking-tighter leading-none">
+            Registro 2026
+          </h1>
+            {/* Selectores con mejor espaciado y responsividad */}
+          <div className="flex flex-wrap gap-2">
+          <select 
+            value={grado} 
+               onChange={(e) => setGrado(e.target.value)}
+               disabled={esEstudiante} 
+               className="bg-green-50 border-slate-100 text-[10px] font-bold px-3 py-2 rounded-xl outline-none focus:ring-2 focus:ring-green-500 transition-all">
+              {opcionesPermitidas.grados.length > 0 ? (
+              opcionesPermitidas.grados.map(g => <option key={g} value={g}>{g}</option>)
+           ) : (
+       <option value="">Cargando grados...</option>
+      )}
+     </select>
+     <select 
+      value={area} 
+        onChange={(e) => setArea(e.target.value)}
+         disabled={esEstudiante} 
+          className="bg-green-50 text-green-700 border border-green-200 text-[10px] font-bold px-3 py-2 rounded-xl outline-none focus:ring-2 focus:ring-green-500 transition-all">
+          {opcionesPermitidas.areas.length > 0 ? (
+           opcionesPermitidas.areas.map(a => <option key={a} value={a}>{a}</option>)
+            ) : (
+            <option value="">Cargando áreas...</option>
+            )}
+          </select>
 
               {/* Selector de ESTADOS (Estadística eliminada como solicitaste) */}
               <div className="flex items-center bg-slate-900 border border-slate-400 rounded-2xl h-[40px] overflow-hidden shadow-lg">
@@ -622,7 +631,7 @@ return (
                   value={filtroEstado}
                   onChange={(e) => setFiltroEstado(e.target.value)}
                   className="bg-slate-800 hover:bg-emerald-500 text-white text-[10px] font-bold px-4 outline-none cursor-pointer uppercase tracking-tight h-full transition-colors"
-                >
+                  >
                   <option value="Todos" className="bg-slate-800">TODOS</option>
                   <option value="Activo" className="bg-slate-800">ACTIVO</option>
                   <option value="Retirado" className="bg-slate-800">RETIRADO</option>
@@ -633,172 +642,193 @@ return (
             </div>
           </div>
         </div>
-        {/* LADO DERECHO: Bimestres y Botones de Acción */}
-        <div className="flex flex-wrap items-center gap-3 lg:justify-end">
-          {/* Selector de Bimestre */}
-          <div className="flex bg-gray-50 p-1.5 rounded-[1.25rem] border border-slate-200 shadow-inner">
-            {[1, 2, 3, 4].map(n => (
-              <button 
-                key={n} 
-                onClick={() => setBimestre(n)} 
-                className={`px-4 py-2 rounded-xl text-[10px] font-black whitespace-nowrap transition-all ${
-                  bimestre === n ? 'bg-slate-800 text-white shadow-md' : 'text-slate-400 hover:text-slate-600'
-                }`}>
-                {n}° BIM
-              </button>
-            ))}
-          </div>
-          
-          {/* Botones de Guardado y Exportación */}
-          <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
-            {!esEstudiante && (
+          {/* SECCIÓN DERECHA: Bimestres y Acciones */}
+            <div className="flex flex-wrap items-center gap-3">
+              {/* Selector de Bimestres (Scroll horizontal en móvil para evitar saltos de línea) */}
+              <div className="flex bg-gray-50 p-1.5 rounded-[1.25rem] overflow-x-auto">
+                {[1, 2, 3, 4].map(n => (
+                  <button 
+                    key={n} 
+                    onClick={() => setBimestre(n)} 
+                    className={`px-4 py-2 rounded-xl text-[10px] font-black whitespace-nowrap transition-all ${
+                      bimestre === n ? 'bg-slate-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-600'
+                    }`}>
+                    {n}° BIM
+                  </button>
+                ))}
+              </div>
+              <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+             {!esEstudiante && (
               <>
                 <button 
-                  onClick={() => exportarExcel(bimestre)} 
-                  className="bg-green-600 hover:bg-green-500 text-white px-4 py-2.5 rounded-xl text-[10px] font-black flex items-center gap-2 transition-all shadow-lg flex-1 sm:flex-none border border-green-500 active:scale-95"
-                  >
-                  <Download className="w-4 h-4" /> EXCEL
-                </button>
-                <button 
-                  onClick={() => setShowConfirm(true)} 
+                  onClick={exportarExcel} 
+                   className="bg-green-600 hover:bg-green-600 text-white px-4 py-2.5 rounded-xl text-[10px] font-black flex items-center justify-center gap-2 transition-all active:scale-95 shadow-lg shadow-green-100 flex-1 sm:flex-none"
+                    >
+                  <Download className="w-4 h-4" /> 
+                <span className="inline">EXCEL</span>
+              </button>
+              <button 
+                 onClick={() => setShowConfirm(true)} 
                   disabled={loading} 
-                  className="bg-slate-900 hover:bg-slate-700 text-white px-7 py-3 border border-slate-400 rounded-xl text-[10px] font-black flex items-center gap-2 transition-all shadow-xl disabled:bg-slate-400 flex-1 sm:flex-none active:scale-95"
-                  >
-                  {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4 text-green-100" />} 
-                  <span>GUARDAR</span>
-                </button>
-              </>
-             )}
-           </div>
-         </div>
-        </div>
-      </div>
-      {/* TABLA */}
-      <div className="p-4 flex-1">
-        <div className="bg-white border border-slate-200 shadow-2xl rounded-[1.5rem] overflow-hidden">
-          <div className="overflow-x-auto custom-scrollbar shadow-xl rounded-lg">
-            <table className="w-max md:w-full border-collapse table-auto">
-              <thead>
-                <tr className="bg-slate-600 text-white text-[9px] uppercase font-bold h-10">
-                  <th rowSpan="2" className="p-1 w-10 sticky left-0 z-50 bg-emerald-700 border-r border-b border-green-500 text-center">N°</th>
-                  <th rowSpan="2" className="hidden md:table-cell p-1 w-8 sticky left-7 z-50 bg-pink-700 border-r border-b border-green-500 text-center">SEXO</th>
-                  <th rowSpan="2" className="w-[100px] md:w-[300px] sticky left-7 md:left-15 z-40 bg-slate-600 border-r border-b border-slate-400 text-center px-1 shadow-[3px_0_3px_-2px_rgba(0,0,0,0.3)]">
-                    APELLIDOS Y NOMBRES
-                  </th>
-                  {competencias.map((c, i) => (
-                    <th key={i} colSpan="5" className="p-1 border-r border-b border-slate-400 bg-slate-600 text-center text-[8px]">{c}</th>
-                  ))}
-                  <th rowSpan="2" className="p-0.5 w-10 sticky right-0 z-50 bg-yellow-400 text-slate-800 font-black border-l border-b border-yellow-500 text-center text-[9px]">LOGRO</th>
-                </tr>
-                <tr className="bg-slate-800 text-white text-[9px] text-center h-7">
-                  {competencias.map((_, i) => (
-                    <React.Fragment key={i}>
-                      <th className="w-8 border-r border-green-600/50">D1</th>
-                      <th className="w-8 border-r border-green-600/50">D2</th>
-                      <th className="w-8 border-r border-green-600/50">D3</th>
-                      <th className="w-8 border-r border-green-600/50">D4</th>
-                      <th className="w-8 bg-emerald-500 font-bold border-r border-green-600">PROM</th>
-                    </React.Fragment>
-                  ))}
-                </tr>
-              </thead>
-             <tbody className={`text-[10px] ${perfilUsuario?.rol_id === 6 ? 'pointer-events-none' : ''}`}>
-             {alumnosOrdenados
-             .filter(({ nombre }) => {
-              const nombreKey = (nombre || "").toUpperCase().trim();
-               const dniEst = dnis[nombreKey];
-               // Lógica híbrida: Filtro por Rol + Filtro por Estado
-                const rolUsuario = Number(perfilUsuario?.rol_id);
-                 const coincideDocente = (rolUsuario === 1 || rolUsuario === 3) || 
-                             normalizarID(nombre).includes(normalizarID(perfilUsuario?.nombre_completo));
-                  const estadoEst = estadosAlumnos[dniEst] || 'Activo';
-                  // Corrección: usamos estadoEst para la validación del filtro
-                   const coincideEstado = (filtroEstado === 'Todos' || estadoEst === filtroEstado);
-                   return coincideDocente && coincideEstado;
-                   })
-                .map(({ nombre, originalIdx }, displayIdx) => {
-               const nombreKey = (nombre || "").toUpperCase().trim();
-              const dniEst = dnis[nombreKey];
-              const generoActual = generos[nombreKey] || "";
-              const estadoActual = estadosAlumnos[dniEst] || 'Activo';
-            // Definimos si es editable: Solo Activos e Ingresantes pueden tener notas nuevas
-            const esEditable = estadoActual === 'Activo' || estadoActual === 'Ingresante';
-          return (
-            <tr key={originalIdx} className={`border-b border-slate-200 hover:bg-green-50/50 h-8 ${!esEditable ? 'bg-slate-50/50' : ''}`}>
-             <td className="text-center sticky left-0 z-20 bg-green-200 font-bold border-r border-slate-300 text-gray-600 w-6 text-[10px]">
-              {displayIdx + 1}
-              </td>
-             <td className="hidden md:table-cell p-0 sticky left-7 z-20 bg-gray-200 border-r border-slate-300 w-8">
-               <select
-                disabled={esEstudiante || !esEditable}
-                value={generoActual}
-                onChange={(e) => setGeneros(prev => ({ ...prev, [nombreKey]: e.target.value }))}
-                className={`w-full h-full text-center font-bold outline-none appearance-none bg-transparent ${
-                generoActual === 'H' ? 'text-blue-600' : generoActual === 'M' ? 'text-pink-500' : 'text-gray-400'
-                }`}
-                >
-                  <option value="">-</option>
-                  <option value="M">M</option>
-                  <option value="H">H</option>
-                 </select>
-              </td>
-
-              <td className="p-0 sticky left-7 md:left-15 z-30 bg-white border-r border-slate-200 min-w-[80px] md:min-w-[250px] h-8 shadow-[3px_0_3px_-2px_rgba(0,0,0,0.1)]">
-               <div className="flex flex-col px-2 justify-center h-full overflow-hidden">
-                <span className={`font-bold uppercase text-[9px] truncate ${!esEditable ? 'text-slate-400' : 'text-slate-700'}`}>
-                  {nombre}
-                 </span>
-                  <span className={`text-[7px] font-black tracking-tighter uppercase ${
-                    estadoActual === 'Activo' ? 'text-emerald-500' : 
-                    estadoActual === 'Ingresante' ? 'text-blue-500' : 
-                    estadoActual === 'Retirado' ? 'text-red-500' : 'text-amber-500'
-                    }`}>
-                   {estadoActual}
-                  </span>
-                </div>
-              </td>
-
-              {competencias.map((comp, cIdx) => (
-               <React.Fragment key={cIdx}>
-                 {[1, 2, 3, 4].map(dIdx => {
-                   const llaveNota = `${dniEst}-${cIdx}-${dIdx}`; 
-                   const notaActual = notas[llaveNota] || "";
-                    return (
-                      <td key={dIdx} className="p-0 border-r border-slate-200 w-7">
-                       <select
-                         disabled={esEstudiante || !esEditable}
-                         value={notaActual}
-                         onChange={(e) => setNotas(prev => ({ ...prev, [llaveNota]: e.target.value }))}
-                         className={`w-full h-7 text-center font-bold outline-none appearance-none text-[9px] ${getColorNota(notaActual)} ${!esEditable ? 'bg-gray-100 opacity-50 cursor-not-allowed' : 'bg-transparent'}`}
-                         >
-                         <option value="">-</option>
-                         <option value="AD">AD</option>
-                         <option value="A">A</option>
-                         <option value="B">B</option>
-                         <option value="C">C</option>
-                       </select>
-                     </td>
-                     );
-                  })}
-                 <td className={`text-center font-black bg-green-100 border-r border-slate-200 text-[9px] w-8 ${getColorNota(calcularPromedio(dniEst, cIdx))}`}>
-                  {esEditable ? calcularPromedio(dniEst, cIdx) : '-'}
-                   </td>
-                    </React.Fragment>
-                     ))}
-          
-                      <td className={`text-center font-black bg-yellow-200 sticky right-0 z-20 border-l border-yellow-300 text-[9px] w-10 ${getColorNota(calcularLogroBimestral(dniEst))}`}>
-                       {esEditable ? calcularLogroBimestral(dniEst) : '-'}
-                        </td>
-                      </tr>
-                     );
-                  })}
-              </tbody>
-            </table>
+                   className="bg-gray-900 hover:bg-slate-800 text-white px-7 py-4 rounded-xl text-[10px] font-black flex items-center justify-center gap-2 transition-all active:scale-95 shadow-xl shadow-slate-200 disabled:bg-slate-400 flex-1 sm:flex-none"
+                    >
+                    {loading ? <Loader2 className="w-2 h-2 animate-spin" /> : <Save className="w-4 h-4 text-green-100" />} 
+                    <span>GUARDAR</span>
+                   </button>
+                  </>
+                 )}
+              </div>
+            </div>
           </div>
+         </div>
+         {/* TABLA: SOLUCIÓN AL DESPLAZAMIENTO */}
+            <div className="p-4 flex-1">
+              <div className="bg-white border border-slate-200 shadow-2xl rounded-[1.5rem] overflow-hidden">
+                {/* Contenedor con scroll horizontal SOLAMENTE */}
+                <div className="overflow-x-auto custom-scrollbar shadow-xl rounded-lg">
+                  <table className="w-max md:w-full border-collapse table-auto">
+                  <thead>
+                 <tr className="bg-slate-600 text-white text-[9px] uppercase font-bold h-10">
+               {/* N° - Ancho fijo w-7 coincide con left-7 de los nombres */}
+             <th rowSpan="2" className="p-1 w-10 sticky left-0 z-50 bg-emerald-700 border-r border-b border-green-500 text-center">
+            N°
+          </th>
+          {/* SEXO - Solo escritorio */}
+          <th rowSpan="2" className="hidden md:table-cell p-1 w-8 sticky left-7 z-50 bg-pink-700 border-r border-b border-green-500 text-center">
+           SEXO
+            </th>
+             {/* APELLIDOS Y NOMBRES - Desplazamiento coordinado */}
+              <th rowSpan="2" className="w-[100px] md:w-[300px] sticky left-7 md:left-15 z-40 bg-slate-600 border-r border-b border-slate-400 text-center px-1 shadow-[3px_0_3px_-2px_rgba(0,0,0,0.3)]">
+               <div className="text-[10px] md:text-[10px] leading-tight whitespace-normal md:whitespace-nowrap flex items-center justify-center h-full">
+              APELLIDOS Y NOMBRES
+            </div>
+          </th>
+          {competencias.map((c, i) => (
+          <th key={i} colSpan="5" className="p-1 border-r border-b border-slate-400 bg-slate-600 text-center min-w-[60px] text-[8px]">
+            {c}
+             </th>
+              ))}
+             <th rowSpan="2" className="p-0.5 w-10 sticky right-0 z-50 bg-yellow-400 text-slate-800 font-black border-l border-b border-yellow-500 text-center text-[9px]">
+            LOGRO
+          </th>
+        </tr>
+        <tr className="bg-slate-800 text-white text-[9px] text-center uppercase h-7">
+          {competencias.map((_, i) => (
+            <React.Fragment key={i}>
+             {/* Columnas D1-D4 más anchas en escritorio */}
+              <th className="w-8 border-r border-green-600/50">D1</th>
+              <th className="w-8 border-r border-green-600/50">D2</th>
+              <th className="w-8 border-r border-green-600/50">D3</th>
+              <th className="w-8 border-r border-green-600/50">D4</th>
+              <th className="w-8 bg-emerald-500 font-bold border-r border-green-600">PROM</th>
+            </React.Fragment>
+            ))}
+          </tr>
+          </thead>
+         <tbody className={`text-[10px] ${perfilUsuario?.rol_id === 6 ? 'pointer-events-none' : ''}`}>
+         {alumnosOrdenados
+          .filter(({ nombre }) => {
+           const rolUsuario = Number(perfilUsuario?.rol_id);
+           const nombreKey = (nombre || "").toUpperCase().trim();
+           const dniEst = dnis[nombreKey];
+      
+           let coincideDocente = (rolUsuario === 1 || rolUsuario === 3);
+          if (!coincideDocente) {
+         const idFila = normalizarID(nombre);
+         const idUsuario = normalizarID(perfilUsuario?.nombre_completo);
+         coincideDocente = idFila.includes(idUsuario) || idUsuario.includes(idFila);
+         }
+
+        const estadoEst = estadosAlumnos[dniEst] || 'Activo';
+        const coincideEstado = (filtroEstado === 'Todos' || estadoEst === filtroEstado);
+        return coincideDocente && coincideEstado;
+        })
+        .map(({ nombre, originalIdx }, displayIdx) => {
+         const nombreEst = (nombre || "").toUpperCase().trim();
+         const dniEst = dnis[nombreEst];
+         const generoActual = generos[nombreEst] || "";
+         const estadoActual = estadosAlumnos[dniEst] || 'Activo';
+
+        return (
+           <tr key={originalIdx} className="border-b border-slate-200 hover:bg-green-50/50 h-10 md:h-8">
+              {/* N° ORDEN - ESTÁTICO (Sticky left-0) */}
+               <td className="text-center sticky left-0 z-[40] bg-green-200 font-bold border-r border-slate-300 text-gray-600 w-6 min-w-[24px] text-[9px]">
+                {displayIdx + 1}
+                </td>
+                {/* SEXO - Solo visible en Desktop, pegado al N° */}
+               <td className="hidden md:table-cell p-0 sticky left-6 z-[30] bg-gray-200 border-r border-slate-300 w-8">
+              <select
+              disabled={esEstudiante}
+              value={generoActual}
+              onChange={(e) => setGeneros(prev => ({ ...prev, [nombreEst]: e.target.value }))}
+              className="w-full h-full text-center font-bold outline-none appearance-none bg-transparent">
+                 <option value="">-</option>
+                 <option value="M">M</option>
+                 <option value="H">H</option>
+              </select>
+             </td>
+           {/* COLUMNA NOMBRE - ESTÁTICO (Límite del scroll) */}
+           {/* En móvil se queda en left-6, en PC en left-14 por la columna Sexo */}
+           <td className="p-0 sticky left-8 md:left-14 z-[35] bg-white border-r border-slate-200 min-w-[120px] md:min-w-[250px] shadow-[4px_0_4px_-2px_rgba(0,0,0,0.15)]">
+             <div className="flex flex-col px-2 justify-center h-full min-h-[40px] md:min-h-0 leading-tight">
+              <span className="font-bold uppercase text-[7.5px] md:text-[9px] text-slate-700 whitespace-normal break-words line-clamp-2">
+                {nombre}
+                </span>
+                <span className={`text-[7px] font-black uppercase tracking-tighter ${
+                  estadoActual === 'Activo' ? 'text-emerald-500' : 
+                  estadoActual === 'Trasladado' ? 'text-amber-500' : 
+                  estadoActual === 'Ingresante' ? 'text-blue-500' : 
+                  estadoActual === 'Retirado' ? 'text-red-500' : 'text-amber-500'
+                 }`}>
+                 {estadoActual}
+                </span>
+              </div>
+            </td>
+
+            {/* ÁREA DE NOTAS - SE DESPLAZA POR DEBAJO */}
+            {competencias.map((_, cIdx) => (
+              <React.Fragment key={cIdx}>
+                {[1, 2, 3, 4].map(dIdx => {
+                  const notaKey = `${dniEst}-${cIdx}-${dIdx}`; 
+                  const notaValor = notas[notaKey] || "";
+                  return (
+                   <td key={dIdx} className="p-0 border-r border-slate-200 w-6 min-w-[22px]">
+                      <select
+                         disabled={esEstudiante}
+                          value={notaValor}
+                          onChange={(e) => setNotas(prev => ({ ...prev, [notaKey]: e.target.value }))}
+                          className={`w-full h-full min-h-[32px] text-center font-bold outline-none appearance-none bg-transparent text-[9px] ${getColorNota(notaValor)}`}
+                          >
+                            <option value="">-</option>
+                            <option value="AD">AD</option>
+                            <option value="A">A</option>
+                            <option value="B">B</option>
+                            <option value="C">C</option>
+                        </select>
+                     </td>
+                    );
+                  })}
+                 {/* PROMEDIO COMPETENCIA */}
+                 <td className={`text-center font-black bg-green-50 border-r border-slate-200 text-[8px] w-7 min-w-[26px] ${getColorNota(calcularPromedio(dniEst, cIdx))}`}>
+                  {calcularPromedio(dniEst, cIdx)}
+                  </td>
+                   </React.Fragment>
+                   ))}
+
+                 {/* LOGRO FINAL - Sticky a la derecha */}
+                 <td className={`text-center font-black bg-yellow-200 sticky right-0 z-[30] border-l border-yellow-300 text-[9px] w-8 min-w-[32px] ${getColorNota(calcularLogroBimestral(dniEst))}`}>
+                  {calcularLogroBimestral(dniEst)}
+                 </td>
+               </tr>
+               );
+             })}
+          </tbody>
+         </table>
         </div>
+       </div>
       </div>
       {/* MODAL CONFIRMACIÓN */}
-      {showConfirm && (
+       {showConfirm && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-800 backdrop-blur-sm">
           <div className="bg-white rounded-[2rem] p-8 max-w-sm w-full text-center shadow-2xl">
             <h3 className="text-xl font-black text-slate-800">¿Guardar registro?</h3>

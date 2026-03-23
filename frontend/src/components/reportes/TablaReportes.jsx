@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 
 const TablaReportes = ({ datosTabla = [] }) => {
   const [paginaActual, setPaginaActual] = useState(1);
-  const registrosPorPagina = 4; // Reducimos a 4 para asegurar que quepa en pantalla
+  const registrosPorPagina = 3; // Reducimos a 4 para asegurar que quepa en pantalla
 
   const ultimoIndice = paginaActual * registrosPorPagina;
   const primerIndice = ultimoIndice - registrosPorPagina;

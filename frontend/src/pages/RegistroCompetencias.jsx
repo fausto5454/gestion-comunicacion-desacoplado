@@ -139,13 +139,15 @@ const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion
     setEstadosAlumnos(mapaEstados); // <--- CORRECCIÓN: Define la variable que faltaba en la consola
 
     if (matriculados?.length > 0) {
-      const areaQuery = area.normalize("NFC").toUpperCase().trim(); 
+      const areaQuery = area.toUpperCase().trim();
 
       const { data: califData, error } = await supabase
           .from('calificaciones')
           .select('*')
-          .eq('area', areaQuery)
-          .eq('bimestre', parseInt(bimestre));
+          .ilike('area', areaQuery)
+          .eq('bimestre', parseInt(bimestre))
+          .eq('grado', gradoDB)    
+          .eq('seccion', seccionDB);
 
       const nuevasNotas = {};
 
@@ -238,6 +240,11 @@ const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion
     const colLogroIdx = 3 + (numComp * 5);
 
     // 2. ESTILOS BASE
+    const estiloTituloPrincipal = {
+      font: { bold: true, sz: 14, color: { rgb: "FFFFFF" } },
+      fill: { fgColor: { rgb: "16A34A" } }, // Tu verde institucional
+      alignment: { horizontal: "center", vertical: "center" }
+     };
     const borderThin = { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } };
     const estiloBase = { font: { sz: 8 }, border: borderThin, alignment: { vertical: "center", horizontal: "center" } };
     const estiloVerdeEncabezado = { ...estiloBase, font: { bold: true, color: { rgb: "FFFFFF" }, sz: 9 }, fill: { fgColor: { rgb: "00A859" } } };
@@ -271,7 +278,9 @@ const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion
 
     // --- ENCABEZADOS DINÁMICOS ---
     const textoBimestre = obtenerTextoBimestre(bimestreSeleccionado);
-    rows.push([{ v: `REGISTRO AUXILIAR 2026 - ${textoBimestre}`, s: { font: { bold: true, sz: 14 }, alignment: { horizontal: "center" } } }]);
+    const filaTitulo = Array(colLogroIdx + 6).fill({ v: "", s: estiloTituloPrincipal });
+    filaTitulo[0] = { v: `REGISTRO AUXILIAR 2026 - ${textoBimestre}`, s: estiloTituloPrincipal };
+    rows.push(filaTitulo);
     
     const filaInfo = Array(colLogroIdx + 6).fill({ v: "", s: {} });
     filaInfo[0] = { v: `ÁREA: ${area.toUpperCase()}`, s: { font: { bold: true, sz: 8 } } };
@@ -323,33 +332,76 @@ const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion
         row.push({ v: lf, s: { ...estiloBase, fill: { fgColor: { rgb: "FEF08A" } }, font: { sz: 8, bold: true, color: { rgb: colorLf } } } });
         row.push({ v: "", s: {} }); 
 
-        // --- RESUMEN ESTADÍSTICO CON MEJORA DE COLORES ---
-        const nivelesResumen = [
-            { l: "DESTACADO", n: "AD", c: "00FF00", f: "000000" },
-            { l: "LOGRADO",   n: "A",  c: "0000FF", f: "FFFFFF" },
-            { l: "EN PROCESO", n: "B",  c: "FFFF00", f: "000000" },
-            { l: "EN INICIO",  n: "C",  c: "FF0000", f: "FFFFFF" }
-        ];
+       const calcularPorcentajesExactos = () => {
+    if (totalRegistros === 0) return { AD: 0, A: 0, B: 0, C: 0 };
 
-        if (idx < 4) {
-            const item = nivelesResumen[idx];
-            const cant = stats[item.n] || 0;
-            const porc = totalRegistros > 0 ? ((cant / totalRegistros) * 100).toFixed(0) : 0;
-            const colorLetraNota = coloresCalificaciones[item.n]; // Conecta el color dinámico
+    const notasClaves = ['AD', 'A', 'B', 'C'];
+    let sumaRedondeada = 0;
 
-            row.push({ v: item.l, s: { ...estiloBase, fill: { fgColor: { rgb: item.c } }, font: { bold: true, sz: 8, color: { rgb: item.f } }, alignment: { horizontal: "left" } } });
-            row.push({ v: item.n, s: { ...estiloBase, font: { bold: true, color: { rgb: colorLetraNota } } } }); // Mejora aplicada
-            row.push({ v: cant, s: estiloBase });
-            row.push({ v: `${porc}%`, s: estiloBase });
-        } else if (idx === 4) {
-            row.push({ v: "TOTAL", s: estiloTotalGris }, { v: "", s: estiloTotalGris }, { v: totalRegistros, s: estiloTotalGris }, { v: "100%", s: estiloTotalGris });
-        }
-        rows.push(row);
+    // Calculamos valores reales y aplicamos redondeo estándar
+    let datos = notasClaves.map(n => {
+        const real = ((stats[n] || 0) / totalRegistros) * 100;
+        const redondeado = Math.round(real); // Redondeo clásico (ej: 46.6 -> 47)
+        sumaRedondeada += redondeado;
+        return { n, real, redondeado, diferencia: real - redondeado };
+    });
+
+    let diferenciaTotal = 100 - sumaRedondeada;
+
+    // Si la suma no es 100, ajustamos al que tenga el mayor error de redondeo
+    if (diferenciaTotal !== 0) {
+        // Ordenamos por la magnitud de la diferencia para identificar el mejor candidato al ajuste
+        datos.sort((a, b) => diferenciaTotal > 0 
+            ? b.diferencia - a.diferencia 
+            : a.diferencia - b.diferencia
+        );
+        datos[0].redondeado += diferenciaTotal;
+    }
+
+    return datos.reduce((acc, curr) => ({ ...acc, [curr.n]: curr.redondeado }), {});
+};
+
+// Ejecutamos la lógica una sola vez
+const porcentajesFinales = calcularPorcentajesExactos();
+
+// 2. CONSTRUCCIÓN DEL RESUMEN EN EL EXCEL (DENTRO DEL FOREACH DE ALUMNOS)
+const nivelesResumen = [
+    { l: "DESTACADO", n: "AD", c: "32CD32", f: "000000" },
+    { l: "LOGRADO",   n: "A",  c: "0000FF", f: "FFFFFF" },
+    { l: "EN PROCESO", n: "B",  c: "FFFF00", f: "000000" },
+    { l: "EN INICIO",  n: "C",  c: "FF0000", f: "FFFFFF" }
+];
+
+if (idx < 4) {
+    const item = nivelesResumen[idx];
+    const cant = stats[item.n] || 0;
+    const porc = porcentajesFinales[item.n]; // Valor corregido y redondeado
+    const colorLetraNota = coloresCalificaciones[item.n] || "000000";
+
+    row.push({ 
+        v: item.l, 
+        s: { ...estiloBase, fill: { fgColor: { rgb: item.c } }, font: { bold: true, sz: 8, color: { rgb: item.f } }, alignment: { horizontal: "left" } } 
+    });
+    row.push({ 
+        v: item.n, 
+        s: { ...estiloBase, font: { bold: true, sz: 7, color: { rgb: colorLetraNota } } } 
+    }); 
+    row.push({ v: cant, s: estiloBase });
+    row.push({ v: `${porc}%`, s: estiloBase }); 
+
+} else if (idx === 4) {
+    row.push(
+        { v: "TOTAL", s: estiloTotalGris }, 
+        { v: "", s: estiloTotalGris }, 
+        { v: totalRegistros, s: estiloTotalGris }, 
+        { v: "100%", s: estiloTotalGris }
+    );
+}
+       rows.push(row);
       });
 
       const ws = XLSX.utils.aoa_to_sheet(rows);
-     
-      // Merges y Alturas (Configuración estable)
+    
       // 4. MERGES ESTRATÉGICOS (PARA EVITAR DATOS OCULTOS)
       ws['!merges'] = [
           { s: { r: 0, c: 0 }, e: { r: 0, c: colLogroIdx + 5 } }, // Título Principal
@@ -396,10 +448,12 @@ const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion
     const { data: { user } } = await supabase.auth.getUser();
     const correoResponsable = user?.email || 'usuario_desconocido';
 
-    const gradoLimpio = grado.replace("°", ""); 
-    const partes = gradoLimpio.split(" ");
-    const numGrado = partes[0]?.trim(); // "1", "2", etc.
-    const seccionFinal = partes[1]?.trim() || "A";
+    const partes = grado.trim().split(" "); 
+    let numGrado = partes[0]?.trim().toUpperCase() || "";
+    if (numGrado && !numGrado.includes("°")) {
+        numGrado = `${numGrado}°`;
+    }
+    const seccionFinal = partes[1]?.trim().toUpperCase() || "A";
     
     const areaNormalizada = area.toUpperCase().trim();
     const bimestreInt = parseInt(bimestre);
@@ -546,7 +600,7 @@ const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion
       // 5. ÉXITO FINAL
       Swal.fire({
         icon: 'success',
-        title: '<span style="color:#10b981; font-weight:800">¡SINCRO EXITOSA!</span>',
+        title: '<span style="color:#10b981; font-weight:800">¡REGISTRO EXITOSO!</span>',
         text: `Se actualizaron ${data.length} registros y se generó un respaldo en la nube.`,
         timer: 2500,
         showConfirmButton: false,
@@ -660,10 +714,7 @@ return (
               <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
              {!esEstudiante && (
               <>
-                <button 
-                  onClick={exportarExcel} 
-                   className="bg-green-600 hover:bg-green-600 text-white px-4 py-2.5 rounded-xl text-[10px] font-black flex items-center justify-center gap-2 transition-all active:scale-95 shadow-lg shadow-green-100 flex-1 sm:flex-none"
-                    >
+                <button onClick={() => exportarExcel(bimestre)} className="bg-green-600 hover:bg-green-700 text-white px-4 py-2.5 rounded-xl text-[10px] font-black flex items-center justify-center gap-2 transition-all active:scale-95 shadow-lg shadow-green-100 flex-1 sm:flex-none">
                   <Download className="w-4 h-4" /> 
                 <span className="inline">EXCEL</span>
               </button>
@@ -755,21 +806,24 @@ return (
                <td className="text-center sticky left-0 z-[40] bg-green-200 font-bold border-r border-slate-300 text-gray-600 w-6 min-w-[24px] text-[9px]">
                 {displayIdx + 1}
                 </td>
-                {/* SEXO - Solo visible en Desktop, pegado al N° */}
-               <td className="hidden md:table-cell p-0 sticky left-6 z-[30] bg-gray-200 border-r border-slate-300 w-8">
+                 {/* COLUMNA SEXO */}
+               <td className="hidden md:table-cell p-0 sticky left-7 z-20 bg-gray-200 border-r border-slate-300 w-8">
               <select
               disabled={esEstudiante}
               value={generoActual}
-              onChange={(e) => setGeneros(prev => ({ ...prev, [nombreEst]: e.target.value }))}
-              className="w-full h-full text-center font-bold outline-none appearance-none bg-transparent">
-                 <option value="">-</option>
-                 <option value="M">M</option>
-                 <option value="H">H</option>
-              </select>
-             </td>
+               onChange={(e) => setGeneros(prev => ({ ...prev, [nombreEst]: e.target.value }))}
+               className={`w-full h-full text-center font-bold outline-none appearance-none bg-transparent ${
+                generoActual === 'H' ? 'text-blue-600' :
+                generoActual === 'M' ? 'text-pink-500' : 'text-gray-400'
+               }`}>
+               <option value="">-</option>
+               <option value="M">M</option>
+               <option value="H">H</option>
+             </select>
+            </td>
            {/* COLUMNA NOMBRE - ESTÁTICO (Límite del scroll) */}
            {/* En móvil se queda en left-6, en PC en left-14 por la columna Sexo */}
-           <td className="p-0 sticky left-8 md:left-14 z-[35] bg-white border-r border-slate-200 min-w-[120px] md:min-w-[250px] shadow-[4px_0_4px_-2px_rgba(0,0,0,0.15)]">
+           <td className="p-0 sticky left-8 md:left-14 z-[35] bg-white border-r border-slate-200 min-w-[115px] md:min-w-[250px] shadow-[4px_0_4px_-2px_rgba(0,0,0,0.15)]">
              <div className="flex flex-col px-2 justify-center h-full min-h-[40px] md:min-h-0 leading-tight">
               <span className="font-bold uppercase text-[7.5px] md:text-[9px] text-slate-700 whitespace-normal break-words line-clamp-2">
                 {nombre}

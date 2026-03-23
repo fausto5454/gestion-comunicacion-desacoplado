@@ -22,7 +22,7 @@ const CalificacionesPage = ({ session }) => {
 
     const AREAS_MINEDU = [
         "Matemática", "Comunicación", "Ciencia y Tecnología", "Ciencias Sociales", 
-        "DPCC", "EPT", "Arte y Cultura", "Educación Física", "Religión", "Inglés", "Tutoría"
+        "DPCC", "EPT", "Arte y Cultura", "Educacion Física", "Religión", "Inglés", "Tutoría"
     ];
 
     // Carga dinámica de áreas al cambiar el grado

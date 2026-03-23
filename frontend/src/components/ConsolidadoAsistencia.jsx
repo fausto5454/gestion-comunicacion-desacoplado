@@ -122,8 +122,8 @@ const ConsolidadoAsistencia = () => {
           
           // Lógica Admin/Docente
           setPerfilUsuario(perfil);
-          if (Number(perfil.rol_id) === 1, 3) { // Admin
-             gradosFinales = ['1-A', '1-B', '1-C', '2-A', '2-B', '2-C', '3-A', '3-B', '4-A', '4-B', '5-A', '5-B'];
+          if ([1, 3].includes(Number(perfil.rol_id))) { 
+          gradosFinales = ['1-A', '1-B', '1-C', '2-A', '2-B', '2-C', '3-A', '3-B', '4-A', '4-B', '5-A', '5-B'];
           }
           const [initG, initS] = gradosFinales[0]?.split('-') || ['1', 'A'];
           setSeleccion(prev => ({ ...prev, grado: initG, seccion: initS, area: areasFinales[0] }));
@@ -162,6 +162,18 @@ const ConsolidadoAsistencia = () => {
       return nombreCompleto.includes(searchTerm.toLowerCase());
     });
   }, [estudiantes, searchTerm]);
+
+   const mapeoExcel = {
+      'Presente': 'P',
+      'P': 'P',
+      'Ausente': 'F',
+      'A': 'F', // Agrega esto para que la "A" de tu BD sea "F" en Excel
+      'Falta': 'F',
+      'Tardanza': 'T',
+      'T': 'T',
+      'Justificado': 'J',
+      'J': 'J'
+   };
   
  const handleExportExcel = async () => {
     const workbook = new ExcelJS.Workbook();
@@ -254,13 +266,20 @@ const ConsolidadoAsistencia = () => {
   
     // 6. LLENADO DE DATOS (Con bordes Thin Negros)
     filtrados.forEach((est, index) => {
-      let faltas = 0;
-      const filaAsistencia = diasDelMes.map(d => {
-        const valor = datos[est.id_matricula]?.[d.numero] || '-';
-        if(valor === 'A') faltas++;
-        return valor;
+    let faltas = 0;
+    
+    const filaAsistencia = diasDelMes.map(d => {
+      // Usamos el id_matricula o dni_estudiante según cómo esté guardado en 'datos'
+      const valorOriginal = datos[est.dni_estudiante]?.[d.numero] || 
+                            datos[est.id_matricula]?.[d.numero] || '-';
+      
+      // Contar faltas (A o Ausente o Falta)
+      if (valorOriginal === 'F' || valorOriginal === 'Ausente' || valorOriginal === 'Falta') {
+        faltas++;
+      }
+      return mapeoExcel[valorOriginal] || valorOriginal; 
       });
-  
+
       const row = worksheet.addRow([
         index + 1, 
         `${est.apellido_paterno} ${est.apellido_materno}, ${est.nombres}`, 
@@ -268,22 +287,75 @@ const ConsolidadoAsistencia = () => {
         faltas
       ]);
       
-      row.eachCell((cell, colNum) => {
-        cell.font = { name: 'Arial', size: 9 };
-        // Bordes delgados negros en todas las celdas de datos
-        cell.border = { 
-          top: { style: 'thin' }, 
-          left: { style: 'thin' }, 
-          bottom: { style: 'thin' }, 
-          right: { style: 'thin' } 
-        };
-        
-        if (colNum === 1 || colNum > 2) {
-          cell.alignment = { horizontal: 'center' };
+    row.eachCell((cell, colNum) => {
+    // 1. Estilo base para todas las celdas
+    cell.font = { name: 'Arial', size: 9 };
+    cell.alignment = { vertical: 'middle', horizontal: 'center' };
+    cell.border = { 
+      top: { style: 'thin', color: { argb: 'FFCBD5E1' } }, 
+      left: { style: 'thin', color: { argb: 'FFCBD5E1' } }, 
+      bottom: { style: 'thin', color: { argb: 'FFCBD5E1' } }, 
+      right: { style: 'thin', color: { argb: 'FFCBD5E1' } } 
+    };
+
+    if (colNum === 1) {
+        // AZUL CLARO para la columna N° (Mejor contraste)
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0F2FE' } };
+    } 
+    
+    if (colNum === totalCols) {
+        // ROJO CLARO base para la columna Faltas (bg-red-100)
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEE2E2' } };
+
+    if (faltas >= 3) {
+            cell.fill = {
+                type: 'pattern',
+                pattern: 'solid',
+                fgColor: { argb: 'FFDC2626' } // Rojo vibrante de la UI
+            };
+            cell.font = { name: 'Arial', size: 9, bold: true, color: { argb: 'FFFFFFFF' } };
         }
-      });
+    }
+
+    if (colNum >= 3 && colNum <= (diasDelMes.length + 2)) {
+      const indiceDia = colNum - 3;
+      const dia = diasDelMes[indiceDia];
+      const nombreLimpio = dia.nombre.toUpperCase();
+      const esFinde = nombreLimpio.includes("SÁB") || nombreLimpio.includes("DOM");
+
+      if (esFinde) {
+        // APLICAR COLOR DE FONDO (Fila de estudiante, columna de finde)
+        cell.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: 'FFFEF2F2' } // Un rojo muy claro (pálido) para el contenido
+        };
+        cell.font = { color: { argb: 'FFB91C1C' }, size: 9 }; // Texto rojo oscuro para el '-'
+      }
+    }
+    // 2. Alineación: Centro para N° y estados, Izquierda para Nombres (col 2)
+   cell.alignment = (colNum === 1 || colNum > 2) 
+     ? { horizontal: 'center', vertical: 'middle' } 
+     : { horizontal: 'left', indent: 1 };
+
+   // 3. Color de letra según el estado (Columnas de asistencia)
+  if (colNum > 2 && colNum < totalCols) {
+    const valor = cell.value ? cell.value.toString().trim().toUpperCase() : '';
+
+     if (valor === 'F') {
+           // Importante: Volver a pasar el size para que no se resetee
+           cell.font = { name: 'Arial', size: 8, color: { argb: 'FFFF0000' }, bold: true };
+         } else if (valor === 'T') {
+           cell.font = { name: 'Arial', size: 8, color: { argb: 'FFBF9000' }, bold: true }; // Ámbar más oscuro para lectura
+         } else if (valor === 'J') {
+           cell.font = { name: 'Arial', size: 8, color: { argb: 'FF274E13' }, bold: true }; // Verde
+         } else if (valor === 'P') {
+           cell.font = { name: 'Arial', size: 8, color: { argb: 'FF000000' } };
+        }
+       }
+     });
     });
-  
+
     const buffer = await workbook.xlsx.writeBuffer();
     saveAs(new Blob([buffer]), `Asistencia_${seleccion.area}_${seleccion.grado}${seleccion.seccion}.xlsx`);
    };
@@ -323,11 +395,9 @@ const ConsolidadoAsistencia = () => {
         </button>
        )}
      </div>
-
     {/* FILTROS INTEGRADOS DINÁMICOS */}
     <div className="bg-emerald-700 p-4 rounded-[2rem] shadow-lg mb-6 flex flex-col lg:flex-row gap-4 items-center justify-between">
       <div className="flex flex-wrap gap-2 w-full lg:w-auto">
-        
         {/* GRADO/SEC SELECTOR */}
         <div className="min-w-[120px] flex items-center gap-2 bg-slate-100 px-3 py-2 rounded-2xl border">
           <Filter size={14} className="text-emerald-600" />
@@ -340,8 +410,7 @@ const ConsolidadoAsistencia = () => {
                 const [g, s] = val.split('-');
                 setSeleccion(prev => ({...prev, grado: g, seccion: s}));
               }
-            }}
-          >
+            }}>
             {opcionesPermitidas.grados.length > 0 ? (
               opcionesPermitidas.grados.map(opt => (
                 <option key={opt} value={opt}>{opt.replace('-', '° ')}</option>
@@ -351,7 +420,6 @@ const ConsolidadoAsistencia = () => {
             )}
           </select>
         </div>
-
         {/* ÁREA SELECTOR */}
         <div className="flex-1 min-w-[150px] flex items-center gap-2 bg-slate-100 px-3 py-2 rounded-2xl border">
           <Menu size={14} className="text-emerald-600" />
@@ -359,7 +427,7 @@ const ConsolidadoAsistencia = () => {
             className="bg-transparent font-black text-green-700 outline-none text-[10px] uppercase w-full cursor-pointer" 
             value={seleccion.area} 
             onChange={(e) => setSeleccion(prev => ({...prev, area: e.target.value}))}
-          >
+            >
             {opcionesPermitidas.areas.length > 0 ? (
               opcionesPermitidas.areas.map(a => <option key={a} value={a}>{a}</option>)
             ) : (
@@ -367,19 +435,16 @@ const ConsolidadoAsistencia = () => {
             )}
           </select>
         </div>
-
         {/* MES SELECTOR */}
         <select 
           className="flex-1 min-w-[100px] bg-slate-100 px-3 py-2 rounded-2xl border font-black text-[11px] uppercase outline-none" 
           value={seleccion.mes} 
-          onChange={(e) => setSeleccion(prev => ({...prev, mes: parseInt(e.target.value)}))}
-        >
+          onChange={(e) => setSeleccion(prev => ({...prev, mes: parseInt(e.target.value)}))}>
           {["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"].map((m, i) => (
             <option key={i} value={i+1}>{m}</option>
           ))}
         </select>
       </div>
-
       {/* BÚSQUEDA */}
       <div className="relative w-full lg:w-64">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
@@ -392,7 +457,6 @@ const ConsolidadoAsistencia = () => {
         />
       </div>
     </div>
-
     {/* TABLA DE RESULTADOS */}
     <div className="bg-white rounded-[1rem] shadow-xl border border-gray-300 overflow-hidden">
       <div className="overflow-x-auto">
@@ -414,56 +478,81 @@ const ConsolidadoAsistencia = () => {
               })}
               <th className="sticky right-0 top-0 z-40 bg-red-600 py-2 text-[8px] md:text-[10px] font-black w-[50px] text-center border-l border-slate-800">FALTAS</th>
             </tr>
-          </thead>
+           </thead>
           <tbody className="divide-y divide-slate-100 bg-white">
-            {loading ? (
-              <tr>
-                <td colSpan={diasDelMes.length + 3} className="py-20 text-center">
-                  <div className="flex flex-col items-center gap-2">
-                    <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Sincronizando con Supabase...</span>
-                  </div>
-                </td>
-              </tr>
-            ) : filtrados.length === 0 ? (
-              <tr>
-                <td colSpan={diasDelMes.length + 3} className="py-20 text-center text-slate-400 font-bold uppercase text-[10px]">
-                  No se encontraron registros de matrícula
-                </td>
-              </tr>
-            ) : (
-              filtrados.map((est, index) => {
-                let totalFaltas = 0;
-                const asistenciaEst = datos[est.dni_estudiante] || {};
+          {loading ? (
+           <tr>
+            <td colSpan={diasDelMes.length + 3} className="py-20 text-center">
+             <div className="flex flex-col items-center gap-2">
+              <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Sincronizando con Supabase...</span>
+              </div>
+             </td>
+           </tr>
+         ) : filtrados.length === 0 ? (
+        <tr>
+          <td colSpan={diasDelMes.length + 3} className="py-20 text-center text-slate-400 font-bold uppercase text-[10px]">
+            No se encontraron registros de matrícula
+          </td>
+         </tr>
+       ) : (
+       filtrados.map((est, index) => {
+       const asistenciaEst = datos[est.dni_estudiante] || {};
+       // 1. CÁLCULO PREVIO: Contamos las faltas antes de retornar el JSX
+       let totalFaltas = 0;
+        diasDelMes.forEach(dia => {
+         const valorBD = asistenciaEst[dia.numero] || '';
+         const res = valorBD.toString().trim().toUpperCase().charAt(0);
+         if (['F', 'A'].includes(res)) totalFaltas++;
+         });
+        const enRiesgo = totalFaltas >= 3;
+        return (
+            <tr key={est.id_matricula || est.dni_estudiante} className="hover:bg-slate-50 transition-colors group">
+              {/* COLUMNA N° */}
+               <td className="sticky left-0 z-30 bg-emerald-100 py-1 text-center text-[8px] md:text-[12px] font-bold text-emerald-600 border-r border-slate-300">
+                {(index + 1).toString().padStart(2, '0')}
+                  </td>
 
-                return (
-                  <tr key={est.id_matricula || est.dni_estudiante} className="hover:bg-slate-50 transition-colors group">
-                    <td className="sticky left-0 z-30 bg-emerald-100 py-1 text-center text-[8px] md:text-[12px] font-bold text-emerald-600 border-r border-slate-300">
-                      {(index + 1).toString().padStart(2, '0')}
-                    </td>
-                    <td className="bg-white py-1 px-3 text-[8px] md:text-[10px] font-semibold text-slate-700 border-r border-slate-300/80 uppercase">
-                      {est.apellido_paterno} {est.apellido_paterno_materno || est.apellido_materno} {est.nombres}
-                    </td>
-                    {diasDelMes.map(dia => {
-                      const res = asistenciaEst[dia.numero] || '-';
-                      if (res === 'F' || res === 'A') totalFaltas++; // Asumiendo 'F' o 'A' como falta
-                      const esFinde = dia.nombre === "Sáb" || dia.nombre === "Dom";
-                      return (
-                        <td 
-                          key={dia.numero} 
-                          className={`text-center py-2 text-[11px] border-r border-slate-300/80 ${esFinde ? 'bg-red-50/50 text-red-400' : 'bg-white text-slate-400'}`}
-                        >
-                          {res}
-                        </td>
-                      );
-                    })}
-                    <td className={`sticky right-0 z-30 py-1 text-center font-black text-[8px] md:text-[13px] border-l border-slate-200 ${totalFaltas > 3 ? 'bg-red-600 text-white' : 'bg-red-100 text-slate-500'}`}>
-                      {totalFaltas}
+                 {/* COLUMNA APELLIDOS Y NOMBRES */}
+               <td className="bg-white py-1 px-3 text-[8px] md:text-[10px] font-semibold text-slate-700 border-r border-slate-300/80 uppercase">
+              {est.apellido_paterno} {est.apellido_paterno_materno || est.apellido_materno} {est.nombres}
+             </td>
+             {/* COLUMNAS DE DÍAS (ASISTENCIA) */}
+             {diasDelMes.map(dia => {
+             const valorBD = asistenciaEst[dia.numero] || '';
+             const res = valorBD.toString().trim().toUpperCase().charAt(0);
+             const esFinde = dia.nombre === "Sáb" || dia.nombre === "Dom";
+               const colorClass = 
+                 res === 'F' || res === 'A' ? 'text-red-600 font-semibold' : 
+                 res === 'T' ? 'text-amber-500 font-bold' : 
+                 res === 'J' ? 'text-green-600 font-bold' : 
+                 res === 'P' ? 'text-slate-800' : 'text-slate-300';
+
+                 const letraFinal = (res === 'A') ? 'F' : (['P','F','T','J'].includes(res) ? res : '-');
+                 return (
+                   <td 
+                    key={dia.numero} 
+                     className={`text-center py-0 border-r border-slate-300/80 min-w-[32px] md:min-w-[40px] ${esFinde ? 'bg-red-50' : 'bg-white'}`}
+                       >
+                      <span className={`text-[10px] md:text-[11px] select-none ${colorClass}`}>
+                     {letraFinal}
+                    </span>
+                   </td>
+                   );
+                 })}
+
+                  {/* COLUMNA TOTAL FALTAS (LA MEJORA) */}
+                   <td className={`sticky right-0 z-30 py-1 text-center font-semibold text-[10px] md:text-[11px] border-l border-slate-200 transition-all ${
+                     enRiesgo 
+                     ? 'bg-red-600 text-white animate-pulse shadow-inner' 
+                     : 'bg-red-100 text-slate-600'                        
+                     }`}>
+                     {totalFaltas}
                     </td>
                   </tr>
-                 );
-               })
-             )}
+                  );
+                })
+              )}
            </tbody>
          </table>
        </div>

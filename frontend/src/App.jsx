@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from './config/supabaseClient';
-import { Toaster } from 'react-hot-toast';
+import { Toaster, toast } from 'sonner';
 import AppLayout from './components/AppLayout';
 import LoginPage from './pages/LoginPage';
 
@@ -87,7 +87,18 @@ const App = () => {
 
   return (
     <>
-      <Toaster position="top-right" />
+      <Toaster 
+         position="top-right"
+         richColors 
+         toastOptions={{
+         style: { 
+         borderRadius: '20px', // Ajuste de redondeo
+         background: '#ffffff', // Fondo limpio
+         border: '1px solid #E2E8F0',
+        },
+         className: 'my-custom-toast',
+       }}
+      />
       <AppLayout 
         session={session} 
         userProfile={perfilUsuario} 

@@ -4,11 +4,12 @@ import {
   Save, FileText, FileSpreadsheet, Loader2, 
   Bookmark, Users, Calendar 
 } from 'lucide-react';
-import toast from 'react-hot-toast';
+import { Toaster, toast } from 'sonner';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import ExcelJS from 'exceljs';
+import Swal from 'sweetalert2';
 import { saveAs } from 'file-saver';
 import { generarConsolidadoProfesional } from '../services/asistenciaService';
 
@@ -194,10 +195,12 @@ const AsistenciaAlumnos = ({ perfilUsuario, session }) => {
   titleCell.alignment = { horizontal: 'center' };
 
   // --- CÁLCULOS PREVIOS ---
-  const presentes = Object.values(asistencia).filter(v => v === 'Presente').length;
-  const ausentes = Object.values(asistencia).filter(v => v === 'Ausente').length;
-  const tardanzas = Object.values(asistencia).filter(v => v === 'Tardanza').length;
-  const justificadosCount = Object.values(asistencia).filter(v => v === 'Justificado').length;
+  const valores = Object.values(asistencia);
+
+  const presentes = valores.filter(v => v === 'Presente' || v === 'P').length;
+  const ausentes = valores.filter(v => v === 'Ausente' || v === 'F' || v === 'Falta').length;
+  const tardanzas = valores.filter(v => v === 'Tardanza' || v === 'T').length;
+  const justificadosCount = valores.filter(v => v === 'Justificado' || v === 'J').length;
 
   // Cabecera de Datos (Fila 5)
   worksheet.getCell('B5').value = `ÁREA: ${areaSeleccionada}`;
@@ -257,30 +260,55 @@ const AsistenciaAlumnos = ({ perfilUsuario, session }) => {
 
   // --- 4. DATOS DE ESTUDIANTES ---
   estudiantes.forEach((est, i) => {
-    const estadoActual = asistencia[est.dni_estudiante] || 'Presente';
-    const row = worksheet.addRow([
-      null,
-      i + 1,
-      `${est.apellido_paterno} ${est.apellido_materno}, ${est.nombres}`,
-      estadoActual,
-      areaSeleccionada,
-      fecha
-    ]);
+  // Declaramos estadoActual (llave: dni_estudiante)
+  const estadoActual = asistencia[est.dni_estudiante] || 'Presente'; 
+  
+  const row = worksheet.addRow([
+    null,
+    i + 1,
+    `${est.apellido_paterno} ${est.apellido_materno}, ${est.nombres}`,
+    estadoActual === 'Ausente' ? 'Falta' : estadoActual,
+    areaSeleccionada,
+    fecha
+  ]);
 
-    row.eachCell((cell, colNumber) => {
-      if (colNumber > 1) {
-        cell.font = { size: 10 };
-        cell.border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
-        cell.alignment = colNumber === 3 ? { horizontal: 'left', indent: 1 } : { horizontal: 'center' };
+  row.eachCell((cell, colNumber) => {
+    if (colNumber > 1) {
+      // 1. Tamaño de letra reducido a 8 (más pequeño como el original)
+      cell.font = { name: 'Arial', size: 8 }; 
+      
+      // 2. RESTAURACIÓN DE BORDES: Estilo 'thin' negro para todas las celdas
+      cell.border = { 
+        top: { style: 'thin', color: { argb: 'FF000000' } }, 
+        left: { style: 'thin', color: { argb: 'FF000000' } }, 
+        bottom: { style: 'thin', color: { argb: 'FF000000' } }, 
+        right: { style: 'thin', color: { argb: 'FF000000' } } 
+      };
 
-        if (colNumber === 4) {
-          const colores = {
-            'Ausente': 'FFFF0000',
-            'Justificado': 'FF00B050',
-            'Tardanza': 'FFFFC000',
-            'Presente': 'FF000000'
-          };
-          cell.font = { color: { argb: colores[estadoActual] || 'FF000000' }, bold: true };
+      cell.alignment = colNumber === 3 
+        ? { horizontal: 'left', vertical: 'middle', indent: 1 } 
+        : { horizontal: 'center', vertical: 'middle' };
+
+      // 3. Lógica de colores (Mantenida e idéntica, pero con size 8)
+      if (colNumber === 4) { // Columna ESTADO
+        const valor = cell.value ? cell.value.toString().trim().toUpperCase() : '';
+        const esFalta = valor === 'F' || valor === 'FALTA' || valor === 'AUSENTE';
+        const esTardanza = valor === 'T' || valor === 'TARDANZA';
+        const esJustificado = valor === 'J' || valor === 'JUSTIFICADO';
+
+        if (esFalta) {
+            // Usamos size 8 y bold, pero sin fondo (fill) para limpiar el diseño
+            cell.font = { name: 'Arial', size: 8, color: { argb: 'FFFF0000' }, bold: true };
+            cell.fill = { type: 'pattern', pattern: 'none' }; // Quitamos fondo
+          } else if (esTardanza) {
+            cell.font = { name: 'Arial', size: 8, color: { argb: 'FFBF9000' }, bold: true };
+            cell.fill = { type: 'pattern', pattern: 'none' }; 
+          } else if (esJustificado) {
+            cell.font = { name: 'Arial', size: 8, color: { argb: 'FF15803D' }, bold: true };
+            cell.fill = { type: 'pattern', pattern: 'none' }; 
+          } else {
+            cell.fill = { type: 'pattern', pattern: 'none' }; 
+          }
         }
       }
     });
@@ -312,10 +340,11 @@ const AsistenciaAlumnos = ({ perfilUsuario, session }) => {
   const exportarPDF = () => {
   const doc = new jsPDF();
   const total = estudiantes.length;
-  const presentes = Object.values(asistencia).filter(v => v === 'Presente').length;
-  const ausentes = Object.values(asistencia).filter(v => v === 'Ausente').length;
-  const tardanzas = Object.values(asistencia).filter(v => v === 'Tardanza').length;
-  const justificado = Object.values(asistencia).filter(v => v === 'Justificado').length;
+  const valores = Object.values(asistencia);
+  const presentes = valores.filter(v => v === 'Presente' || v === 'P').length;
+  const ausentes = valores.filter(v => v === 'Falta' || v === 'F' || v === 'Ausente').length;
+  const tardanzas = valores.filter(v => v === 'Tardanza' || v === 'T').length;
+  const justificado = valores.filter(v => v === 'Justificado' || v === 'J').length;
 
   // --- CABECERA ESTILO EXCEL ---
   doc.setFont("helvetica", "bold");
@@ -358,15 +387,21 @@ const AsistenciaAlumnos = ({ perfilUsuario, session }) => {
 
   // --- TABLA DE ASISTENCIA ---
   doc.autoTable({
-    startY: 40,
-    head: [['N°', 'APELLIDOS Y NOMBRES', 'ESTADO', 'ÁREA', 'FECHA']],
-    body: estudiantes.map((e, i) => [
+  startY: 40,
+  head: [['N°', 'APELLIDOS Y NOMBRES', 'ESTADO', 'ÁREA', 'FECHA']],
+  body: estudiantes.map((e, i) => {
+    const estadoGuardado = asistencia[e.dni_estudiante] || 'Presente';
+    const estadoVisual = estadoGuardado === 'Ausente' ? 'Falta' : estadoGuardado;
+
+    return [
       i + 1,
       `${e.apellido_paterno} ${e.apellido_materno}, ${e.nombres}`,
-      asistencia[e.id_matricula] || 'Presente',
+      estadoVisual,
       areaSeleccionada,
       fecha
-    ]),
+    ];
+   }),
+
     theme: 'grid',
     headStyles: {
       fillColor: [146, 208, 80], // El mismo verde #92D050 de tu Excel
@@ -385,10 +420,11 @@ const AsistenciaAlumnos = ({ perfilUsuario, session }) => {
       3: { cellWidth: 35 },
       4: { halign: 'center', cellWidth: 25 }
     },
+
     didParseCell: (data) => {
       if (data.section === 'body' && data.column.index === 2) {
         const estado = data.cell.raw;
-        if (estado === 'Ausente') {
+        if (estado === 'Ausente' || estado === 'Falta') {
           data.cell.styles.textColor = [255, 0, 0]; // Rojo Fosforescente
         } else if (estado === 'Justificado') {
           data.cell.styles.textColor = [0, 200, 0]; // Verde Intenso
@@ -397,6 +433,7 @@ const AsistenciaAlumnos = ({ perfilUsuario, session }) => {
         }
       }
     },
+
     didDrawPage: (data) => {
       // Pie de página con numeración
       const str = "Página " + doc.internal.getNumberOfPages();
@@ -409,7 +446,7 @@ const AsistenciaAlumnos = ({ perfilUsuario, session }) => {
   toast.success("PDF generado con éxito");
  };
 
- const guardarAsistenciaTotal = async () => {
+const guardarAsistenciaTotal = async () => {
   const marcados = Object.keys(asistencia).length;
   if (marcados < estudiantes.length) {
     const faltantes = estudiantes.length - marcados;
@@ -417,79 +454,57 @@ const AsistenciaAlumnos = ({ perfilUsuario, session }) => {
       return;
     }
   }
+
   setIsSaving(true);
 
   try {
     const { data: { user } } = await supabase.auth.getUser();
-    
-    // VALIDACIÓN DE SEGURIDAD: Evitar guardar si no hay sesión
     if (!user) {
-      toast.error("Sesión expirada. Por favor, vuelve a iniciar sesión.");
+      toast.error("Sesión expirada.");
+      setIsSaving(false);
       return;
     }
 
-      const gradoFmt = `${grado.toString().replace('°', '')}°`;
-      const seccionFmt = seccion.trim().toUpperCase();
+    const gradoFmt = `${grado.toString().replace('°', '')}°`;
+    const seccionFmt = seccion.trim().toUpperCase();
+    const areaFmt = areaSeleccionada.toUpperCase().trim();
 
-      const { data: existente } = await supabase
-         .from('asistencia')
-         .select('id_asistencia')
-         .eq('fecha', fecha)
-         .eq('observaciones', areaSeleccionada)
-         .eq('grado', gradoFmt)
-         .eq('seccion', seccionFmt)
-         .limit(1);
+    // Preparación de los registros (Solo las 6 columnas técnicas necesarias)
+    const records = estudiantes.map(est => {
+      const dniLimpio = String(est.dni_estudiante).trim();
+      const estadoVisual = asistencia[dniLimpio] || 'Presente';
+      const estadoMap = { 'Presente': 'P', 'Falta': 'F', 'Tardanza': 'T', 'Justificado': 'J', 'Ausente': 'F' };
 
-    if (existente && existente.length > 0) {
-      const confirmar = window.confirm("Ya existe asistencia para este día. ¿Deseas actualizar los registros?");
-      if (!confirmar) return; // Si cancela, salimos de la función
-    }
-
-   const records = estudiantes.map(est => {
-   // Verificamos que el DNI exista para evitar registros nulos
-   const dniValido = est.dni_estudiante || est.id_estudiante;
-  
-   if (!dniValido) {
-     console.error("Estudiante sin DNI detectado:", est);
-   }
-
-   return {
-        // Columnas obligatorias según tus capturas de Supabase
-        dni_estudiante: String(dniValido).trim(),
-        id_estudiante: String(dniValido).trim(), // Duplicamos por seguridad si tu DB usa ambos
-        fecha: fecha, // 'YYYY-MM-DD'
-        estado: asistencia[dniValido] || 'Presente',
-        observaciones: areaSeleccionada.toUpperCase().trim(), // 'MATEMÁTICA'
-    
-        // Estos campos estaban llegando NULL, ahora los forzamos:
-         grado: `${grado.toString().replace('°', '')}°`, // Asegura el formato '1°'
-         seccion: seccion.trim().toUpperCase(),          // Asegura el formato 'A'
-         id_auxiliar: perfilUsuario?.id_usuario || null
+      return {
+        dni_estudiante: dniLimpio,
+        fecha: fecha,
+        estado: estadoMap[estadoVisual] || 'P',
+        observaciones: areaFmt,
+        grado: gradoFmt,
+        seccion: seccionFmt
       };
-     }).filter(r => r.dni_estudiante !== "undefined"); // Filtramos errores
+    });
 
-     console.log("📤 Datos listos para enviar a Supabase:", records);
+    // Ejecución directa del Upsert
+    const { error } = await supabase
+      .from('asistencia')
+      .upsert(records, { onConflict: 'dni_estudiante, fecha, observaciones' });
 
-    // Ejecutamos el guardado
-    const { data, error } = await supabase
-        .from('asistencia')
-        .upsert(records, { 
-        onConflict: 'dni_estudiante, fecha, observaciones' 
-     });
-    
     if (error) throw error;
-    
-     alert("¡Asistencia guardada correctamente!");
-   } catch (error) {
-     console.error("Error capturado al guardar:", error);
-     alert("Error al guardar: " + error.message);
-   } finally {
-      setTimeout(() => {
+
+    // ✅ ÉXITO INMEDIATO: El Toast ahora aparecerá sin interferencias
+    toast.success('¡Sincronización exitosa!', {
+      description: `${records.length} registros actualizados en ${areaFmt}`,
+      duration: 3000,
+    });
+
+    } catch (error) {
+      console.error("Error en el guardado:", error);
+      toast.error(`Error de base de datos: ${error.message}`);
+    } finally {
       setIsSaving(false);
-      console.log("Botón desbloqueado");
-      }, 500); 
     }
-  };
+   };
 
    return (
     <div className="bg-white rounded-[1.5rem] md:rounded-[2rem] shadow-2xl border border-gray-100 overflow-hidden">
@@ -527,7 +542,7 @@ const AsistenciaAlumnos = ({ perfilUsuario, session }) => {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
             </svg>
              </div>
-              </div>
+              </div>     
   
              {/* SELECTOR DE ÁREA */}
            <div className="relative">
@@ -590,32 +605,39 @@ const AsistenciaAlumnos = ({ perfilUsuario, session }) => {
                 </span>
               </td>
               <td className="border border-gray-300 px-2 py-1.5 bg-emerald-100/60">
-                <div className="flex justify-center gap-1">
-                  {['P', 'A', 'T', 'J'].map((letra) => {
-                    const valorReal = letra === 'P' ? 'Presente' : letra === 'A' ? 'Ausente' : letra === 'T' ? 'Tardanza' : 'Justificado';
-                    const isActive = asistencia[est.id_matricula] === valorReal;
-  
-                    const activeStyle = {
-                      'P': 'text-slate-500 border-slate-200 bg-slate-50', 
-                      'A': 'text-red-400 border-red-200 bg-red-50',     
-                      'T': 'text-amber-400 border-amber-200 bg-amber-50', 
-                      'J': 'text-green-400 border-green-200 bg-green-50'  
-                    };
-                    return (
-                     <button
-                      key={letra}
-                       onClick={() => {
-                       console.log("Cambiando DNI:", est.dni_estudiante, "a:", valorReal);
-                       setAsistencia(p => ({ ...p, [est.dni_estudiante]: valorReal }));
-                       }}
-                       className={`w-7 h-7 md:w-8 md:h-8 rounded-md text-[11px] font-black transition-all duration-200 border
-                       ${asistencia[est.dni_estudiante] === valorReal
-                       ? `${activeStyle[letra]} shadow-sm scale-110 z-10`
-                      : 'bg-white border-transparent text-gray-300 hover:text-gray-400'
-                      }`}
-                      >
-                      {letra}
-                     </button>
+              <div className="flex justify-center gap-1">
+               {['P', 'F', 'T', 'J'].map((letra) => {
+                // Sincronizamos con el nuevo término 'Falta' que pide tu BD
+                  const valorReal = letra === 'P' ? 'Presente' : 
+                        letra === 'F' ? 'Falta' : 
+                        letra === 'T' ? 'Tardanza' : 'Justificado';
+      
+                    // Usamos 'Presente' como fallback si aún no se ha marcado nada
+                     const estadoActual = asistencia[est.dni_estudiante] || 'Presente';
+                     const isActive = estadoActual === valorReal;
+
+                        const activeStyle = {
+                            'P': 'text-slate-600 border-slate-300 bg-white shadow-inner', 
+                            'F': 'text-red-600 border-red-300 bg-red-50 shadow-inner',     
+                            'T': 'text-amber-600 border-amber-300 bg-amber-50 shadow-inner', 
+                            'J': 'text-green-600 border-green-300 bg-green-50 shadow-inner'  
+                         };
+
+                        return (
+                           <button
+                           key={letra}
+                           onClick={() => {
+                           console.log("Cambiando DNI:", est.dni_estudiante, "a:", valorReal);
+                            setAsistencia(p => ({ ...p, [est.dni_estudiante]: valorReal }));
+                             }}
+                             className={`w-7 h-7 md:w-8 md:h-8 rounded-md text-[11px] font-black transition-all duration-200 border
+                              ${isActive
+                               ? `${activeStyle[letra]} scale-110 z-10`
+                                : 'bg-white/50 border-transparent text-gray-300 hover:text-gray-400 hover:bg-white'
+                                }`}
+                               >
+                           {letra}
+                      </button>
                      );
                   })}
                 </div>

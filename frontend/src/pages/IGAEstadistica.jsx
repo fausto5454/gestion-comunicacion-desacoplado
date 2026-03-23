@@ -2,9 +2,13 @@ import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { supabase } from '../config/supabaseClient';
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { FileDown, RefreshCcw, LayoutDashboard, PieChart as PieIcon } from 'lucide-react';
 import { toPng } from 'html-to-image';
+import { Chart as ChartJS, ArcElement, BarElement, Tooltip, Title, LinearScale, CategoryScale, Legend } from 'chart.js';
+import {Bar, Doughnut} from 'react-chartjs-2';
+import { percentageLabelPlugin } from "../utils/dashboardPlugins";
+
+ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement);
 
 const IGAEstadistica = () => {
     const [allData, setAllData] = useState([]);
@@ -13,6 +17,14 @@ const IGAEstadistica = () => {
     const [filtros, setFiltros] = useState({
         bimestre: '1', grado: '1°', seccion: 'A', area: 'MATEMÁTICA'
     });
+
+    const OPCIONES_GRADO_SECCION = [
+        { value: '1A', label: '1° A' }, { value: '1B', label: '1° B' }, { value: '1C', label: '1° C' },
+        { value: '2A', label: '2° A' }, { value: '2B', label: '2° B' }, { value: '2C', label: '2° C' },
+        { value: '3A', label: '3° A' }, { value: '3B', label: '3° B' },
+        { value: '4A', label: '4° A' }, { value: '4B', label: '4° B' },
+        { value: '5A', label: '5° A' }, { value: '5B', label: '5° B' },
+    ];
 
     useEffect(() => {
         const fetchDatos = async () => {
@@ -31,39 +43,52 @@ const IGAEstadistica = () => {
     }, []);
 
     const stats = useMemo(() => {
-        const filtered = allData.filter(d => 
-            d.bimestre.toString() === filtros.bimestre && d.grado === filtros.grado &&
-            d.seccion === filtros.seccion && d.area === filtros.area
-        );
+        const filtered = allData.filter(d => {
+            return d.bimestre.toString() === filtros.bimestre &&
+                   d.grado.trim() === filtros.grado.trim() &&
+                   d.seccion.trim() === filtros.seccion.trim() &&
+                   d.area.toUpperCase() === filtros.area.toUpperCase();
+        });
+
         const count = (nota) => filtered.filter(d => d.logro_bimestral === nota).length;
         const total = filtered.length;
 
-        const dataArr = [
-            { name: 'DESTACADO (AD)', cant: count('AD'), color: '#16a34a' },
-            { name: 'LOGRADO (A)', cant: count('A'), color: '#2563eb' },
-            { name: 'PROCESO (B)', cant: count('B'), color: '#eab308' },
-            { name: 'INICIO (C)', cant: count('C'), color: '#dc2626' }
-        ];
+        const dataValues = [count('AD'), count('A'), count('B'), count('C')];
+        const colors = ['#05aa13', '#0b61ec', '#d1bd05', '#f82c2c'];
 
-        return {
+       return {
             estudiantes: filtered,
             total,
-            chartData: dataArr,
-            resumen: dataArr.map(d => ({ ...d, percent: total > 0 ? ((d.cant / total) * 100).toFixed(0) : 0 }))
+            values: dataValues, // Solo los números para Chart.js
+            colors: colors,
+            resumen: [
+                { name: 'DESTACADO (AD)', cant: dataValues[0], color: colors[0], percent: total > 0 ? Math.round((dataValues[0] / total) * 100) : 0 },
+                { name: 'LOGRADO (A)', cant: dataValues[1], color: colors[1], percent: total > 0 ? Math.round((dataValues[1] / total) * 100) : 0 },
+                { name: 'PROCESO (B)', cant: dataValues[2], color: colors[2], percent: total > 0 ? Math.round((dataValues[2] / total) * 100) : 0 },
+                { name: 'INICIO (C)', cant: dataValues[3], color: colors[3], percent: total > 0 ? Math.round((dataValues[3] / total) * 100) : 0 }
+            ]
         };
     }, [allData, filtros]);
 
-    const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }) => {
-        const RADIAN = Math.PI / 180;
-        const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
-        const x = cx + radius * Math.cos(-midAngle * RADIAN);
-        const y = cy + radius * Math.sin(-midAngle * RADIAN);
+    // Manejador para el selector de Grado y Sección
+    const handleGradoChange = (valorCombo) => {
+        const gradoNum = valorCombo.charAt(0);
+        const seccionLetra = valorCombo.charAt(1);
+        setFiltros(prev => ({
+            ...prev,
+            grado: `${gradoNum}°`,
+            seccion: seccionLetra
+        }));
+    };
 
-        return percent > 0 ? (
-            <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central" className="text-[12px] font-black">
-                {`${(percent * 100).toFixed(0)}%`}
-            </text>
-        ) : null;
+    const dataConfig = {
+        labels: ['DESTACADO (AD)', 'LOGRADO (A)', 'PROCESO (B)', 'INICIO (C)'],
+        datasets: [{
+            label: 'Estudiantes',
+            data: stats.values,
+            backgroundColor: stats.colors,
+            borderRadius: 10,
+        }]
     };
 
     // 3. EXPORTACIÓN A EXCEL CORREGIDA (GÉNERO COMBINADO Y ESTILOS)
@@ -75,8 +100,18 @@ const IGAEstadistica = () => {
         // 1. TÍTULO PRINCIPAL (B1 a J1)
         worksheet.mergeCells('B1:J1'); 
         const titleCell = worksheet.getCell('B1');
+        titleCell.fill = {
+             type: 'pattern',
+             pattern: 'solid',
+             fgColor: { argb: 'FF047857' } 
+             };
         titleCell.value = 'REPORTE CONSOLIDADO IGA 2026';
-        titleCell.font = { bold: true, size: 14, name: 'Calibri' };
+        titleCell.font = {
+             name: 'Calibri',
+             size: 14,
+             bold: true,
+             color: { argb: 'FFFFFFFF' } // Texto en blanco para contraste
+            };
         titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
 
         // 2. FILA DE FILTROS (Fila 2)
@@ -110,7 +145,7 @@ const IGAEstadistica = () => {
               cell.fill = { 
                   type: 'pattern', 
                   pattern: 'solid', 
-                  fgColor: { argb: 'FFFFC000' } // Naranja/Ámbar vibrante del diseño
+                  fgColor: { argb: 'FFD97706' } // Naranja/Ámbar vibrante del diseño
               };
               cell.font = { color: { argb: 'FFFFFFFF' }, size: 9, bold: true }; // Texto blanco
            } 
@@ -148,13 +183,13 @@ const IGAEstadistica = () => {
          if (genero === 'M') countM++; if (genero === 'H') countH++;
 
          const row = worksheet.addRow([
-            null, i + 1, est.nombre_estudiante, 
-            genero === 'H' ? '1' : '', genero === 'M' ? '1' : '', 
-            est.logro_bimestral === 'AD' ? '1' : '', est.logro_bimestral === 'A' ? '1' : '',
-            est.logro_bimestral === 'B' ? '1' : '', est.logro_bimestral === 'C' ? '1' : '',
+            null, i + 1, est.nombre_estudiante.trim().toUpperCase(),
+            genero === 'H' ? 'X' : '', genero === 'M' ? 'X' : '', 
+            est.logro_bimestral === 'AD' ? 'X' : '', est.logro_bimestral === 'A' ? 'X' : '',
+            est.logro_bimestral === 'B' ? 'X' : '', est.logro_bimestral === 'C' ? 'X' : '',
             est.logro_bimestral
          ]);
-
+         
          // MAPA DE COLORES PARA LAS LETRAS (Sin relleno, solo fuente)
          const coloresLetraNota = {
                'AD': 'FF008000', // Verde oscuro profesional
@@ -230,10 +265,10 @@ const IGAEstadistica = () => {
         
         worksheet.mergeCells(`B${resRowIdx}:C${resRowIdx}`);
         worksheet.getCell(`B${resRowIdx}`).value = 'RESUMEN';
-        worksheet.mergeCells(`D${resRowIdx}:E${resRowIdx}`);
+        worksheet.mergeCells(`D${resRowIdx}:F${resRowIdx}`);
         worksheet.getCell(`D${resRowIdx}`).value = 'CANTIDAD';
-        worksheet.mergeCells(`F${resRowIdx}:H${resRowIdx}`);
-        worksheet.getCell(`F${resRowIdx}`).value = 'PORCENTAJE';
+        worksheet.mergeCells(`G${resRowIdx}:J${resRowIdx}`);
+        worksheet.getCell(`G${resRowIdx}`).value = 'PORCENTAJE';
 
         worksheet.getRow(resRowIdx).eachCell(c => {
             if (c.value) {
@@ -246,10 +281,10 @@ const IGAEstadistica = () => {
             const rIdx = worksheet.lastRow.number + 1;
             worksheet.mergeCells(`B${rIdx}:C${rIdx}`);
             worksheet.getCell(`B${rIdx}`).value = r.name;
-            worksheet.mergeCells(`D${rIdx}:E${rIdx}`);
+            worksheet.mergeCells(`D${rIdx}:F${rIdx}`);
             worksheet.getCell(`D${rIdx}`).value = r.cant;
-            worksheet.mergeCells(`F${rIdx}:H${rIdx}`);
-            worksheet.getCell(`F${rIdx}`).value = `${r.percent}%`;
+            worksheet.mergeCells(`G${rIdx}:J${rIdx}`);
+            worksheet.getCell(`G${rIdx}`).value = `${r.percent}%`;
 
             const colorHex = r.color?.replace('#', 'FF').toUpperCase() || 'FFCCCCCC';
             [`B${rIdx}`, `E${rIdx}`, `G${rIdx}`].forEach(ref => {
@@ -267,8 +302,9 @@ const IGAEstadistica = () => {
                 const dataUrl = await toPng(chartRef.current, { backgroundColor: '#ffffff', pixelRatio: 2 });
                 const imageId = workbook.addImage({ base64: dataUrl, extension: 'png' });
                 worksheet.addImage(imageId, {
-                    tl: { col: 2, row: worksheet.lastRow.number + 2 },
-                    ext: { width: 350, height: 250 }
+                   tl: { col: 1, row: 29 }, // Posición en la celda
+                   ext: { width: 650, height: 280 }, // FUERZA QUE SEA CUADRADO
+                   editAs: 'oneCell'
                 });
             } catch (e) { console.error("Error gráfico:", e); }
         }
@@ -276,7 +312,7 @@ const IGAEstadistica = () => {
         // --- AJUSTE DE ANCHOS (Reducción de columna C) ---
         worksheet.getColumn(1).width = 2;   // Margen A
         worksheet.getColumn(2).width = 5;   // N°
-        worksheet.getColumn(3).width = 35;  // ESTUDIANTE (Antes era 45, ahora es más estrecha)
+        worksheet.getColumn(3).width = 45;  // ESTUDIANTE (Ahora es 45)
         worksheet.getColumn(4).width = 5;   // H
         worksheet.getColumn(5).width = 5;   // M
         worksheet.getColumn(6).width = 5;   //AD
@@ -288,188 +324,162 @@ const IGAEstadistica = () => {
         const buffer = await workbook.xlsx.writeBuffer();
         saveAs(new Blob([buffer]), `Consolidado_IGA_${filtros?.area || 'Reporte'}.xlsx`);
 
-    } catch (error) {
-        console.error("Error:", error);
-    
-   };
-
-        // 8. RESUMEN Y GRÁFICO (Restaurados)
-        worksheet.addRow([]);
-        const resHeader = worksheet.addRow(['RESUMEN', 'CANTIDAD', 'PORCENTAJE']);
-        resHeader.eachCell(c => { c.font = { bold: true }; c.alignment = { horizontal: 'center' }; });
-
-        stats.resumen.forEach(r => {
-            const row = worksheet.addRow([r.name, r.cant, `${r.percent}%`]);
-            const cleanColor = r.color.replace('#', 'FF').toUpperCase();
-            row.eachCell((c, colNum) => {
-                c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: cleanColor } };
-                c.font = { color: { argb: 'FFFFFFFF' }, bold: true };
-                c.border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
-                c.alignment = { horizontal: colNum === 1 ? 'left' : 'center' };
-            });
-        });
-
-        // Configuración de anchos y Gráfico
-        worksheet.getColumn(2).width = 35;
-        worksheet.getColumn(3).width = 6;
-        worksheet.getColumn(4).width = 6;
-
-        if (chartRef.current) {
-            try {
-                const dataUrl = await toPng(chartRef.current, { backgroundColor: '#ffffff', pixelRatio: 2 });
-                const imageId = workbook.addImage({ base64: dataUrl, extension: 'png' });
-                worksheet.addImage(imageId, {
-                    tl: { col: 2, row: worksheet.rowCount + 2 },
-                    ext: { width: 500, height: 300 }
-                });
-            } catch (e) { console.error(e); }
+        } catch (error) {
+            console.error("Error en exportación:", error);
         }
-
-        const buffer = await workbook.xlsx.writeBuffer();
-        saveAs(new Blob([buffer]), `Consolidado_IGA_${filtros.area}.xlsx`);
-        
     };
-
-    const OPCIONES_GRADO_SECCION = [
-                 { value: '1A', label: '1° A' },
-                 { value: '1B', label: '1° B' },
-                 { value: '1C', label: '1° C' },
-                 { value: '2A', label: '2° A' },
-                 { value: '2B', label: '2° B' },
-                 { value: '2C', label: '2° C' },
-                 { value: '3A', label: '3° A' },
-                 { value: '3B', label: '3° B' },
-                 { value: '4A', label: '4° A' },
-                 { value: '4B', label: '4° B' },
-                 { value: '5A', label: '5° A' },
-                 { value: '5B', label: '5° B' },
-     ];
-    const [filtroGrado, setFiltroGrado] = useState('');
-
-    return (
+    
+   return (
         <div className="p-6 bg-slate-50 min-h-screen space-y-6">
-            <div className="bg-sky-900 p-6 rounded-[2rem] shadow-sm border border-slate-200 grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
+            {/* PANEL DE FILTROS */}
+            <div className="bg-sky-900 p-6 rounded-[2rem] shadow-sm grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
                 <div className="flex flex-col">
-                    <label className="text-[10px] text-center font-black text-white uppercase tracking-wider mb-1 ml-1">Área Curricular</label>
-                    <select value={filtros.area} onChange={(e) => setFiltros({...filtros, area: e.target.value})} className="w-full bg-white border-none rounded-xl text-gray-600 font-bold p-3">
+                    <label className="text-[10px] text-center font-black text-white uppercase mb-1">Área Curricular</label>
+                    <select 
+                        value={filtros.area} 
+                        onChange={(e) => setFiltros({...filtros, area: e.target.value})} 
+                        className="w-full bg-green-100 rounded-xl font-bold p-3 text-[12px] text-green-700 uppercase soutline-none"
+                    >
                         <option value="MATEMÁTICA">Matemática</option>
                         <option value="COMUNICACIÓN">Comunicación</option>
                         <option value="ARTE Y CULTURA">Arte y Cultura</option>
                         <option value="CIENCIAS SOCIALES">Ciencias Sociales</option>
                         <option value="DPCC">DPCC</option>
                         <option value="CIENCIA Y TECNOLOGÍA">Ciencia y Tecnología</option>
-                        <option value="EDUCACIÓN FÍSICA">Educación Física</option>
+                        <option value="EDUCACION FÍSICA">Educacion Física</option>
                         <option value="EPT">EPT</option>
                         <option value="RELIGIÓN">Religión</option>
                         <option value="INGLÉS">Inglés</option>
                     </select>
                 </div>
                 <div className="flex flex-col">
-                    <label className="text-[10px] text-center font-black text-white uppercase tracking-wider mb-1 ml-1">Bimestres</label>
-                    <select value={filtros.bimestre} onChange={(e) => setFiltros({...filtros, bimestre: e.target.value})} className="w-full bg-white border-none rounded-xl text-gray-600 font-bold p-3">
-                        <option value="1">1° Bimestre</option><option value="2">2° Bimestre</option>
-                        <option value="3">3° Bimestre</option><option value="4">4° Bimestre</option>
+                    <label className="text-[10px] text-center font-black text-white uppercase mb-1">Bimestres</label>
+                    <select 
+                        value={filtros.bimestre} 
+                        onChange={(e) => setFiltros({...filtros, bimestre: e.target.value})} 
+                        className="w-full bg-green-100 rounded-xl font-bold p-3 text-[12px] text-green-700 uppercase outline-none"
+                         >
+                        <option value="1">1° Bimestre</option>
+                        <option value="2">2° Bimestre</option>
+                        <option value="3">3° Bimestre</option>
+                        <option value="4">4° Bimestre</option>
                     </select>
                 </div>
-              <div className="flex flex-col">
-              {/* Título uniforme y pegado al botón */}
-               <label className="text-[10px] text-center font-black text-white uppercase tracking-wider mb-1 ml-1">
-                Grado y Sección
-                </label>
-                <div className="relative">
-                <select 
-                   value={filtroGrado}
-                   onChange={(e) => setFiltroGrado(e.target.value)}
-                   className="w-full min-w-[130px] px-4 py-3 bg-white border-none rounded-xl text-sm font-bold text-gray-700 outline-none appearance-none cursor-pointer shadow-sm">
-                   {OPCIONES_GRADO_SECCION.map(op => (
-                   <option key={op.value} value={op.value}>
-                    {op.label}
-                   </option>
-                   ))}
-               </select>
-             {/* Icono de flecha para que se vea igual a los otros selectores */}
-            <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-600">
-            <svg className="w-3 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" d="M19 9l-7 7-7-7" />
-             </svg>
-              </div>
-               </div>
-               </div>
-                   <button onClick={exportarExcelCompleto} className="bg-green-500 text-white p-2 rounded-xl font-black text-xs flex items-center justify-center gap-2 hover:bg-green-600 transition-all shadow-lg">
-                   <FileDown size={18} /> EXPORTAR EXCEL + GRÁFICO
-                   </button>
-                   <div className="flex items-center gap-2 text-[12px] font-bold text-sky-200 p-3">
-                    <RefreshCcw size={14} className={loading ? "animate-spin text-green-500" : ""} /> {loading ? "Sincronizando..." : "Sincronizado Realtime"}
+                <div className="flex flex-col">
+                    <label className="text-[10px] text-center font-black text-white uppercase mb-1">Grado y Sección</label>
+                    <div className="relative">
+                        <select 
+                            value={`${filtros.grado.replace('°', '')}${filtros.seccion}`}
+                            onChange={(e) => handleGradoChange(e.target.value)}
+                            className="w-full px-4 py-3 bg-green-100 text-[12px] rounded-xl text-sm font-bold text-green-700 outline-none appearance-none cursor-pointer"
+                            >
+                            {OPCIONES_GRADO_SECCION.map(op => (
+                                <option key={op.value} value={op.value}>{op.label}</option>
+                            ))}
+                        </select>
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-600">
+                            <svg className="w-3 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" d="M19 9l-7 7-7-7" /></svg>
+                        </div>
+                    </div>
                 </div>
-            </div>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          {stats.resumen.map((item, i) => {
-           const estilosPorNivel = {
-            "DESTACADO (AD)": "bg-green-200 border-green-100 text-green-600",
-            "LOGRADO (A)": "bg-blue-200 border-blue-100 text-blue-600",
-            "PROCESO (B)": "bg-amber-200 border-amber-100 text-amber-600",
-            "INICIO (C)": "bg-red-200 border-red-100 text-red-600"
-            };
-           const estiloActual = estilosPorNivel[item.name] || "bg-white border-slate-100 text-slate-500";
-           const colorBase = estiloActual.split(' ')[2]; // Extrae el color para el porcentaje
-
-           return (
-               <div key={i} className={`${estiloActual.split(' ').slice(0,2).join(' ')} p-5 rounded-[2rem] border shadow-sm transition-all hover:shadow-md`}>
-                   <p className={`text-[9px] font-black uppercase tracking-tighter ${estiloActual.split(' ')[2]}`}>
-                    {item.name}
-                   </p>
-                   <div className="flex justify-between items-end mt-2">
-                       <p className="text-3xl font-black text-slate-800">{item.cant}</p>
-                       <p className={`text-sm font-black px-2 py-1 rounded-lg bg-white/50 shadow-sm`} style={{color: item.color}}>
-                          {item.percent}%
-                       </p>
-                     </div>
-                   </div>
+                <button onClick={exportarExcelCompleto} className="bg-green-500 text-white p-2 rounded-xl font-black text-xs flex items-center justify-center gap-2 hover:bg-green-600 transition-all shadow-lg h-[48px]">
+                    <FileDown size={18} /> EXPORTAR EXCEL + GRÁFICO
+                </button>
+                <div className="flex items-center gap-2 text-[12px] font-bold text-sky-200 p-3">
+                 <RefreshCcw size={14} className={loading ? "animate-spin text-green-500" : ""} /> {loading ? "Sincronizando..." : "Sincronizado Realtime"}
+                    </div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        {stats.resumen.map((item, i) => {
+                        const estilosPorNivel = {
+                         "DESTACADO (AD)": "bg-green-200 border-green-100 text-green-600",
+                         "LOGRADO (A)": "bg-blue-200 border-blue-100 text-blue-600",
+                         "PROCESO (B)": "bg-amber-200 border-amber-100 text-amber-600",
+                         "INICIO (C)": "bg-red-200 border-red-100 text-red-600"
+                        };
+                    const estiloActual = estilosPorNivel[item.name] || "bg-white border-slate-100 text-slate-500";
+                    const colorBase = estiloActual.split(' ')[2]; // Extrae el color para el porcentaje
+                    return (
+                        <div key={i} className={`${estiloActual.split(' ').slice(0,2).join(' ')} p-5 rounded-[2rem] border shadow-sm transition-all hover:shadow-md`}>
+                            <p className={`text-[9px] font-black uppercase tracking-tighter ${estiloActual.split(' ')[2]}`}>
+                                {item.name}
+                            </p>
+                            <div className="flex justify-between items-end mt-2">
+                            <p className="text-3xl font-black text-slate-800">{item.cant}</p>
+                            <p className={`text-sm font-black px-2 py-1 rounded-lg bg-white/50 shadow-sm`} style={{color: item.color}}>
+                                {item.percent}%
+                            </p>
+                      </div>
+                    </div>
                   );
                 })}
-              </div>
-             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div className="bg-white p-8 rounded-[3rem] shadow-sm border border-slate-100 h-[380px]">
+             </div>
+            {/* SECCIÓN DE GRÁFICOS */}
+            <div ref={chartRef} className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="bg-white p-8 rounded-[3rem] shadow-sm border h-[400px]">
                     <h3 className="text-[10px] font-black text-slate-400 uppercase mb-6 flex items-center gap-2 tracking-widest">
-                        <LayoutDashboard size={14} className="text-green-600"/> Rendimiento: {filtros.area}
+                        <LayoutDashboard size={14} className="text-green-600"/> RENDIMIENTO: {filtros.area}
                     </h3>
-                    <ResponsiveContainer width="100%" height="90%">
-                        <BarChart data={stats.chartData}>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                            <XAxis dataKey="name" hide />
-                            <YAxis axisLine={false} tickLine={false} />
-                            <Tooltip contentStyle={{borderRadius: '15px', border: 'none'}} />
-                            <Bar dataKey="cant" radius={[10, 10, 0, 0]} barSize={50}>
-                                {stats.chartData.map((entry, index) => <Cell key={index} fill={entry.color} />)}
-                            </Bar>
-                        </BarChart>
-                    </ResponsiveContainer>
+                    <div className="h-[250px] w-full">
+                        <Bar 
+                            key={`bar-${JSON.stringify(stats.values)}`}
+                            data={dataConfig}
+                            options={{
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                plugins: { legend: { display: false } },
+                                scales: {
+                                    y: { beginAtZero: true, grid: { color: '#f1f5f9' } },
+                                    x: { 
+                                        ticks: {
+                                            color: (ctx) => stats.colors[ctx.index], // Callback de color corregido
+                                            font: { weight: 'bold' }
+                                        }
+                                    }
+                                }
+                            }}
+                        />
+                    </div>
                 </div>
-
-                <div ref={chartRef} className="bg-white p-8 rounded-[3rem] shadow-sm border border-slate-100 h-[380px]">
+                <div className="bg-white p-6 md:p-8 rounded-[2rem] shadow-sm border h-auto min-h-[400px] flex flex-col">
                     <h3 className="text-[10px] font-black text-slate-400 uppercase mb-6 flex items-center gap-2 tracking-widest">
-                        <PieIcon size={14} className="text-blue-600"/> Distribución de Logros
+                    <PieIcon size={14} className="text-blue-600"/> DISTRIBUCIÓN DE LOGROS
                     </h3>
-                    <ResponsiveContainer width="100%" height="90%">
-                        <PieChart>
-                            <Pie 
-                                data={stats.chartData} 
-                                innerRadius={60} 
-                                outerRadius={110} 
-                                paddingAngle={5} 
-                                dataKey="cant"
-                                labelLine={false}
-                                label={renderCustomizedLabel}
-                            >
-                                {stats.chartData.map((entry, index) => <Cell key={index} fill={entry.color} />)}
-                            </Pie>
-                            <Tooltip />
-                            <Legend verticalAlign="bottom" wrapperStyle={{fontSize: '10px', fontWeight: 'bold'}}/>
-                        </PieChart>
-                    </ResponsiveContainer>
-                </div>
-            </div>
-        </div>
+                      <div className="flex-grow flex items-center justify-center w-full">
+                       <div className="w-full max-w-[270px] aspect-square relative">
+                        <Doughnut 
+                            key={`pie-${JSON.stringify(stats.values)}`}
+                            data={dataConfig}
+                            options={{
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                cutout: '65%',
+                                plugins: {
+                                    legend: {
+                                        position: 'bottom',
+                                        labels: {
+                                            usePointStyle: true,
+                                            font: { size: 11, weight: 'bold' },
+                                            generateLabels: (chart) => {
+                                                const { data } = chart;
+                                                return data.labels.map((label, i) => ({
+                                                    text: label,
+                                                    fillStyle: data.datasets[0].backgroundColor[i],
+                                                    fontColor: data.datasets[0].backgroundColor[i],
+                                                    index: i
+                                                 }));
+                                              }
+                                          }
+                                      }
+                                   }
+                                }}
+                            plugins={[percentageLabelPlugin]}
+                          />
+                       </div>
+                   </div>
+               </div>
+           </div> 
+       </div>
     );
 };
 

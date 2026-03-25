@@ -604,7 +604,7 @@ const guardarAsistenciaTotal = async () => {
                   {est.apellido_paterno} {est.apellido_materno}, {est.nombres}
                 </span>
               </td>
-              <td className="border border-gray-300 px-2 py-1.5 bg-emerald-100/60">
+              <td className="border border-gray-300 px-2 py-1.5 bg-emerald-100/70">
               <div className="flex justify-center gap-1">
                {['P', 'F', 'T', 'J'].map((letra) => {
                 // Sincronizamos con el nuevo término 'Falta' que pide tu BD
@@ -617,10 +617,10 @@ const guardarAsistenciaTotal = async () => {
                      const isActive = estadoActual === valorReal;
 
                         const activeStyle = {
-                            'P': 'text-slate-600 border-slate-300 bg-white shadow-inner', 
-                            'F': 'text-red-600 border-red-300 bg-red-50 shadow-inner',     
-                            'T': 'text-amber-600 border-amber-300 bg-amber-50 shadow-inner', 
-                            'J': 'text-green-600 border-green-300 bg-green-50 shadow-inner'  
+                            'P': 'text-white border-white bg-slate-500 shadow-inner',
+                            'F': 'text-white border-red-300 bg-red-500 shadow-inner',     
+                            'T': 'text-white border-amber-300 bg-amber-400 shadow-inner', 
+                            'J': 'text-white border-green-300 bg-green-500 shadow-inner'  
                          };
 
                         return (

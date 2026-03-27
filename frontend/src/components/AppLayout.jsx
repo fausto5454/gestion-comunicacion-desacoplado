@@ -13,8 +13,10 @@ import IGAEstadistica from '../pages/IGAEstadistica';
 
 // ✅ 1. IMPORTACIONES FALTANTES PARA ASISTENCIA
 import AsistenciaAlumnos from './AsistenciaAlumnos';
-import PanelAsistencia from './PanelAsistencia';
+import AsistenciaAuxiliar from './AsistenciaAuxiliar'; 
+import ConsolidadoGeneral from './ConsolidadoGeneral';
 import ConsolidadoAsistencia from './ConsolidadoAsistencia';
+import PanelAsistencia from './PanelAsistencia';
 import ImportarMatricula from './ImportarMatricula';
 import Sidebar from './Sidebar';
 import SecurityModal from './SecurityModal';
@@ -173,10 +175,13 @@ const AppLayout = ({ session, onLogout, currentView, setCurrentView, onCursoSele
         bandeja: ComunicacionesPage,
         calificaciones: RegistroCompetencias,
         'iga-estadistica': IGAEstadistica,
-        // Agregamos asistencia (usaremos una función para decidir qué mostrar)
+        // ASISTENCIA DOCENTE (Solo el nombre del componente, sin < >)
         asistencia: cursoActivo ? AsistenciaAlumnos : PanelAsistencia,
         'consolidado-asistencia': ConsolidadoAsistencia,
-        matricula: ImportarMatricula,
+       // ASISTENCIA AUXILIAR (Asegúrate de que ConsolidadoGeneral esté importado arriba)
+       'asistencia-auxiliar': AsistenciaAuxiliar, 
+       'consolidado-general': ConsolidadoGeneral,
+       matricula: ImportarMatricula,
     };
 
     const renderContent = () => {

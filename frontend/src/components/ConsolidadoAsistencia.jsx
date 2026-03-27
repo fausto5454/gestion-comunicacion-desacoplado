@@ -65,19 +65,22 @@ const ConsolidadoAsistencia = () => {
       if (nomErr) throw nomErr;
 
       // Carga de Asistencias del mes
-      const { data: asistencias } = await supabase.from('asistencia')
-        .select('dni_estudiante, fecha, estado')
-        .eq('grado', gradoFmt)
-        .eq('seccion', seleccion.seccion)
-        .eq('observaciones', seleccion.area);
+      const { data: asistenciasDocente, error: asistErr } = await supabase
+         .from('asistencia')
+         .select('*')
+         .eq('grado', gradoFmt)
+         .eq('seccion', seleccion.seccion)
+         .or(`observaciones.eq."${seleccion.area}",observaciones.eq.CONTROL_AUXILIAR`);
 
       const mapa = {};
-      asistencias?.forEach(a => {
+      if (asistenciasDocente) {
+      asistenciasDocente.forEach(a => {
         const d = a.dni_estudiante;
         const diaNum = new Date(a.fecha).getUTCDate();
         if (!mapa[d]) mapa[d] = {};
         mapa[d][diaNum] = a.estado;
       });
+     }
 
       setEstudiantes(nomina || []);
       setDatos(mapa);

@@ -34,9 +34,18 @@ const Sidebar = ({ rol_id, userName, userEmail, setCurrentView, currentView, isS
             children: [
                 { name: 'Calificaciones', view: 'calificaciones', icon: GraduationCap, roles: [1, 3, 5, 6] },
                 { name: 'Asistencia', view: 'asistencia', icon: CalendarCheck, roles: [1, 3, 5] },
-                { name: 'Consolidado-Asistencia', view: 'consolidado-asistencia', icon: LayoutGrid, roles: [1, 2, 3, 5, 6] },
+                { name: 'Consolidado Asistencia', view: 'consolidado-asistencia', icon: LayoutGrid, roles: [1, 2, 3, 5, 6] },
                 { name: 'Matrícula', view: 'matricula', icon: FileSpreadsheet, roles: [1] },
                 { name: 'IGA-Estadística', view: 'iga-estadistica', icon: BarChart, roles: [1, 2, 3, 5] },
+            ]
+        },
+         { 
+            name: 'Gestión Auxiliares', 
+            icon: FolderTree, 
+            roles: [1, 5],
+            children: [
+                { name: 'Control de Asistencia', view: 'asistencia-auxiliar', icon: CalendarCheck, roles: [1, 5] },
+                { name: 'Consolidado General', view: 'consolidado-general', icon: LayoutGrid, roles: [1, 5] },
             ]
         },
         { 

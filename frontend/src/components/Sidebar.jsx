@@ -46,6 +46,7 @@ const Sidebar = ({ rol_id, userName, userEmail, setCurrentView, currentView, isS
             children: [
                 { name: 'Control de Asistencia', view: 'asistencia-auxiliar', icon: CalendarCheck, roles: [1, 5] },
                 { name: 'Consolidado General', view: 'consolidado-general', icon: LayoutGrid, roles: [1, 5] },
+                { name: 'Resumen Estadístico', view: 'resumen-estadistico', icon: BarChart, roles: [1, 5] },
             ]
         },
         { 

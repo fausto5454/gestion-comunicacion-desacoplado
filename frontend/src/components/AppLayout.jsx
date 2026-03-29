@@ -18,6 +18,7 @@ import ConsolidadoGeneral from './ConsolidadoGeneral';
 import ConsolidadoAsistencia from './ConsolidadoAsistencia';
 import PanelAsistencia from './PanelAsistencia';
 import ImportarMatricula from './ImportarMatricula';
+import ResumenEstadistico from './ResumenEstadistico';
 import Sidebar from './Sidebar';
 import SecurityModal from './SecurityModal';
 
@@ -29,17 +30,19 @@ const AppLayout = ({ session, onLogout, currentView, setCurrentView, onCursoSele
     const [userGrado, setUserGrado] = useState(null);
     const [userSeccion, setUserSeccion] = useState(null);
     const [perfilUsuario, setPerfilUsuario] = useState(null);
+    const [estudiantes, setEstudiantes] = useState([]);
+    const [asistencia, setAsistencia] = useState({});
+    const [trasladados, setTrasladados] = useState([]);
     
     const user = session?.user;
     const userEmail = user?.email || 'N/A';
     const userName = user?.user_metadata?.nombre_completo || user?.email || 'Usuario';
 
-   const fetchUserData = useCallback(async () => {
+  const fetchUserData = useCallback(async () => {
     const emailLimpio = userEmail?.trim().toLowerCase();
     if (!emailLimpio || emailLimpio === 'n/a') return;
 
     try {
-        // --- VÍA A: Datos básicos en 'usuarios' ---
         let { data: baseData, error: errorBase } = await supabase
             .from("usuarios")
             .select("id_usuario, rol_id, nombre_completo, correo_electronico") 
@@ -47,20 +50,47 @@ const AppLayout = ({ session, onLogout, currentView, setCurrentView, onCursoSele
             .maybeSingle();
 
         if (errorBase) {
-            console.error("❌ Error de vinculación en Supabase:", errorBase.message);
+            console.error("❌ Error de vinculación:", errorBase.message);
             return;
         }
-
-        let finalProfile = null;
-
+        let finalProfile = {};
         if (baseData) {
-            // Inicializamos el perfil con mapeo de seguridad para evitar 'is.null'
-            finalProfile = { 
+            setPerfilUsuario({ 
                 ...baseData, 
                 id: baseData.id_usuario, 
                 correo: baseData.correo_electronico,
                 asignaciones: [] 
-            };
+            });
+            // Seteamos IDs básicos
+            setUsuarioID(baseData.id_usuario);
+            setRolID(baseData.rol_id);
+
+            const { data: dataEst } = await supabase
+                .from('matriculas')
+                .select('*');
+            if (dataEst) setEstudiantes(dataEst); 
+
+            // Cargamos los traslados SIAGIE
+            const { data: dataTras } = await supabase
+                .from('trasladados')
+                .select('*');
+            if (dataTras) setTrasladados(dataTras); 
+
+            // Cargamos el mapa de asistencia
+            const { data: dataAsist } = await supabase
+                .from('asistencia')
+                .select('*');
+            
+            if (dataAsist) {
+                // Transformamos a objeto clave-valor para acceso rápido: { dni: { fecha: estado } }
+                const mapaAsistencia = dataAsist.reduce((acc, curr) => ({
+                    ...acc,
+                    [curr.dni_estudiante]: curr.registro_asistencia || {}
+                }), {});
+                setAsistencia(mapaAsistencia); // "Enciende" el estado gris
+            }
+
+            console.log("✅ Datos de reporte sincronizados para SIGESCOM 2079");
 
             // --- CASO DOCENTE/ADMIN (Roles 1, 2, 3) ---
             if (baseData.rol_id !== 6) {
@@ -111,14 +141,12 @@ const AppLayout = ({ session, onLogout, currentView, setCurrentView, onCursoSele
         }
 
         // --- ACTUALIZACIÓN FINAL DE ESTADOS ---
-        if (finalProfile) {
+       if (finalProfile && finalProfile.id_usuario) {
             setPerfilUsuario(finalProfile); 
             setRolID(finalProfile.rol_id);
             setUsuarioID(finalProfile.id_usuario);
             setUserGrado(finalProfile.grado);
             setUserSeccion(finalProfile.seccion);
-            
-            console.log("✅ Acceso híbrido y quirúrgico completado para:", finalProfile.nombre_completo);
         }
 
     } catch (err) {
@@ -181,6 +209,7 @@ const AppLayout = ({ session, onLogout, currentView, setCurrentView, onCursoSele
        // ASISTENCIA AUXILIAR (Asegúrate de que ConsolidadoGeneral esté importado arriba)
        'asistencia-auxiliar': AsistenciaAuxiliar, 
        'consolidado-general': ConsolidadoGeneral,
+       'resumen-estadistico': ResumenEstadistico,
        matricula: ImportarMatricula,
     };
 
@@ -276,7 +305,10 @@ const AppLayout = ({ session, onLogout, currentView, setCurrentView, onCursoSele
               <AsistenciaAlumnos 
               perfilUsuario={perfilUsuario} // Inyectamos las asignaciones detectadas
              session={session} 
-            cursoActivo={cursoActivo} 
+             cursoActivo={cursoActivo}
+            estudiantes={estudiantes} 
+           asistencia={asistencia} 
+           trasladados={trasladados} 
           />
           ) : currentView === 'calificaciones' ? (
            <RegistroCompetencias 
@@ -285,10 +317,16 @@ const AppLayout = ({ session, onLogout, currentView, setCurrentView, onCursoSele
                  areaNombre={cursoActivo?.area} 
                    gradoSeccion={cursoActivo?.grado} 
                     />
-                   ) : (
-                  renderContent()
-                 )}
-             </main>
+                  ) : currentView === 'resumen-estadistico' ? (
+                 <ResumenEstadistico 
+                 estudiantes={estudiantes} 
+                 asistencia={asistencia} 
+                 trasladados={trasladados} 
+                />
+               ) : (
+                renderContent()
+               )}
+            </main>
          </div>
       </div>
    );

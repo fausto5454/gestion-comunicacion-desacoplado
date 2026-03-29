@@ -70,17 +70,18 @@ const ConsolidadoAsistencia = () => {
          .select('*')
          .eq('grado', gradoFmt)
          .eq('seccion', seleccion.seccion)
-         .or(`observaciones.eq."${seleccion.area}",observaciones.eq.CONTROL_AUXILIAR`);
+         .or(`observaciones.eq."${seleccion.area}",observaciones.eq.GENERAL`)
 
       const mapa = {};
-      if (asistenciasDocente) {
       asistenciasDocente.forEach(a => {
-        const d = a.dni_estudiante;
-        const diaNum = new Date(a.fecha).getUTCDate();
-        if (!mapa[d]) mapa[d] = {};
-        mapa[d][diaNum] = a.estado;
-      });
-     }
+      const dni = String(a.dni_estudiante);
+      const diaNum = new Date(a.fecha + 'T00:00:00').getDate();
+  
+      if (!mapa[dni]) mapa[dni] = {};
+      if (!mapa[dni][diaNum] || a.observaciones === 'GENERAL') {
+        mapa[dni][diaNum] = a.estado;
+      }
+    });
 
       setEstudiantes(nomina || []);
       setDatos(mapa);
@@ -166,196 +167,180 @@ const ConsolidadoAsistencia = () => {
     });
   }, [estudiantes, searchTerm]);
 
-   const mapeoExcel = {
-      'Presente': 'P',
-      'P': 'P',
-      'Ausente': 'F',
-      'A': 'F', // Agrega esto para que la "A" de tu BD sea "F" en Excel
-      'Falta': 'F',
-      'Tardanza': 'T',
-      'T': 'T',
-      'Justificado': 'J',
-      'J': 'J'
-   };
+  const handleExportExcel = async () => {
+  const workbook = new ExcelJS.Workbook();
+  const worksheet = workbook.addWorksheet('Consolidado');
   
- const handleExportExcel = async () => {
-    const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet('Consolidado');
-    
-    // 1. Configuración de columnas (Anchos optimizados)
-    const totalCols = diasDelMes.length + 3; // N° + Nombres + Días + Faltas
-    const ultimaLetra = worksheet.getColumn(totalCols).letter;
-  
-    // 2. FILA 1: TÍTULO PRINCIPAL
-    worksheet.mergeCells(`A1:${ultimaLetra}1`);
-    const titulo = worksheet.getCell('A1');
-    titulo.value = 'CONSOLIDADO DE ASISTENCIA MENSUAL - 2026';
-    titulo.font = { name: 'Arial Black', size: 12, bold: true, color: { argb: 'FFFFFFFF' } };
-    titulo.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF059669' } };
-    titulo.alignment = { horizontal: 'center', vertical: 'middle' };
-  
-    // 3. FILA 2: SUB-ENCABEZADOS DINÁMICOS
-    const bloque = Math.floor(totalCols / 4);
-    const nombreMes = ["", "ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO", "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"][seleccion.mes];
-  
-    const secciones = [
-      { t: `ÁREA: ${seleccion.area}`, s: 1, e: bloque },
-      { t: `GRADO/SEC: ${seleccion.grado}° "${seleccion.seccion}"`, s: bloque + 1, e: bloque * 2 },
-      { t: `MES: ${nombreMes}`, s: (bloque * 2) + 1, e: bloque * 3 },
-      { t: `I.E. N° 2079`, s: (bloque * 3) + 1, e: totalCols }
-    ];
-  
-    secciones.forEach(sec => {
-      worksheet.mergeCells(2, sec.s, 2, sec.e);
-      const cell = worksheet.getCell(2, sec.s);
-      cell.value = sec.t;
-      cell.font = { name: 'Arial', size: 9, bold: true };
-      cell.alignment = { horizontal: 'center' };
-      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
-      cell.border = { 
-        top: { style: 'thin' }, 
-        left: { style: 'thin' }, 
-        bottom: { style: 'thin' }, 
-        right: { style: 'thin' } 
-      };
-    });
-  
-    // 4. FILA 4: ENCABEZADOS DE DÍAS (Letras)
-    const rowDiasNombre = worksheet.getRow(4);
-    rowDiasNombre.values = ["", "", ...diasDelMes.map(d => d.nombre.charAt(0))]; 
-    
-    rowDiasNombre.eachCell((cell, colNum) => {
-      if (colNum > 2) {
-        const letraDia = cell.value;
-        const esFinDeSemana = (letraDia === 'S' || letraDia === 'D');
-        cell.font = { 
-          name: 'Arial', size: 7, bold: true, 
-          color: { argb: esFinDeSemana ? 'FFFF0000' : 'FF64748B' } 
-        };
-        cell.alignment = { horizontal: 'center' };
-        cell.border = { 
-          top: { style: 'thin' }, left: { style: 'thin' }, 
-          bottom: { style: 'thin' }, right: { style: 'thin' } 
-        };
-      }
-    });
-  
-    // 5. FILA 5: ENCABEZADOS DE NÚMEROS (1, 2, 3...)
-    const headerRow = worksheet.getRow(5);
-    headerRow.values = ["N°", "APELLIDOS Y NOMBRES", ...diasDelMes.map(d => d.numero), "FALTAS"];
-    
-    headerRow.eachCell((cell, colNum) => {
-      const diaInfo = colNum > 2 && colNum <= (diasDelMes.length + 2) ? diasDelMes[colNum - 3] : null;
-      const esFinDeSemana = diaInfo && (diaInfo.nombre.charAt(0) === 'S' || diaInfo.nombre.charAt(0) === 'D');
-  
-      cell.font = { 
-        name: 'Arial', size: 9, bold: true, 
-        color: { argb: esFinDeSemana ? 'FFFF0000' : 'FFFFFFFF' } 
-      };
-      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E2948' } };
-      cell.alignment = { horizontal: 'center', vertical: 'middle' };
-      
-      // Bordes definidos para el encabezado
-      cell.border = { 
-        top: { style: 'thin' }, left: { style: 'thin' }, 
-        bottom: { style: 'thin' }, right: { style: 'thin' } 
-      };
+  // 1. CONFIGURACIÓN DE COLUMNAS
+  const totalCols = diasDelMes.length + 3;
+  const ultimaLetra = worksheet.getColumn(totalCols).letter;
+  worksheet.getColumn(1).width = 5;  // N°
+  worksheet.getColumn(2).width = 40; // Apellidos y Nombres
+  for (let i = 3; i < totalCols; i++) worksheet.getColumn(i).width = 3.5; // Días
+  worksheet.getColumn(totalCols).width = 8; // Faltas
 
-      if (colNum === 1) worksheet.getColumn(colNum).width = 5;
-      if (colNum === 2) worksheet.getColumn(colNum).width = 40;
-      if (colNum > 2 && colNum < totalCols) worksheet.getColumn(colNum).width = 3.5;
-      if (colNum === totalCols) worksheet.getColumn(colNum).width = 8;
-    });
-  
-    // 6. LLENADO DE DATOS (Con bordes Thin Negros)
-    filtrados.forEach((est, index) => {
-    let faltas = 0;
-    
-    const filaAsistencia = diasDelMes.map(d => {
-      // Usamos el id_matricula o dni_estudiante según cómo esté guardado en 'datos'
-      const valorOriginal = datos[est.dni_estudiante]?.[d.numero] || 
-                            datos[est.id_matricula]?.[d.numero] || '-';
-      
-      // Contar faltas (A o Ausente o Falta)
-      if (valorOriginal === 'F' || valorOriginal === 'Ausente' || valorOriginal === 'Falta') {
-        faltas++;
-      }
-      return mapeoExcel[valorOriginal] || valorOriginal; 
-      });
+  // 2. FILA 1: TÍTULO PRINCIPAL (Estilo Idéntico al Frontend)
+  worksheet.mergeCells(`A1:${ultimaLetra}1`);
+  const titulo = worksheet.getCell('A1');
+  titulo.value = 'CONSOLIDADO DE ASISTENCIA MENSUAL - 2026';
+  titulo.font = { name: 'Arial Black', size: 12, bold: true, color: { argb: 'FFFFFFFF' } };
+  titulo.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF059669' } }; // Verde Esmeralda
+  titulo.alignment = { horizontal: 'center', vertical: 'middle' };
+  titulo.border = { bottom: { style: 'thin', color: { argb: 'FF000000' } } };
 
-      const row = worksheet.addRow([
-        index + 1, 
-        `${est.apellido_paterno} ${est.apellido_materno}, ${est.nombres}`, 
-        ...filaAsistencia, 
-        faltas
-      ]);
-      
-    row.eachCell((cell, colNum) => {
-    // 1. Estilo base para todas las celdas
-    cell.font = { name: 'Arial', size: 9 };
-    cell.alignment = { vertical: 'middle', horizontal: 'center' };
-    cell.border = { 
-      top: { style: 'thin', color: { argb: 'FFCBD5E1' } }, 
-      left: { style: 'thin', color: { argb: 'FFCBD5E1' } }, 
-      bottom: { style: 'thin', color: { argb: 'FFCBD5E1' } }, 
-      right: { style: 'thin', color: { argb: 'FFCBD5E1' } } 
+  // 3. FILA 2: SUB-ENCABEZADOS DINÁMICOS
+  const bloque = Math.floor(totalCols / 4);
+  const nombreMes = ["", "ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO", "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"][seleccion.mes];
+
+  const secciones = [
+    { t: `ÁREA: ${seleccion.area}`, s: 1, e: bloque },
+    { t: `GRADO/SEC: ${seleccion.grado}° "${seleccion.seccion}"`, s: bloque + 1, e: bloque * 2 },
+    { t: `MES: ${nombreMes}`, s: (bloque * 2) + 1, e: bloque * 3 },
+    { t: `I.E. N° 2079 ANTONIO RAIMONDI`, s: (bloque * 3) + 1, e: totalCols }
+  ];
+
+  secciones.forEach(sec => {
+    worksheet.mergeCells(2, sec.s, 2, sec.e);
+    const cell = worksheet.getCell(2, sec.s);
+    cell.value = sec.t;
+    cell.font = { name: 'Arial Black', size: 9, bold: true };
+    cell.alignment = { horizontal: 'center', vertical: 'middle' };
+    cell.border = {
+      top: { style: 'thin' }, left: { style: 'thin' },
+      bottom: { style: 'thin' }, right: { style: 'thin' }
     };
+  });
 
-    if (colNum === 1) {
-        // AZUL CLARO para la columna N° (Mejor contraste)
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0F2FE' } };
-    } 
+  // 4. FILA 4 y 5: ENCABEZADOS DE DÍAS Y NÚMEROS (Con colores de fin de semana)
+  const rowLetras = worksheet.getRow(4);
+  const rowNumeros = worksheet.getRow(5);
+  
+  rowLetras.values = ["", "", ...diasDelMes.map(d => d.nombre.charAt(0))];
+  rowNumeros.values = ["N°", "APELLIDOS Y NOMBRES", ...diasDelMes.map(d => d.numero), "FALTAS"];
+
+  [4, 5].forEach(rowNum => {
+    const row = worksheet.getRow(rowNum);
+    row.eachCell((cell, colNum) => {
+      const diaInfo = colNum > 2 && colNum < totalCols ? diasDelMes[colNum - 3] : null;
+      const esFinde = diaInfo && (diaInfo.nombre.startsWith('S') || diaInfo.nombre.startsWith('D'));
+
+      cell.font = { 
+        name: 'Arial Bold', size: 8, bold: true, 
+        color: { argb: esFinde ? 'FFFF0000' : (rowNum === 5 ? 'FFFFFFFF' : 'FF64748B') } 
+      };
+      
+      if (rowNum === 5) {
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E293B' } }; // Azul oscuro UI
+      }
+      
+      cell.alignment = { horizontal: 'center', vertical: 'middle' };
+      cell.border = {
+        top: { style: 'thin', color: { argb: 'FF000000' } },
+        left: { style: 'thin', color: { argb: 'FF000000' } },
+        bottom: { style: 'thin', color: { argb: 'FF000000' } },
+        right: { style: 'thin', color: { argb: 'FF000000' } }
+      };
+    });
+  });
+
+  // 5. LLENADO DE DATOS Y COLORES DE FIN DE SEMANA EN COLUMNAS
+  const mapeoExcel = {
+    'Presente': '•', 'P': '•', '.': '•',
+    'Ausente': 'F', 'A': 'F', 'Falta': 'F', 'F': 'F',
+    'Tardanza': 'T', 'T': 'T', 'TJ': 'TJ',
+    'Justificado': 'J', 'J': 'J', 'FJ': 'FJ'
+  };
+
+  filtrados.forEach((est, index) => {
+  let faltasEstudiante = 0;
+  
+  const asistenciaArray = diasDelMes.map(d => {
+    const v = datos[est.dni_estudiante]?.[d.numero] || datos[est.id_matricula]?.[d.numero] || '';
     
-    if (colNum === totalCols) {
-        // ROJO CLARO base para la columna Faltas (bg-red-100)
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEE2E2' } };
-
-    if (faltas >= 3) {
-            cell.fill = {
-                type: 'pattern',
-                pattern: 'solid',
-                fgColor: { argb: 'FFDC2626' } // Rojo vibrante de la UI
-            };
-            cell.font = { name: 'Arial', size: 9, bold: true, color: { argb: 'FFFFFFFF' } };
-        }
+    if (['F', 'A', 'Ausente', 'Falta'].includes(v)) {
+      faltasEstudiante++;
     }
 
-    if (colNum >= 3 && colNum <= (diasDelMes.length + 2)) {
-      const indiceDia = colNum - 3;
-      const dia = diasDelMes[indiceDia];
-      const nombreLimpio = dia.nombre.toUpperCase();
-      const esFinde = nombreLimpio.includes("SÁB") || nombreLimpio.includes("DOM");
+    return mapeoExcel[v] || v; 
+  });
 
+  const row = worksheet.addRow([
+    index + 1, 
+    `${est.apellido_paterno} ${est.apellido_materno}, ${est.nombres}`, 
+    ...asistenciaArray, 
+    faltasEstudiante
+  ]);
+
+  row.eachCell((cell, colNum) => {
+    // ESTILO BASE Y BORDES NEGROS PROFESIONALES
+    cell.font = { name: 'Arial', size: 9 };
+    cell.alignment = { vertical: 'middle', horizontal: 'center' };
+    cell.border = {
+      top: { style: 'thin', color: { argb: 'FF000000' } },
+      left: { style: 'thin', color: { argb: 'FF000000' } },
+      bottom: { style: 'thin', color: { argb: 'FF000000' } },
+      right: { style: 'thin', color: { argb: 'FF000000' } }
+    };
+
+    // Identificar si la columna actual pertenece a un fin de semana
+    const diaInfo = colNum > 2 && colNum < totalCols ? diasDelMes[colNum - 3] : null;
+    if (diaInfo) {
+      const nombreLimpio = diaInfo.nombre.toUpperCase();
+      const esSábado = nombreLimpio.includes("SÁB");
+      const esDomingo = nombreLimpio.includes("DOM");
+      const esFinde = esSábado || esDomingo;
+
+      // --- CRÍTICO: APLICAR COLOR ROJO DE FIN DE SEMANA (RÉPLICA IDÉNTICA UI) ---
       if (esFinde) {
-        // APLICAR COLOR DE FONDO (Fila de estudiante, columna de finde)
+        // Color de Fondo (bg-red-50 de la web)
         cell.fill = {
           type: 'pattern',
           pattern: 'solid',
-          fgColor: { argb: 'FFFEF2F2' } // Un rojo muy claro (pálido) para el contenido
+          fgColor: { argb: 'FFFEF2F2' } // Rojo muy claro (pálido) para el contenido
         };
-        cell.font = { color: { argb: 'FFB91C1C' }, size: 9 }; // Texto rojo oscuro para el '-'
+        
+        cell.font = { name: 'Arial', size: 9, color: { argb: 'FFB91C1C' } }; 
       }
     }
-    // 2. Alineación: Centro para N° y estados, Izquierda para Nombres (col 2)
-   cell.alignment = (colNum === 1 || colNum > 2) 
-     ? { horizontal: 'center', vertical: 'middle' } 
-     : { horizontal: 'left', indent: 1 };
 
-   // 3. Color de letra según el estado (Columnas de asistencia)
-  if (colNum > 2 && colNum < totalCols) {
-    const valor = cell.value ? cell.value.toString().trim().toUpperCase() : '';
+    if (colNum > 2 && colNum < totalCols) {
+      const val = cell.value?.toString();
+      
+      // • Presente (P) - Negro
+      if (val === '•') {
+        cell.font = { name: 'Arial', size: 10, color: { argb: 'FF000000' } };
+      }
+      // F Falta (A) - Rojo vibrante
+      else if (val === 'F') {
+        cell.font = { name: 'Arial', size: 9, color: { argb: 'FFFF0000' }, bold: true };
+      }
+      // TJ/T Tardanza (Justificada) - Ámbar
+      else if (val === 'T' || val === 'TJ') {
+        cell.font = { name: 'Arial', size: 9, color: { argb: 'FFD97706' }, bold: true };
+      }
+      // FJ/J Justificación (Falta) - Verde Esmeralda
+      else if (val === 'J' || val === 'FJ') {
+        cell.font = { name: 'Arial', size: 9, color: { argb: 'FF059669' }, bold: true };
+      }
+    }
 
-     if (valor === 'F') {
-           // Importante: Volver a pasar el size para que no se resetee
-           cell.font = { name: 'Arial', size: 8, color: { argb: 'FFFF0000' }, bold: true };
-         } else if (valor === 'T') {
-           cell.font = { name: 'Arial', size: 8, color: { argb: 'FFBF9000' }, bold: true }; // Ámbar más oscuro para lectura
-         } else if (valor === 'J') {
-           cell.font = { name: 'Arial', size: 8, color: { argb: 'FF274E13' }, bold: true }; // Verde
-         } else if (valor === 'P') {
-           cell.font = { name: 'Arial', size: 8, color: { argb: 'FF000000' } };
-        }
+    // Estilos de columnas de control especiales
+    if (colNum === 1) { // Columna N° (Azul pizarra suave)
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2E8F0' } };
+    }
+    
+    if (colNum === 2) { // Columna Nombres (Alineación izquierda)
+      cell.alignment = { horizontal: 'left', indent: 1 };
+    }
+    
+    // Columna de Faltas (Alerta roja para >= 3 faltas)
+    if (colNum === totalCols) {
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEE2E2' } };
+      if (faltasEstudiante >= 3) {
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDC2626' } };
+        cell.font = { name: 'Arial', size: 9, color: { argb: 'FFFFFFFF' }, bold: true };
        }
+      }
      });
     });
 
@@ -512,7 +497,7 @@ const ConsolidadoAsistencia = () => {
         return (
             <tr key={est.id_matricula || est.dni_estudiante} className="hover:bg-slate-50 transition-colors group">
               {/* COLUMNA N° */}
-               <td className="sticky left-0 z-30 bg-emerald-100 py-1 text-center text-[8px] md:text-[12px] font-bold text-emerald-600 border-r border-slate-300">
+               <td className="sticky left-0 z-30 bg-emerald-100 py-1 text-center text-[8px] md:text-[11px] font-bold text-emerald-600 border-r border-slate-300">
                 {(index + 1).toString().padStart(2, '0')}
                   </td>
 
@@ -520,28 +505,33 @@ const ConsolidadoAsistencia = () => {
                <td className="bg-white py-1 px-3 text-[8px] md:text-[10px] font-semibold text-slate-700 border-r border-slate-300/80 uppercase">
               {est.apellido_paterno} {est.apellido_paterno_materno || est.apellido_materno} {est.nombres}
              </td>
-             {/* COLUMNAS DE DÍAS (ASISTENCIA) */}
+             {/* COLUMNAS DE DÍAS (ASISTENCIA) - ACTUALIZADO PARA SIGESCOM 2079 */}
              {diasDelMes.map(dia => {
-             const valorBD = asistenciaEst[dia.numero] || '';
-             const res = valorBD.toString().trim().toUpperCase().charAt(0);
+             const valorBD = (asistenciaEst[dia.numero] || '').toString().trim().toUpperCase();
              const esFinde = dia.nombre === "Sáb" || dia.nombre === "Dom";
-               const colorClass = 
-                 res === 'F' || res === 'A' ? 'text-red-600 font-semibold' : 
-                 res === 'T' ? 'text-amber-500 font-bold' : 
-                 res === 'J' ? 'text-green-600 font-bold' : 
-                 res === 'P' ? 'text-slate-800' : 'text-slate-300';
+             let visualChar = '-';
+             if (['.', 'P', '•'].includes(valorBD)) {
+             visualChar = '•'; 
+             } else if (['F', 'A', 'T', 'J', 'FJ', 'TJ'].includes(valorBD)) {
+             visualChar = (valorBD === 'A') ? 'F' : valorBD;
+             }
+             const colorClass = 
+                 (valorBD === 'F' || valorBD === 'A' || valorBD === 'FJ') ? 'text-red-600 font-bold' : 
+                 (valorBD === 'T' || valorBD === 'TJ') ? 'text-amber-500 font-bold' : 
+                 (valorBD === 'J') ? 'text-green-600 font-bold' : 
+                 (['.', 'P', '•'].includes(valorBD)) ? 'text-slate-800 font-black' : 
+                 'text-slate-300';
 
-                 const letraFinal = (res === 'A') ? 'F' : (['P','F','T','J'].includes(res) ? res : '-');
-                 return (
-                   <td 
-                    key={dia.numero} 
-                     className={`text-center py-0 border-r border-slate-300/80 min-w-[32px] md:min-w-[40px] ${esFinde ? 'bg-red-50' : 'bg-white'}`}
-                       >
-                      <span className={`text-[10px] md:text-[11px] select-none ${colorClass}`}>
-                     {letraFinal}
-                    </span>
-                   </td>
-                   );
+            return (
+                <td 
+                  key={dia.numero} 
+                    className={`text-center py-0 border-r border-slate-300/80 min-w-[32px] md:min-w-[40px] ${esFinde ? 'bg-red-50' : 'bg-white'}`}
+                      >
+                     <span className={`text-[10px] md:text-[11px] select-none ${colorClass}`}>
+                    {visualChar}
+                   </span>
+                  </td>
+                  );
                  })}
 
                   {/* COLUMNA TOTAL FALTAS (LA MEJORA) */}

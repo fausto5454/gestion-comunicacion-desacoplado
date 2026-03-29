@@ -509,7 +509,7 @@ const guardarAsistenciaTotal = async () => {
    return (
     <div className="bg-white rounded-[1.5rem] md:rounded-[2rem] shadow-2xl border border-gray-100 overflow-hidden">
       {/* HEADER */}
-      <div className="p-4 md:p-6 bg-slate-600 border-b border-gray-100 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
+      <div className="p-4 md:p-4 bg-slate-600 border-b border-gray-100 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
         <div className="flex items-center gap-3 md:gap-5 w-full lg:w-auto">
           <div className="hidden sm:block bg-pink-600 p-6 rounded-3xl text-white shadow-lg">
             <Bookmark size={24} />
@@ -590,10 +590,10 @@ const guardarAsistenciaTotal = async () => {
               <tr className="bg-gray-500">
                 <th className="border border-gray-300 px-3 py-2 text-left text-[10px] font-black text-green-400 bg-emerald-800 uppercase w-10">N°</th>
                 <th className="border border-gray-300 px-4 py-2 text-left text-[10px] font-black text-green-400 uppercase tracking-wider">Apellidos y Nombres</th>
-                <th className="border border-gray-300 px-2 py-2 text-center text-[10px] font-black text-green-400 bg-pink-600 uppercase w-40">Estado</th>
+                <th className="border border-gray-300 px-2 py-2 text-center text-[10px] font-black text-green-400 bg-pink-600 uppercase w-40">Estado del Estudiante</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-300">
+            <tbody className="divide-y divide-gray-200">
            {estudiantes.map((est, index) => (
             <tr key={est.dni_estudiante} className="hover:bg-slate-50 transition-colors">
               <td className="border border-gray-300 px-3 py-1.5 text-center text-[11px] font-bold text-emerald-600 bg-emerald-100/60">

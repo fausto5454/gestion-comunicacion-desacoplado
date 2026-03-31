@@ -541,6 +541,11 @@ const ConsolidadoAsistencia = () => {
                      : 'bg-red-100 text-slate-600'                        
                      }`}>
                      {totalFaltas}
+                     {enRiesgo && (
+                     <div className="text-[6px] leading-none mt-0.5 uppercase font-bold">
+                     Seguimiento
+                     </div>
+                     )}
                     </td>
                   </tr>
                   );

@@ -33,44 +33,44 @@ const AsistenciaAuxiliar = () => {
   setLoading(true);
   try {
     const [grado, seccion] = gradoSeccion.split(' ');
-      
-      const fechaLimpia = typeof fecha === 'string' ? fecha.split('T')[0] : new Date(fecha).toISOString().split('T')[0];
-     const { data: listaAlumnos, error: errorMatriculas } = await supabase
+    const fechaISO = typeof fecha === 'string' ? fecha.split('T')[0] : new Date(fecha).toISOString().split('T')[0];
+
+    // 1. Cargar alumnos activos (Matriculas)
+    const { data: alumnos } = await supabase
       .from('matriculas')
       .select('dni_estudiante, apellido_paterno, apellido_materno, nombres')
       .eq('grado', grado)
-      .eq('seccion', seccion)
+      .eq('seccion', seccion.trim())
       .eq('anio_lectivo', 2026)
-      .eq('estado_estudiante', 'Activo')
-      .order('apellido_paterno', { ascending: true });
+      .eq('estado_estudiante', 'Activo');
 
-    if (errorMatriculas) throw errorMatriculas;
-
-    const { data: asistenciasHoy, error: errorExistente } = await supabase
+    // 2. Cargar asistencia (Docentes y Auxiliares compartiendo la misma tabla)
+    const { data: asistenciaDB } = await supabase
       .from('asistencia')
-      .select('dni_estudiante, estado')
-      .eq('fecha', fechaLimpia)
-      .eq('turno', turno);
+      .select('dni_estudiante, estado, turno, observaciones')
+      .eq('fecha', fechaISO)
+      .eq('grado', grado)
+      .eq('seccion', seccion.trim());
 
-    if (errorExistente) throw errorExistente;
+    if (alumnos) {
+      setEstudiantes(alumnos);
+      const nuevoMapaAsistencia = {};
 
-    if (listaAlumnos) {
-      setEstudiantes(listaAlumnos);
-      const mapAsist = {};
-      
-      listaAlumnos.forEach(est => {
-        const reg = asistenciasHoy?.find(a => String(a.dni_estudiante).trim() === String(est.dni_estudiante).trim());
-        mapAsist[est.dni_estudiante] = reg ? reg.estado : '.';
+      alumnos.forEach(est => {
+        // Buscamos si ya existe registro para este alumno hoy
+        const registro = asistenciaDB?.find(a => String(a.dni_estudiante) === String(est.dni_estudiante));
+        
+        // Si el docente ya marcó, el auxiliar lo ve. Si no, aparece 'P' (Presente)
+        nuevoMapaAsistencia[est.dni_estudiante] = registro ? registro.estado : 'P';
       });
-      
-      setAsistencia(mapAsist);
+
+      setAsistencia(nuevoMapaAsistencia);
     }
-   } catch (err) {
-     toast.error(`Error de carga: ${err.message}`);
-     console.error("Error en fetchNomina:", err);
-   } finally {
-     setLoading(false);
-   }
+  } catch (err) {
+    console.error("Error de sincronización:", err);
+  } finally {
+    setLoading(false);
+  }
   }, [gradoSeccion, fecha, turno]);
 
   useEffect(() => {
@@ -83,54 +83,66 @@ const AsistenciaAuxiliar = () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("Sesión expirada");
 
+    // 1. VALIDACIÓN CRÍTICA: Evita que se guarde como NULL si el selector falló
+    if (!turno) throw new Error("Debe seleccionar un TURNO (MAÑANA/TARDE) antes de guardar.");
+
     const [grado, seccion] = gradoSeccion.split(' ');
-    const fechaISO = new Date(fecha + 'T12:00:00').toISOString().split('T')[0];
+    
+    // MEJORA: Normalización estricta de fecha para el Consolidado General
+    const fechaISO = typeof fecha === 'string' ? fecha.split('T')[0] : new Date(fecha).toISOString().split('T')[0];
 
-   const registros = estudiantes.map(est => {
-   const estadoActual = asistencia[est.dni_estudiante];
-  
-   // UNIFICACIÓN: Si es punto, P o está vacío, guardamos 'P'
-   let estadoParaBD = 'P'; 
-   if (['F', 'T', 'J', 'FJ', 'TJ'].includes(estadoActual)) {
-     estadoParaBD = estadoActual;
-   }
+    const registros = estudiantes.map(est => {
+      const estadoActual = asistencia[est.dni_estudiante];
+      
+      // UNIFICACIÓN: Si es punto, vacío o P, guardamos 'P'
+      let estadoParaBD = 'P'; 
+      if (['F', 'T', 'J', 'FJ', 'TJ'].includes(estadoActual)) {
+        estadoParaBD = estadoActual;
+      }
 
-   return {
-       dni_estudiante: String(est.dni_estudiante),
-       fecha: fechaISO,
-       estado: estadoParaBD, // Siempre guardará P, F, T, etc.
-       grado: grado,
-       seccion: seccion,
-       turno: turno,
-       observaciones: "GENERAL",
-       usuario_gmail: user.email,
-       anio_lectivo: "2026"
-     };
+      return {
+        dni_estudiante: String(est.dni_estudiante),
+        fecha: fechaISO,
+        estado: estadoParaBD,
+        grado: grado,
+        seccion: seccion.trim(), 
+        turno: turno.toUpperCase(),
+        observaciones: "SINCRO_FINAL", 
+        usuario_gmail: user.email,
+        anio_lectivo: "2026"
+      };
     });
 
     const { error } = await supabase
       .from('asistencia')
       .upsert(registros, { 
-        // Esta línea es CRÍTICA: debe tener los mismos campos que el UNIQUE CONSTRAINT del SQL
-        onConflict: 'dni_estudiante,fecha,turno' 
-      });
+        onConflict: 'dni_estudiante,fecha,turno'});
 
     if (error) throw error;
 
-    toast.success(`Sincronización ${turno} completada`);
+    toast.success(`Asistencia ${turno} sincronizada correctamente`);
     
-   } catch (err) {
+  } catch (err) {
     console.error("DETALLE DEL ERROR:", err);
-    // Si el error es de llave duplicada, lo manejamos visualmente
-    if (err.code === '23505') {
-        toast.error("Error de duplicidad: La base de datos no permite sobreescribir este registro.");
-    } else {
-        toast.error("Error: " + (err.message || "No se pudo actualizar"));
-    }
+    toast.error("Error: " + (err.message || "No se pudo actualizar"));
   } finally {
     setIsSaving(false);
   }
- };
+  };
+
+  useEffect(() => {
+    const canalAuxiliar = supabase
+      .channel('cambios_desde_docente')
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: 'asistencia' }, 
+        (payload) => {
+          fetchNomina(); 
+        }
+      )
+      .subscribe();
+
+    return () => supabase.removeChannel(canalAuxiliar);
+  }, [fetchNomina]);
 
   const toggleAsistencia = (dni, estado) => {
     setAsistencia(prev => ({ ...prev, [dni]: estado }));
@@ -208,7 +220,7 @@ const AsistenciaAuxiliar = () => {
                       {['P', 'F', 'T', 'J', 'FJ', 'TJ'].map((l) => {
                         const isActive = asistencia[est.dni_estudiante] === l;
                         const colors = {
-                          'P': isActive ? 'bg-slate-600 text-white' : 'bg-slate-200 text-white',
+                          'P': isActive ? 'bg-slate-500 text-white' : 'bg-slate-200 text-white',
                           'F': isActive ? 'bg-red-500 text-white' : 'bg-red-50 text-red-200',
                           'T': isActive ? 'bg-amber-400 text-white' : 'bg-amber-50 text-amber-200',
                           'J': isActive ? 'bg-emerald-500 text-white' : 'bg-emerald-50 text-emerald-200',

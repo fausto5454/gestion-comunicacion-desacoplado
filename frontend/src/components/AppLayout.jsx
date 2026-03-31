@@ -31,7 +31,7 @@ const AppLayout = ({ session, onLogout, currentView, setCurrentView, onCursoSele
     const [userSeccion, setUserSeccion] = useState(null);
     const [perfilUsuario, setPerfilUsuario] = useState(null);
     const [estudiantes, setEstudiantes] = useState([]);
-    const [asistencia, setAsistencia] = useState({});
+    const [asistencia, setAsistencia] = useState([]);
     const [trasladados, setTrasladados] = useState([]);
     
     const user = session?.user;
@@ -82,15 +82,9 @@ const AppLayout = ({ session, onLogout, currentView, setCurrentView, onCursoSele
                 .select('*');
             
             if (dataAsist) {
-                // Transformamos a objeto clave-valor para acceso rápido: { dni: { fecha: estado } }
-                const mapaAsistencia = dataAsist.reduce((acc, curr) => ({
-                    ...acc,
-                    [curr.dni_estudiante]: curr.registro_asistencia || {}
-                }), {});
-                setAsistencia(mapaAsistencia); // "Enciende" el estado gris
-            }
-
-            console.log("✅ Datos de reporte sincronizados para SIGESCOM 2079");
+           setAsistencia(dataAsist); 
+           console.log(`✅ ${dataAsist.length} registros de asistencia sincronizados para SIGESCOM 2079`);
+           }
 
             // --- CASO DOCENTE/ADMIN (Roles 1, 2, 3) ---
             if (baseData.rol_id !== 6) {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Download, Users, FileCheck, AlertTriangle, TrendingUp, Loader2 } from 'lucide-react';
 import { saveAs } from 'file-saver';
 import ExcelJS from 'exceljs';
@@ -10,70 +10,86 @@ const ResumenEstadistico = ({
   fechaConsulta, 
   onExport 
 }) => {
+  const fechaHoyISO = new Date().toISOString().split('T')[0];
+  const hoy = new Date();
+  const [fechaSeleccionada, setFechaSeleccionada] = useState(fechaHoyISO);
+  const fKey = fechaSeleccionada;
+  const superClean = (val) => String(val || "").replace(/[^a-zA-Z0-9]/g, "").toUpperCase().trim();
+  const fechaHoyStr = hoy.toLocaleDateString('es-PE', { 
+    weekday: 'long', 
+    day: 'numeric', 
+    month: 'long', 
+    year: 'numeric' 
+  });
+
   const [datosResumen, setDatosResumen] = useState([]);
   const [loading, setLoading] = useState(true);
-  
-  // Sincronización de fecha para indexar la tabla 'asistencia'
-  const fechaHoyStr = new Date().toISOString().split('T')[0]; 
-  const fKey = fechaConsulta || fechaHoyStr; 
-  
-  const fechaCabecera = new Date(fKey + 'T00:00:00').toLocaleDateString('es-PE', { 
-    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' 
-  }); 
 
-  // Generación de métricas por sección
-  const generarDatosSecciones = () => {
-    const seccionesConfig = [
-      { id: 1, turno: 'MAÑANA', sec: '1° A' }, { id: 2, turno: 'MAÑANA', sec: '1° B' },
-      { id: 3, turno: 'MAÑANA', sec: '1° C' }, { id: 4, turno: 'MAÑANA', sec: '2° A' },
-      { id: 5, turno: 'MAÑANA', sec: '2° B' }, { id: 6, turno: 'MAÑANA', sec: '2° C' },
-      { id: 7, turno: 'TARDE', sec: '3° A' }, { id: 8, turno: 'TARDE', sec: '3° B' },
-      { id: 9, turno: 'TARDE', sec: '4° A' }, { id: 10, turno: 'TARDE', sec: '4° B' },
-      { id: 11, turno: 'TARDE', sec: '5° A' }, { id: 12, turno: 'TARDE', sec: '5° B' },
-    ];
+  const generarDatosSecciones = useCallback(() => {
+  const seccionesConfig = [
+     { id: 1, turno: 'MAÑANA', sec: '1 A' }, { id: 2, turno: 'MAÑANA', sec: '1 B' },
+     { id: 3, turno: 'MAÑANA', sec: '1 C' }, { id: 4, turno: 'MAÑANA', sec: '2 A' },
+     { id: 5, turno: 'MAÑANA', sec: '2 B' }, { id: 6, turno: 'MAÑANA', sec: '2 C' },
+     { id: 7, turno: 'TARDE', sec: '3 A' }, { id: 8, turno: 'TARDE', sec: '3 B' },
+     { id: 9, turno: 'TARDE', sec: '4 A' }, { id: 10, turno: 'TARDE', sec: '4 B' },
+     { id: 11, turno: 'TARDE', sec: '5 A' }, { id: 12, turno: 'TARDE', sec: '5 B' },
+   ];
 
-    return seccionesConfig.map(s => {
-      // Filtrado en tabla 'matriculas'
-      const estudiantesSec = estudiantes?.filter(e => {
-        const dbSec = (e.grado_seccion || `${e.grado} ${e.seccion}`)?.replace('°', '').trim();
-        return dbSec === s.sec.replace('°', '').trim();
-      }) || [];
+   // Función de limpieza ultra-agresiva
+   const superClean = (val) => String(val || "").replace(/[^a-zA-Z0-9]/g, "").toUpperCase().trim();
 
-      const matriculadosSec = estudiantesSec.length;
-      const trasladosSec = trasladados?.filter(t => {
-        const dbSec = (t.grado_seccion || `${t.grado} ${t.seccion}`)?.replace('°', '').trim();
-        return dbSec === s.sec.replace('°', '').trim();
-      }).length || 0;
+   return seccionesConfig.map(s => {
+    // 1. Filtrar estudiantes de la sección
+    const todosEnSeccion = estudiantes?.filter(e => {
+      const dbSec = superClean(e.grado_seccion || `${e.grado}${e.seccion}`);
+      return dbSec === superClean(s.sec);
+    }) || [];
 
-      const enAula = matriculadosSec - trasladosSec;
-      
-      // Conteo de asistencia real
-      const asistenciasHoy = estudiantesSec.filter(e => {
-        const reg = asistencia[e.dni_estudiante];
-        return reg && (reg[fKey] === 'P' || reg[fKey] === '•');
-      }).length;
+    const trasladosSec = todosEnSeccion.filter(e => 
+      ['Trasladado', 'Retirado'].includes(e.estado_estudiante)
+    ).length;
+
+    const matriculadosSec = todosEnSeccion.length;
+    const enAula = matriculadosSec - trasladosSec;
+
+    // 2. CONTEO DE ASISTENCIA (Punto de falla)
+   const asistenciasHoy = todosEnSeccion.filter(e => {
+   if (!Array.isArray(asistencia)) return false;
+
+   return asistencia.some(a => {
+    const dniMatch = String(e.dni_estudiante).trim() === String(a.dni_estudiante).trim();
+    
+    // Simplificamos el match de fecha para evitar errores de formato ISO
+    const fechaDB = String(a.fecha || "").split('T')[0];
+    const fechaMatch = fechaDB === fKey;
+
+    // Si tu tabla de asistencia tiene 'grado' y 'seccion' separados:
+    const seccionDB = superClean(`${a.grado}${a.seccion}`);
+    const seccionMatch = seccionDB === superClean(s.sec);
+
+       return dniMatch && fechaMatch && seccionMatch && a.estado === 'P';
+     });
+    }).length;
 
       return { ...s, matriculadosSec, trasladosSec, enAula, asistenciasHoy };
     });
-  };
+   }, [estudiantes, asistencia, fKey]);
 
-  useEffect(() => {
-    if (estudiantes.length > 0) {
-      setDatosResumen(generarDatosSecciones());
-      setLoading(false);
-    }
-  }, [estudiantes, asistencia, trasladados, fKey]);
-
-  // Cálculos globales para StatCards
   const totalMatriculados = datosResumen.reduce((acc, curr) => acc + curr.matriculadosSec, 0);
   const totalEnAula = datosResumen.reduce((acc, curr) => acc + curr.enAula, 0);
   const totalAsistencias = datosResumen.reduce((acc, curr) => acc + curr.asistenciasHoy, 0);
   const totalFaltas = totalEnAula - totalAsistencias;
 
+  useEffect(() => {
+    const data = generarDatosSecciones();
+    setDatosResumen(data);
+    setLoading(false);
+  }, [generarDatosSecciones]);
+
  const handleExportResumen = async () => {
   const workbook = new ExcelJS.Workbook();
   const worksheet = workbook.addWorksheet('Resumen de Asistencia');
-
+ 
   // 1. COLUMNAS (Anchos profesionales ajustados al diseño)
   worksheet.columns = [
     { width: 5 },  // A: N°
@@ -92,9 +108,14 @@ const ResumenEstadistico = ({
   title.font = { name: 'Arial Black', size: 18, bold: true, underline: true };
   title.alignment = { horizontal: 'center', vertical: 'middle' };
 
-  // 3. CABECERA (Fila 4)
-  const fechaHoyStr = "domingo, 29 de marzo de 2026"; // Texto exacto del Excel
-  const fKey = "2026-03-29"; // Llave para buscar en el objeto asistencia
+  titleCell.value = {
+  richText: [
+    { text: 'SIGESCOM ', font: { name: 'Arial Black', size: 18, bold: true, color: { argb: 'FF1A222E' } } },
+    { text: '2079', font: { name: 'Arial Black', size: 18, bold: true, color: { argb: 'FF22C55E' } } },
+    { text: ' | ASISTENCIA NIVEL SECUNDARIA', font: { name: 'Arial Black', size: 14, bold: true, color: { argb: 'FF444444' } } }
+   ]
+  };
+  titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
 
   const headerRow = worksheet.getRow(4);
   headerRow.values = ['N°', 'TURNO', 'SECCIÓN', 'ESTUDIANTES MATRICULADOS', 'TRASLADADOS SIAGIE', 'ESTUDIANTES EN AULA', fechaHoyStr];
@@ -120,57 +141,59 @@ const ResumenEstadistico = ({
   let tMat = 0, tTras = 0, tAula = 0, tAsis = 0;
 
   seccionesConfig.forEach((item, index) => {
-    const rowNum = 5 + index;
-    const row = worksheet.getRow(rowNum);
+   const rowNum = 5 + index;
+   const row = worksheet.getRow(rowNum);
 
-    // Filtrado Real usando columnas de Supabase
-    const estSec = estudiantes.filter(e => 
-      e.grado === item.grado && 
-      e.seccion === item.seccion && 
-      e.estado_estudiante === 'Activo'
-    );
+  const dataSeccion = datosResumen.find(d => 
+      superClean(d.sec) === superClean(`${item.grado}${item.seccion}`)
+    ) || { matriculadosSec: 0, trasladosSec: 0, enAula: 0, asistenciasHoy: 0 };
 
-    const nMat = estSec.length;
-    const nTras = trasladados.filter(t => t.grado === item.grado && t.seccion === item.seccion).length;
-    const nAula = nMat - nTras;
-    
-    // Conteo de Asistencias (Estado 'P')
-    const nAsis = estSec.filter(e => {
-        const r = asistencia[e.dni_estudiante];
-        return r && (r[fKey] === 'P');
-    }).length;
+  // 2. Asignamos valores a la fila
+  row.values = [
+    item.n, 
+    item.turno, 
+    `${item.grado} ${item.seccion}`, // Columna C
+    dataSeccion.matriculadosSec,     // Columna D (Frontend: 35, 34...)
+    dataSeccion.trasladosSec,       // Columna E (Frontend: 0, 1...)
+    dataSeccion.enAula,             // Columna F (Frontend: 35, 33...)
+    dataSeccion.asistenciasHoy      // Columna G (Frontend: 54, 27...)
+  ];
 
-    row.values = [item.n, item.turno, `${item.grado} ${item.seccion}`, nMat, nTras, nAula, nAsis];
+  // 3. Aplicamos estilos (Aquí es donde fallaba por las variables no definidas)
+  row.eachCell((cell, colNum) => {
+    cell.border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
+    cell.alignment = { horizontal: 'center', vertical: 'middle' };
 
-    // Estilos de celda según tu diseño
-    row.eachCell((cell, colNum) => {
-      cell.border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
-      cell.alignment = { horizontal: 'center', vertical: 'middle' };
-
-      if (colNum === 1) { // N°
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDDEBF7' } }; 
-        cell.font = { bold: true };
-      } 
-      else if (colNum === 2) { // TURNO
-        cell.font = { bold: true }; 
+    if (colNum === 1) { // N°
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDDEBF7' } }; 
+      cell.font = { bold: true };
+    } 
+    else if (colNum === 3) { // SECCIÓN
+      cell.font = { bold: true };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFC6EFCE' } };
+    }
+    else if (colNum === 7) {
+      const faltas = dataSeccion.enAula - dataSeccion.asistenciasHoy;
+      if (faltas >= 3) {
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF176' } };
+        cell.font = { color: { argb: 'FF000000' }, bold: true };
       }
-      else if (colNum === 3) { // SECCIÓN
-        cell.font = { bold: true };
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFC6EFCE' } };
-      }
-      else if (colNum === 7) { // ASISTENCIA (Alerta Roja Condicional)
-        const faltas = nAula - nAsis;
-        if (faltas >= 3) {
-            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF176' } }; // Amarillo claro
-            cell.font = { color: { argb: '00000000' }, bold: true };
-        }
-      }
-    });
+    }
+   });
 
     // Acumuladores para totales
-    tMat += nMat; tTras += nTras; tAula += nAula; tAsis += nAsis;
-    if (item.turno === 'MAÑANA') { mTotalAula += nAula; mTotalAsis += nAsis; }
-    else { tTotalAula += nAula; tTotalAsis += nAsis; }
+   tMat += dataSeccion.matriculadosSec; 
+   tTras += dataSeccion.trasladosSec; 
+   tAula += dataSeccion.enAula; 
+   tAsis += dataSeccion.asistenciasHoy;
+
+  if (item.turno === 'MAÑANA') { 
+     mTotalAula += dataSeccion.enAula; 
+     mTotalAsis += dataSeccion.asistenciasHoy; 
+   } else { 
+     tTotalAula += dataSeccion.enAula; 
+     tTotalAsis += dataSeccion.asistenciasHoy; 
+   }
   });
 
   // 5. MERGE TURNO (Fijo según tu estructura de 12 filas)
@@ -239,36 +262,48 @@ const ResumenEstadistico = ({
     </div>
   );
 
+  const opcionesFecha = { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' };
+  const fechaTextoLegible = new Date(fechaSeleccionada + 'T12:00:00').toLocaleDateString('es-PE', opcionesFecha);
+
   return (
     <div className="p-4 sm:p-6 bg-slate-50 min-h-screen animate-in fade-in duration-500">
       {/* CABECERA DINÁMICA */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
         <div>
           <h1 className="text-2xl font-black text-slate-800 tracking-tight">RESUMEN ESTADÍSTICO</h1>
-          <p className="text-[11px] text-slate-500 font-bold tracking-widest uppercase italic">
-            SIGESCOM 2079 | NIVEL SECUNDARIA | {fechaCabecera}
-          </p>
-        </div>
-        
-        <button 
-          onClick={handleExportResumen}
-          className="bg-[#008000] hover:bg-emerald-700 text-white font-black text-[10px] px-6 py-2.5 rounded-xl flex items-center gap-2 shadow-[0_4px_0_rgb(0,100,0)] active:translate-y-1 active:shadow-none transition-all uppercase tracking-wider"
-        >
-          <Download size={16} /> EXPORTAR REPORTE EXCEL
-        </button>
+          <div className="flex flex-col md:flex-row gap-4 mb-2 items-center justify-between w-full">
+           {/* ÚNICO SELECTOR CON BRANDING */}
+          <div className="flex items-center gap-2 bg-white p-2 rounded-lg border border-slate-300 shadow-sm">
+          <span className="text-[10px] font-black uppercase tracking-tight">
+          <span className="text-[#007BFF]">SIGESCOM</span>
+          <span className="text-[#22c55e]"> 2079</span>
+          <span className="text-slate-700"> | FECHA:</span>
+          </span>
+       <input 
+      type="date" 
+      value={fechaSeleccionada}
+      onChange={(e) => setFechaSeleccionada(e.target.value)}
+      className="outline-none text-blue-600 font-bold text-sm bg-transparent cursor-pointer"/>
+    </div>
+    </div>
+    </div>
+    <button 
+    onClick={handleExportResumen}
+    className="bg-green-700 hover:bg-green-800 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors shadow-md">
+    {/* Asegúrate de tener Lucide React o cambiar el icono por un <span> */}
+     <span className="font-bold">📥 EXPORTAR RESUMEN EXCEL</span>
+     </button>
       </div>
-
       {/* TARJETAS DE ESTADO (Compactas) */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-3">
         <StatCard title="MATRÍCULA TOTAL" value={totalMatriculados} icon={<Users />} color="bg-slate-800" border="border-blue-400" />
         <StatCard title="ASISTENCIAS" value={totalAsistencias} icon={<FileCheck />} color="bg-emerald-600" border="border-green-300" />
         <StatCard title="FALTAS" value={totalFaltas} icon={<AlertTriangle />} color="bg-rose-600" border="border-red-300" />
         <StatCard title="% ASISTENCIA" value={`${totalEnAula > 0 ? ((totalAsistencias/totalEnAula)*100).toFixed(1) : 0}%`} icon={<TrendingUp />} color="bg-blue-600" border="border-blue-300" />
       </div>
-
       {/* TABLA MAESTRA AJUSTADA */}
       <div className="bg-white rounded-2xl shadow-2xl overflow-hidden border border-slate-200">
-        <div className="overflow-x-auto">
+        <div className="mt-0 shadow-lg rounded-xl overflow-hidden">
           <table className="w-full text-[11px] text-center border-collapse">
             <thead className="bg-[#008000] text-white uppercase font-black tracking-tighter">
               <tr>
@@ -326,13 +361,16 @@ const ResumenEstadistico = ({
 
               {/* FILA TOTAL (Resaltada) */}
               <tr className="bg-[#fbbf24] font-black text-black text-xs uppercase shadow-[0_-2px_10px_rgba(0,0,0,0.1)]">
-                <td colSpan={3} className="p-3 border text-right pr-6 tracking-widest">TOTAL GENERAL</td>
+               <td colSpan={3} className="p-3 border text-right pr-6 tracking-widest">TOTAL GENERAL</td>
                 <td className="p-3 border">{totalMatriculados}</td>
-                <td className="p-3 border">0</td>
-                <td className="p-3 border underline decoration-2">{totalEnAula}</td>
-                <td className="p-3 border bg-[#f97316] text-white text-sm shadow-inner">
+                  {/* CAMBIA EL 0 POR LA VARIABLE CALCULADA ABAJO */}
+                  <td className="p-3 border">
+                  {datosResumen.reduce((acc, curr) => acc + curr.trasladosSec, 0)}
+                  </td>
+                  <td className="p-3 border underline decoration-2">{totalEnAula}</td>
+                  <td className="p-3 border bg-[#f97316] text-white text-sm shadow-inner">
                   {totalAsistencias}
-                </td>
+                 </td>
               </tr>
             </tbody>
           </table>

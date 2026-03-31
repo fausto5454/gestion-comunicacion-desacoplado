@@ -80,7 +80,7 @@ if (registrosDocentes) {
       nuevoMapa[dni][diaNum] = simbolo;
     }
     
-    if (reg.observaciones === 'CONTROL_AUXILIAR') {
+    if (reg.observaciones === 'GENERAL') {
        nuevoMapa[dni][diaNum] = simbolo;
     }
   });

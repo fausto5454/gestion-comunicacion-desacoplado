@@ -21,22 +21,22 @@ const Sidebar = ({ rol_id, userName, userEmail, setCurrentView, currentView, isS
         { 
             name: 'Comunicaciones', 
             icon: MessageSquare, 
-            roles: [1, 2, 3, 4, 5, 6],
+            roles: [1, 2, 3, 4, 6],
             children: [
-                { name: 'Enviar Mensaje', view: 'enviar', icon: Send, roles: [1, 2, 3, 4, 5] },
+                { name: 'Enviar Mensaje', view: 'enviar', icon: Send, roles: [1, 2, 3, 4] },
                 { name: 'Bandeja de Entrada', view: 'bandeja', icon: Inbox, roles: [6] },
             ]
         },
         { 
             name: 'Gestión Académica', 
             icon: BookOpen, 
-            roles: [1, 2, 3, 5, 6],
+            roles: [1, 2, 3, 6],
             children: [
-                { name: 'Calificaciones', view: 'calificaciones', icon: GraduationCap, roles: [1, 3, 5, 6] },
-                { name: 'Asistencia', view: 'asistencia', icon: CalendarCheck, roles: [1, 3, 5] },
-                { name: 'Consolidado Asistencia', view: 'consolidado-asistencia', icon: LayoutGrid, roles: [1, 2, 3, 5, 6] },
+                { name: 'Calificaciones', view: 'calificaciones', icon: GraduationCap, roles: [1, 3, 6] },
+                { name: 'Asistencia', view: 'asistencia', icon: CalendarCheck, roles: [1, 3] },
+                { name: 'Consolidado Asistencia', view: 'consolidado-asistencia', icon: LayoutGrid, roles: [1, 2, 3, 6] },
                 { name: 'Matrícula', view: 'matricula', icon: FileSpreadsheet, roles: [1] },
-                { name: 'IGA-Estadística', view: 'iga-estadistica', icon: BarChart, roles: [1, 2, 3, 5] },
+                { name: 'IGA-Estadística', view: 'iga-estadistica', icon: BarChart, roles: [1, 2, 3] },
             ]
         },
          { 
@@ -52,9 +52,9 @@ const Sidebar = ({ rol_id, userName, userEmail, setCurrentView, currentView, isS
         { 
             name: 'Reportes', 
             icon: FolderTree, 
-            roles: [1, 2, 3, 4, 5],
+            roles: [1, 2, 3, 4],
             children: [
-                { name: 'Documentos', view: 'documentos', icon: FileText, roles: [1, 2, 3, 4, 5] },
+                { name: 'Documentos', view: 'documentos', icon: FileText, roles: [1, 2, 3, 4] },
                 { name: 'Reportes', view: 'reportes', icon: BarChart, roles: [1, 2] },
             ]
         },
@@ -150,7 +150,7 @@ const Sidebar = ({ rol_id, userName, userEmail, setCurrentView, currentView, isS
                 <div className="flex items-center gap-3 mb-4 p-2 rounded-lg bg-gray-800">
                     <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
                     <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                        {rol_id === 1 ? "Administrador" : rol_id === 2 ? "Director" : rol_id === 3 ? "Docente" : rol_id === 6 ? "Estudiante" : "Personal"}
+                        {rol_id === 1 ? "Administrador" : rol_id === 2 ? "Director" : rol_id === 3 ? "Docente" : rol_id === 6 ? "Estudiante" : "Auxiliar"}
                         </span>
                         </div>
                       <div className="px-2 mb-4">

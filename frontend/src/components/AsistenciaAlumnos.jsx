@@ -7,10 +7,7 @@ import {
 import { Toaster, toast } from 'sonner';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
-import * as XLSX from 'xlsx';
 import ExcelJS from 'exceljs';
-import Swal from 'sweetalert2';
-import { saveAs } from 'file-saver';
 import { generarConsolidadoProfesional } from '../services/asistenciaService';
 
 const areasConfig = {
@@ -62,7 +59,6 @@ const AsistenciaAlumnos = ({ perfilUsuario, session }) => {
           };
         }
 
-        // Lógica para Docentes (Wendy/David)
         const gradosUnicos = [...new Set(asignaciones.map(a => {
             const gnum = a.grado.toString().replace('°', '');
             return `${gnum}° ${a.seccion}`;
@@ -108,6 +104,40 @@ const AsistenciaAlumnos = ({ perfilUsuario, session }) => {
       setAsistencia(init);
     }
   };
+
+  const fetchAsistenciaArea = useCallback(async () => {
+  const fechaISO = typeof fecha === 'string' ? fecha.split('T')[0] : new Date(fecha).toISOString().split('T')[0];
+  
+  try {
+    const { data, error } = await supabase
+      .from('asistencia')
+      .select('*')
+      .eq('grado', grado)
+      .eq('seccion', seccion)
+      .eq('fecha', fechaISO);
+
+    if (error) throw error;
+    if (data) {
+      const mapa = {};
+      data.forEach(reg => mapa[reg.dni_estudiante] = reg.estado);
+      setAsistencia(mapa);
+    }
+  } catch (err) {
+    console.error("Error:", err);
+  }
+ }, [grado, seccion, fecha]);
+
+ // 2. useEffect para Realtime
+ useEffect(() => {
+   const canalDocente = supabase
+    .channel('realtime_docente')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'asistencia' }, 
+      () => fetchAsistenciaArea()
+    )
+    .subscribe();
+
+    return () => supabase.removeChannel(canalDocente);
+   }, [fetchAsistenciaArea]);
 
   // --- FUNCIÓN DE CARGA DE NÓMINA (Optimizada) ---
   const fetchNomina = useCallback(async () => {

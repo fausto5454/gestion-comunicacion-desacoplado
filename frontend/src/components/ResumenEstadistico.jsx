@@ -5,22 +5,23 @@ import ExcelJS from 'exceljs';
 
 const ResumenEstadistico = ({ 
   estudiantes = [], 
-  asistencia = {}, 
+  asistencia = [],
   trasladados = [], 
   fechaConsulta, 
   onExport 
 }) => {
-  const fechaHoyISO = new Date().toISOString().split('T')[0];
+  const fechaHoyISO = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Lima' });
   const hoy = new Date();
   const [fechaSeleccionada, setFechaSeleccionada] = useState(fechaHoyISO);
   const fKey = fechaSeleccionada;
   const superClean = (val) => String(val || "").replace(/[^a-zA-Z0-9]/g, "").toUpperCase().trim();
-  const fechaHoyStr = hoy.toLocaleDateString('es-PE', { 
-    weekday: 'long', 
-    day: 'numeric', 
-    month: 'long', 
-    year: 'numeric' 
-  });
+  const fechaHoyStr = new Date(fechaSeleccionada + 'T12:00:00').toLocaleDateString('es-PE', { 
+      weekday: 'long', 
+      day: 'numeric', 
+      month: 'long', 
+      year: 'numeric',
+      timeZone: 'America/Lima'
+  }).toUpperCase();
 
   const [datosResumen, setDatosResumen] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -73,7 +74,7 @@ const ResumenEstadistico = ({
 
       return { ...s, matriculadosSec, trasladosSec, enAula, asistenciasHoy };
     });
-   }, [estudiantes, asistencia, fKey]);
+   }, [estudiantes, asistencia, trasladados, fKey]);
 
   const totalMatriculados = datosResumen.reduce((acc, curr) => acc + curr.matriculadosSec, 0);
   const totalEnAula = datosResumen.reduce((acc, curr) => acc + curr.enAula, 0);
@@ -81,9 +82,10 @@ const ResumenEstadistico = ({
   const totalFaltas = totalEnAula - totalAsistencias;
 
   useEffect(() => {
-    const data = generarDatosSecciones();
-    setDatosResumen(data);
-    setLoading(false);
+     setLoading(true); 
+     const data = generarDatosSecciones();
+     setDatosResumen(data);
+     setLoading(false);
   }, [generarDatosSecciones]);
 
  const handleExportResumen = async () => {
@@ -303,7 +305,7 @@ const ResumenEstadistico = ({
       </div>
       {/* TABLA MAESTRA AJUSTADA */}
       <div className="bg-white rounded-2xl shadow-2xl overflow-hidden border border-slate-200">
-        <div className="mt-0 shadow-lg rounded-xl overflow-hidden">
+        <div className="mt-0 shadow-lg rounded-xl overflow-x-auto">
           <table className="w-full text-[11px] text-center border-collapse">
             <thead className="bg-[#008000] text-white uppercase font-black tracking-tighter">
               <tr>

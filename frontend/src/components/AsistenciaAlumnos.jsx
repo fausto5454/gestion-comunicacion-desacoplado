@@ -26,7 +26,7 @@ const areasConfig = {
 const AsistenciaAlumnos = ({ perfilUsuario, session }) => {
   const [estudiantes, setEstudiantes] = useState([]);
   const [asistencia, setAsistencia] = useState({});
-  const [fecha, setFecha] = useState(new Date().toISOString().split('T')[0]);
+  const [fecha, setFecha] = useState(new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Lima' }));
   const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -106,15 +106,17 @@ const AsistenciaAlumnos = ({ perfilUsuario, session }) => {
   };
 
   const fetchAsistenciaArea = useCallback(async () => {
-  const fechaISO = typeof fecha === 'string' ? fecha.split('T')[0] : new Date(fecha).toISOString().split('T')[0];
+  const fechaPeru = typeof fecha === 'string' 
+    ? fecha.split('T')[0] 
+    : new Date(fecha).toLocaleDateString('sv-SE', { timeZone: 'America/Lima' });
   
   try {
     const { data, error } = await supabase
       .from('asistencia')
       .select('*')
-      .eq('grado', grado)
+      .eq('grado', `${grado.toString().replace('°', '')}°`)
       .eq('seccion', seccion)
-      .eq('fecha', fechaISO);
+      .eq('fecha', fechaPeru);
 
     if (error) throw error;
     if (data) {
@@ -486,20 +488,11 @@ const guardarAsistenciaTotal = async () => {
   }
 
   setIsSaving(true);
-
   try {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      toast.error("Sesión expirada.");
-      setIsSaving(false);
-      return;
-    }
+    // Lógica Institucional 2079: 1° y 2° Mañana | 3°, 4° y 5° Tarde
+    const soloGradoNum = parseInt(grado.toString().replace(/\D/g, ''));
+    const turnoDetectado = soloGradoNum >= 3 ? 'TARDE' : 'MAÑANA';
 
-    const gradoFmt = `${grado.toString().replace('°', '')}°`;
-    const seccionFmt = seccion.trim().toUpperCase();
-    const areaFmt = areaSeleccionada.toUpperCase().trim();
-
-    // Preparación de los registros (Solo las 6 columnas técnicas necesarias)
     const records = estudiantes.map(est => {
       const dniLimpio = String(est.dni_estudiante).trim();
       const estadoVisual = asistencia[dniLimpio] || 'Presente';
@@ -511,7 +504,8 @@ const guardarAsistenciaTotal = async () => {
         estado: estadoMap[estadoVisual] || 'P',
         observaciones: areaFmt,
         grado: gradoFmt,
-        seccion: seccionFmt
+        seccion: seccionFmt,
+        turno: turnoDetectado
       };
     });
 

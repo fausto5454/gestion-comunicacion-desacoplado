@@ -32,8 +32,6 @@ const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion
   const [loading, setLoading] = useState(true);
   const [showConfirm, setShowConfirm] = useState(false);
   const [nombreDocenteAsignado, setNombreDocenteAsignado] = useState("");
-  const [conclusiones, setConclusiones] = useState({});
-  const [asistenciaReferencia, setAsistenciaReferencia] = useState({});
   const [dnis, setDnis] = useState({});
   const [filtroEstado, setFiltroEstado] = useState('Todos');
   const [estadosAlumnos, setEstadosAlumnos] = useState({});
@@ -680,11 +678,11 @@ return (
           </select>
 
               {/* Selector de ESTADOS (Estadística eliminada como solicitaste) */}
-              <div className="flex items-center bg-slate-900 border border-slate-400 rounded-2xl h-[40px] overflow-hidden shadow-lg">
+              <div className="flex items-center bg-slate-900 border border-pink-400 rounded-2xl h-[40px] overflow-hidden shadow-lg">
                 <select 
                   value={filtroEstado}
                   onChange={(e) => setFiltroEstado(e.target.value)}
-                  className="bg-slate-800 hover:bg-emerald-500 text-white text-[10px] font-bold px-4 outline-none cursor-pointer uppercase tracking-tight h-full transition-colors"
+                  className="bg-pink-600 hover:bg-pink-400 text-white text-[10px] font-bold px-4 outline-none cursor-pointer uppercase tracking-tight h-full transition-colors"
                   >
                   <option value="Todos" className="bg-slate-800">TODOS</option>
                   <option value="Activo" className="bg-slate-800">ACTIVO</option>

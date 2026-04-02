@@ -1,15 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import * as XLSX from 'xlsx';
 import { supabase } from '../config/supabaseClient';
 import { 
   Upload, 
   FileSpreadsheet, 
-  CheckCircle, 
+  CheckCircle,
+  LogOut, 
   AlertCircle,
   UserPlus,
   X
 } from 'lucide-react';
 import { toast } from 'sonner';
+import ModalTrasladado from './ModalTrasladado';
 
 // --- FUNCIONES DE NORMALIZACIÓN (Relación exacta con Excel) ---
 const limpiarTexto = (t) => (t || '').normalize("NFC").toUpperCase().trim();
@@ -83,7 +85,30 @@ const ImportarMatricula = () => {
   const [loading, setLoading] = useState(false);
   const [preview, setPreview] = useState([]);
   const [fileName, setFileName] = useState("");
+  
+  // ESTADOS SEPARADOS PARA MODALES
+  const [isModalBajaOpen, setIsModalBajaOpen] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [userRole, setUserRole] = useState(null);
+
+  useEffect(() => {
+    const getProfile = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data } = await supabase
+          .from('perfiles') // O la tabla donde guardes los roles
+          .select('rol')
+          .eq('id', user.id)
+          .single();
+        setUserRole(data?.rol);
+      }
+    };
+    getProfile();
+  }, []);
+
+  const cargarDatos = () => {
+    console.log("Refrescando lista de estudiantes...");
+  };
 
   // Definición de stats dentro del componente para evitar el ReferenceError
   const stats = {
@@ -130,16 +155,39 @@ const ImportarMatricula = () => {
   };
 
   const subirADatabase = async () => {
-    if (preview.length === 0) return;
+    if (preview.length === 0) {
+      toast.warning('No hay datos para procesar');
+      return;
+    }
     setLoading(true);
     try {
-      const { error } = await supabase.from('matriculas').upsert(preview, { onConflict: 'dni_estudiante, anio_lectivo' });
+      // Intento de inserción masiva con resolución de conflictos por DNI y Año
+      const { error } = await supabase
+        .from('matriculas')
+        .upsert(preview, { 
+          onConflict: 'dni_estudiante, anio_lectivo',
+          ignoreDuplicates: false // Permite actualizar si el estudiante ya existe
+        });
       if (error) throw error;
-      toast.success('Proceso Exitoso', { description: `${preview.length} registros actualizados.` });
-      setPreview([]); setFileName("");
+      toast.success('Matrícula Sincronizada', { 
+        description: `Se han procesado ${preview.length} registros exitosamente.` 
+      });
+
+      setPreview([]); 
+      setFileName("");
+      
+      if (typeof cargarDatos === 'function') {
+        await cargarDatos();
+      }
+
     } catch (err) {
-      toast.error('Error de Sincronización', { description: err.message });
-    } finally { setLoading(false); }
+      console.error("Error en Sync:", err);
+      toast.error('Error de Sincronización', { 
+        description: err.message || 'Error inesperado al conectar con Supabase' 
+      });
+    } finally { 
+      setLoading(false); 
+    }
   };
 
   return (
@@ -150,12 +198,32 @@ const ImportarMatricula = () => {
             <UserPlus className="text-emerald-500" size={40} /> Matrícula 2026
           </h1>
           <p className="text-green-600 font-medium ml-1">I.E. № 2079 Antonio Raimondi</p>
-        </div>
-        <button onClick={() => setIsModalOpen(true)} className="bg-slate-900 text-white px-6 py-3 rounded-2xl font-bold flex items-center gap-2 hover:bg-slate-800 transition-all shadow-xl active:scale-95">
+         </div>
+       <div className="flex items-center gap-2">
+       {userRole !== 3 && (
+        <>
+      <button 
+        onClick={() => {
+          console.log("Abriendo Modal de Baja...");
+            setIsModalBajaOpen(true);
+             }} 
+            className="flex items-center gap-2 bg-amber-600 hover:bg-amber-700 text-white font-medium py-3 px-6 rounded-2xl shadow-lg transition-all active:scale-95">
+            <LogOut size={20} className="rotate-180" />
+            Registrar Baja
+          </button>
+         <div className="relative z-[9999]">
+         <ModalTrasladado 
+          isOpen={isModalBajaOpen} 
+          onClose={() => setIsModalBajaOpen(false)} 
+          onUpdate={cargarDatos}/>
+         </div> 
+         <button onClick={() => setIsModalOpen(true)} className="bg-slate-900 text-white px-6 py-3 rounded-2xl font-bold flex items-center gap-2 hover:bg-slate-800 transition-all shadow-xl active:scale-95">
           <UserPlus size={20} className="text-emerald-400"/> Registro Manual
-        </button>
+         </button>
+         </>
+         )}
+        </div>
       </div>
-
       {!preview.length ? (
         <div className="bg-white border-2 border-dashed border-emerald-300 rounded-[2.5rem] p-16 text-center hover:border-emerald-500 transition-all group">
           <input type="file" accept=".xlsx, .xls" onChange={handleFileUpload} className="hidden" id="upload" />

@@ -3,13 +3,17 @@ import { supabase } from '../config/supabaseClient';
 import { Save, Loader2, Bookmark, Users, Calendar, FileSpreadsheet, FileText } from 'lucide-react';
 import { toast, Toaster } from 'sonner';
 
+const obtenerFechaLima = () => {
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Lima' });
+  };
+
 const AsistenciaAuxiliar = () => {
+  const [fecha, setFecha] = useState(obtenerFechaLima());
   const [estudiantes, setEstudiantes] = useState([]);
   const [asistencia, setAsistencia] = useState({});
-  const [fecha, setFecha] = useState(new Date().toISOString().split('T')[0]);
   const [loading, setLoading] = useState(false);
   const [gradoSeccion, setGradoSeccion] = useState(""); 
-  const [turno, setTurno] = useState("MAÑANA");
+  const [turno, setTurno] = useState("");
   const [isSaving, setIsSaving] = useState(false);
 
   // MEJORA 1: Detección automática de turno por horario escolar
@@ -50,28 +54,34 @@ const AsistenciaAuxiliar = () => {
       .select('dni_estudiante, estado, turno, observaciones')
       .eq('fecha', fechaISO)
       .eq('grado', grado)
-      .eq('seccion', seccion.trim());
+      .eq('seccion', seccion.trim())
+      .eq('turno', turno);
 
-    if (alumnos) {
-      setEstudiantes(alumnos);
-      const nuevoMapaAsistencia = {};
+   if (alumnos) {
+     setEstudiantes(alumnos);
+     const nuevoMapaAsistencia = {};
 
-      alumnos.forEach(est => {
-        // Buscamos si ya existe registro para este alumno hoy
-        const registro = asistenciaDB?.find(a => String(a.dni_estudiante) === String(est.dni_estudiante));
-        
-        // Si el docente ya marcó, el auxiliar lo ve. Si no, aparece 'P' (Presente)
-        nuevoMapaAsistencia[est.dni_estudiante] = registro ? registro.estado : 'P';
-      });
+     alumnos.forEach(est => {
+        const registrosEst = asistenciaDB?.filter(a => 
+        String(a.dni_estudiante) === String(est.dni_estudiante)
+      );
 
-      setAsistencia(nuevoMapaAsistencia);
+     const regAuxiliar = registrosEst?.find(r => r.observaciones === 'GENERAL');
+     const regDocente = registrosEst?.find(r => r.observaciones !== 'GENERAL');
+     nuevoMapaAsistencia[est.dni_estudiante] = regAuxiliar 
+       ? regAuxiliar.estado 
+       : (regDocente ? regDocente.estado : 'P');
+   });
+
+   setAsistencia(nuevoMapaAsistencia);
+
     }
-  } catch (err) {
-    console.error("Error de sincronización:", err);
-  } finally {
-    setLoading(false);
-  }
-  }, [gradoSeccion, fecha, turno]);
+   } catch (err) {
+     console.error("Error de sincronización:", err);
+   } finally {
+     setLoading(false);
+   }
+   }, [gradoSeccion, fecha, turno]);
 
   useEffect(() => {
     fetchNomina();
@@ -107,7 +117,7 @@ const AsistenciaAuxiliar = () => {
         grado: grado,
         seccion: seccion.trim(), 
         turno: turno.toUpperCase(),
-        observaciones: "SINCRO_FINAL", 
+        observaciones: "GENERAL", 
         usuario_gmail: user.email,
         anio_lectivo: "2026"
       };
@@ -215,17 +225,17 @@ const AsistenciaAuxiliar = () => {
                       {est.apellido_paterno} {est.apellido_materno}, {est.nombres}
                     </span>
                   </td>
-                  <td className="px-2 py-2 bg-emerald-50/30">
+                  <td className="px-2 py-2 bg-emerald-100/60">
                     <div className="flex justify-center gap-1">
                       {['P', 'F', 'T', 'J', 'FJ', 'TJ'].map((l) => {
                         const isActive = asistencia[est.dni_estudiante] === l;
                         const colors = {
-                          'P': isActive ? 'bg-slate-500 text-white' : 'bg-slate-200 text-white',
-                          'F': isActive ? 'bg-red-500 text-white' : 'bg-red-50 text-red-200',
-                          'T': isActive ? 'bg-amber-400 text-white' : 'bg-amber-50 text-amber-200',
-                          'J': isActive ? 'bg-emerald-500 text-white' : 'bg-emerald-50 text-emerald-200',
-                          'FJ': isActive ? 'bg-blue-500 text-white' : 'bg-blue-50 text-blue-200',
-                          'TJ': isActive ? 'bg-sky-400 text-white' : 'bg-sky-50 text-sky-200',
+                          'P': isActive ? 'bg-slate-600 text-white' : 'bg-slate-200 text-white',
+                          'F': isActive ? 'bg-red-500 text-white' : 'bg-white text-red-400',
+                          'T': isActive ? 'bg-amber-400 text-white' : 'bg-white text-amber-400',
+                          'J': isActive ? 'bg-green-500 text-white' : 'bg-white text-green-400',
+                          'FJ': isActive ? 'bg-blue-500 text-white' : 'bg-white text-blue-400',
+                          'TJ': isActive ? 'bg-sky-400 text-white' : 'bg-white text-sky-400',
                         };
                         return (
                           <button

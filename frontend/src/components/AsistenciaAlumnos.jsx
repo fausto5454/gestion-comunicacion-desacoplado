@@ -493,6 +493,10 @@ const guardarAsistenciaTotal = async () => {
     const soloGradoNum = parseInt(grado.toString().replace(/\D/g, ''));
     const turnoDetectado = soloGradoNum >= 3 ? 'TARDE' : 'MAÑANA';
 
+    const gradoFmt = `${grado.toString().replace('°', '')}°`;
+    const seccionFmt = seccion.trim().toUpperCase();
+    const areaFmt = (areaSeleccionada || "").toUpperCase().trim();
+
     const records = estudiantes.map(est => {
       const dniLimpio = String(est.dni_estudiante).trim();
       const estadoVisual = asistencia[dniLimpio] || 'Presente';
@@ -530,6 +534,13 @@ const guardarAsistenciaTotal = async () => {
     }
    };
 
+   const manejarCambioAsistencia = (dni, nuevoEstado) => {
+     setAsistencia(prev => ({
+     ...prev,
+      [dni]: nuevoEstado
+   }));
+   }
+   
    return (
     <div className="bg-white rounded-[1.5rem] md:rounded-[2rem] shadow-2xl border border-gray-100 overflow-hidden">
       {/* HEADER */}
@@ -628,7 +639,7 @@ const guardarAsistenciaTotal = async () => {
                   {est.apellido_paterno} {est.apellido_materno}, {est.nombres}
                 </span>
               </td>
-              <td className="border border-gray-300 px-2 py-1.5 bg-emerald-100/70">
+              <td className="border border-gray-300 px-2 py-1.5 bg-emerald-100/60">
               <div className="flex justify-center gap-1">
                {['P', 'F', 'T', 'J'].map((letra) => {
                 // Sincronizamos con el nuevo término 'Falta' que pide tu BD
@@ -640,27 +651,31 @@ const guardarAsistenciaTotal = async () => {
                      const estadoActual = asistencia[est.dni_estudiante] || 'Presente';
                      const isActive = estadoActual === valorReal;
 
-                        const activeStyle = {
-                            'P': 'text-white border-white bg-slate-500 shadow-inner',
-                            'F': 'text-white border-red-300 bg-red-500 shadow-inner',     
-                            'T': 'text-white border-amber-300 bg-amber-400 shadow-inner', 
-                            'J': 'text-white border-green-300 bg-green-500 shadow-inner'  
-                         };
+                        const stylesBase = {
+                              'P': 'text-slate-600 border-slate-200 hover:bg-slate-100',
+                              'F': 'text-red-400 border-red-100 hover:bg-red-50',
+                              'T': 'text-amber-400 border-amber-100 hover:bg-amber-50',
+                              'J': 'text-green-400 border-green-100 hover:bg-green-50',
+                            };
+
+                       const activeStyles = {
+                              'P': '!bg-slate-600 !text-white !border-slate-700 shadow-md',
+                              'F': '!bg-red-500 !text-white !border-red-600 shadow-md',
+                              'T': '!bg-amber-500 !text-white !border-amber-600 shadow-md',
+                              'J': '!bg-green-600 !text-white !border-green-700 shadow-md',
+                            };
 
                         return (
-                           <button
+                          <button
                            key={letra}
-                           onClick={() => {
-                           console.log("Cambiando DNI:", est.dni_estudiante, "a:", valorReal);
-                            setAsistencia(p => ({ ...p, [est.dni_estudiante]: valorReal }));
-                             }}
-                             className={`w-7 h-7 md:w-8 md:h-8 rounded-md text-[11px] font-black transition-all duration-200 border
-                              ${isActive
-                               ? `${activeStyle[letra]} scale-110 z-10`
-                                : 'bg-white/50 border-transparent text-gray-300 hover:text-gray-400 hover:bg-white'
-                                }`}
-                               >
-                           {letra}
+                           onClick={() => manejarCambioAsistencia(est.dni_estudiante, valorReal)}
+                           className={`
+                           w-8 h-8 rounded-md border text-[11px] font-black transition-all duration-200
+                           ${isActive 
+                           ? activeStyles[letra] 
+                           : `bg-white ${stylesBase[letra]}` 
+                           }`}>
+                        {letra}
                       </button>
                      );
                   })}

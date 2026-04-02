@@ -1,9 +1,26 @@
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { supabase } from '../config/supabaseClient';
 import { Search, Filter, FileSpreadsheet, Menu, Clock } from 'lucide-react';
-import toast from 'react-hot-toast';
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
+
+const obtenerTurnoActual = () => {
+  const ahora = new Date();
+  const hora = ahora.getHours();
+  const minutos = ahora.getMinutes();
+  const tiempoDecimal = hora + minutos / 60;
+
+  // Mañana: 07:30 a 13:00
+  if (tiempoDecimal >= 7.5 && tiempoDecimal < 13) {
+    return 'MAÑANA';
+   } 
+  // Tarde: 13:00 a 18:50 (margen hasta 18:30 + cierre)
+  else if (tiempoDecimal >= 13 && tiempoDecimal <= 18.8) {
+    return 'TARDE';
+   }
+  // Valor por defecto si está fuera de rango escolar
+  return 'MAÑANA'; 
+  };
 
 const ConsolidadoAsistencia = () => {
   const [datos, setDatos] = useState({});
@@ -14,13 +31,24 @@ const ConsolidadoAsistencia = () => {
   const [isReady, setIsReady] = useState(false);
   const [opcionesPermitidas, setOpcionesPermitidas] = useState({ grados: [], areas: [] });
   
-  const [seleccion, setSeleccion] = useState({ 
+const [seleccion, setSeleccion] = useState({ 
       grado: '', 
       seccion: '', 
       mes: new Date().getMonth() + 1,
       area: '',
-      turno: 'MAÑANA' // Nueva mejora: Turno
+      turno: obtenerTurnoActual() 
   });
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const turnoReal = obtenerTurnoActual();
+      if (turnoReal !== seleccion.turno) {
+        setSeleccion(prev => ({ ...prev, turno: turnoReal }));
+      }
+    }, 60000);
+
+    return () => clearInterval(interval);
+  }, [seleccion.turno]);
 
   // 1. MEJORA: REAL-TIME SUBSCRIPTION
   useEffect(() => {
@@ -45,13 +73,18 @@ const ConsolidadoAsistencia = () => {
   setLoading(true);
   try {
     const gradoFmt = `${seleccion.grado}°`;
+    const anio = 2026;
+
+    const mesFmt = String(seleccion.mes).padStart(2, '0');
+    const primerDia = `${anio}-${mesFmt}-01`;
+    const ultimoDia = `${anio}-${mesFmt}-${new Date(anio, seleccion.mes, 0).getDate()}`;
     
     // 1. Cargar nómina (Independencia visual: siempre aparecen los nombres)
     const { data: nomina } = await supabase.from('matriculas')
       .select('dni_estudiante, apellido_paterno, apellido_materno, nombres')
       .eq('grado', gradoFmt).eq('seccion', seleccion.seccion)
       .order('apellido_paterno', { ascending: true });
-      setEstudiantes(nomina || []);
+       setEstudiantes(nomina || []);
 
     // 2. Cargar TODAS las asistencias del turno
     const { data: registrosDocentes, error: asistErr } = await supabase //
@@ -59,38 +92,31 @@ const ConsolidadoAsistencia = () => {
       .select('dni_estudiante, fecha, estado, observaciones')
       .eq('grado', gradoFmt)
       .eq('seccion', seleccion.seccion)
-      .eq('turno', seleccion.turno);
+      .eq('turno', seleccion.turno)
+      .gte('fecha', primerDia)
+      .lte('fecha', ultimoDia);
 
    if (asistErr) throw asistErr;
+      const nuevoMapa = {};
+   if (registrosDocentes) {
+   registrosDocentes.forEach(reg => {
+      const dni = reg.dni_estudiante;
+      const diaNum = new Date(reg.fecha + 'T12:00:00').getDate();
+   if (!nuevoMapa[dni]) nuevoMapa[dni] = {};
 
-   const nuevoMapa = {};
-
-if (registrosDocentes) {
-  registrosDocentes.forEach(reg => {
-    const dni = reg.dni_estudiante;
-    const diaNum = new Date(reg.fecha + 'T12:00:00').getDate();
-    
-    if (!nuevoMapa[dni]) nuevoMapa[dni] = {};
-
-    const simbolo = reg.estado === 'P' ? '•' : reg.estado;
-
-    const valorExistente = nuevoMapa[dni][diaNum];
-
-    if (!valorExistente || (valorExistente === '•' && simbolo !== '•')) {
-      nuevoMapa[dni][diaNum] = simbolo;
-    }
-    
-    if (reg.observaciones === 'GENERAL') {
-       nuevoMapa[dni][diaNum] = simbolo;
-    }
-  });
- }
+      const simbolo = reg.estado === 'P' ? '•' : reg.estado;
+      const esGeneral = reg.observaciones === 'GENERAL';
+      if (!nuevoMapa[dni][diaNum] || esGeneral) {
+         nuevoMapa[dni][diaNum] = simbolo;
+     }
+   });
+  }
   setDatos(nuevoMapa);
 
   } finally {
     setLoading(false);
   }
-  }, [isReady, perfilUsuario, seleccion.grado, seleccion.seccion, seleccion.turno]);
+  }, [isReady, perfilUsuario, seleccion.grado, seleccion.seccion, seleccion.turno, seleccion.mes]);
 
     useEffect(() => {
     cargarDatos();
@@ -343,14 +369,24 @@ if (registrosDocentes) {
               <tr className="bg-slate-900 text-white">
                 <th className="sticky left-0 top-0 z-50 w-[40px] bg-emerald-700 py-3 text-[10px] font-black border-r border-emerald-800 text-center uppercase">N°</th>
                 <th className="bg-slate-900 py-3 px-2 text-center border-r border-slate-800 w-[120px] md:w-[250px] text-[8px] md:text-[11px] font-black uppercase">Apellidos y Nombres</th>
-                {diasDelMes.map(dia => (
-                  <th key={dia.numero} className="py-1 border-r border-slate-800 min-w-[43px] md:min-w-[80px] text-center bg-emerald-900">
-                    <div className="flex flex-col leading-none">
-                      <span className={`text-[7px] font-bold uppercase ${dia.nombre === "Sáb" || dia.nombre === "Dom" ? 'text-red-500' : 'text-slate-400'}`}>{dia.nombre}</span>
-                      <span className="text-[10px] font-bold text-white">{dia.numero}</span>
-                    </div>
+               {diasDelMes.map(dia => {
+               const esFinde = dia.nombre === "Sáb" || dia.nombre === "Dom";
+
+              return (
+               <th 
+                key={dia.numero} 
+                 className={`py-1 border-r border-slate-800 min-w-[43px] md:min-w-[80px] text-center ${esFinde ? 'bg-emerald-900' : 'bg-emerald-900'}`}>
+                <div className="flex flex-col leading-none">
+                 <span className={`text-[7px] font-bold uppercase ${esFinde ? 'text-red-500' : 'text-slate-400'}`}>
+                 {dia.nombre}
+                 </span>
+                 <span className="text-[10px] font-bold text-white">
+                 {dia.numero}
+                 </span>
+                  </div>
                   </th>
-                ))}
+                   );
+                 })}
                 <th className="sticky right-0 top-0 z-40 bg-red-600 py-2 text-[8px] md:text-[10px] font-black w-[50px] text-center border-l border-slate-800">FALTAS</th>
               </tr>
             </thead>
@@ -378,7 +414,10 @@ if (registrosDocentes) {
                     <td className="bg-white py-1 px-3 text-[9px] md:text-[10px] font-semibold text-slate-700 border-r border-slate-300/80 uppercase">
                       {est.apellido_paterno} {est.apellido_materno} {est.nombres}
                     </td>
-                    {diasDelMes.map(dia => {
+                    {diasDelMes.map((dia) => {
+                    const fechaAnalizar = new Date(2026, seleccion.mes - 1, dia.numero);
+                    const esFinDeSemana = fechaAnalizar.getDay() === 0 || fechaAnalizar.getDay() === 6;
+                    const weekendClass = esFinDeSemana ? 'bg-red-50 text-red-500 font-medium' : '';
                     const valorBD = (asistenciaEst[dia.numero] || '').toString().toUpperCase().trim();
                     let visualChar = '-';
                     if (['.', 'P', '•'].includes(valorBD)) {
@@ -393,9 +432,10 @@ if (registrosDocentes) {
                       (valorBD === 'J') ? 'text-green-600 font-bold text-[11px]' : 
                       (['.', 'P', '•'].includes(valorBD)) ? 'text-slate-800 font-black text-[12px]' : 
                       'text-slate-300 text-[11px]';
-
-               return (
-                  <td key={dia.numero} className={`border border-gray-200 text-center w-6 h-7 ${colorClass}`}>
+              return (
+                <td 
+                  key={dia.numero} 
+                   className={`border border-gray-200 text-center w-6 h-7 text-[10px] ${weekendClass} ${colorClass}`}>
                    {visualChar}
                    </td>
                     );

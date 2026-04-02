@@ -5,6 +5,24 @@ import toast from 'react-hot-toast';
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 
+const obtenerTurnoActual = () => {
+  const ahora = new Date();
+  const hora = ahora.getHours();
+  const minutos = ahora.getMinutes();
+  const tiempoDecimal = hora + minutos / 60;
+
+  // Mañana: 07:30 a 13:00
+  if (tiempoDecimal >= 7.5 && tiempoDecimal < 13) {
+    return 'MAÑANA';
+   } 
+  // Tarde: 13:00 a 18:50 (margen hasta 18:30 + cierre)
+  else if (tiempoDecimal >= 13 && tiempoDecimal <= 18.8) {
+    return 'TARDE';
+   }
+  // Valor por defecto si está fuera de rango escolar
+  return 'MAÑANA'; 
+  };
+
 const ConsolidadoAsistencia = () => {
   const [datos, setDatos] = useState({});
   const [estudiantes, setEstudiantes] = useState([]);
@@ -15,11 +33,12 @@ const ConsolidadoAsistencia = () => {
   const [opcionesPermitidas, setOpcionesPermitidas] = useState({ grados: [], areas: [] });
   
   const [seleccion, setSeleccion] = useState({ 
-      grado: '', 
-      seccion: '', 
-      mes: new Date().getMonth() + 1,
-      area: ''
-  });
+        grado: '', 
+        seccion: '', 
+        mes: new Date().getMonth() + 1,
+        area: '',
+        turno: obtenerTurnoActual() 
+    });
 
   const opcionesGradoSeccion = [
     { g: '1', s: 'A' }, { g: '1', s: 'B' }, { g: '1', s: 'C' },
@@ -42,55 +61,62 @@ const ConsolidadoAsistencia = () => {
     "INGLÉS": ["SE COMUNICA ORALMENTE", "LEE TEXTOS ESCRITOS", "ESCRIBE TEXTOS"]
   };
 
-  const cargarDatos = useCallback(async () => {
-    if (!isReady || !perfilUsuario || !seleccion.grado) return;
-    
-    setLoading(true);
-    try {
-      const gradoFmt = `${seleccion.grado}°`;
-      
-      // Consulta de Nómina inteligente por Rol
-      let queryNomina = supabase.from('matriculas')
-        .select('id_matricula, dni_estudiante, apellido_paterno, apellido_materno, nombres')
-        .eq('grado', gradoFmt)
-        .eq('seccion', seleccion.seccion)
-        .order('apellido_paterno', { ascending: true });
-
-      // Si es Estudiante (Rol 6), filtramos solo por su DNI
-      if (Number(perfilUsuario.rol_id) === 6) {
-        queryNomina = queryNomina.eq('dni_estudiante', perfilUsuario.dni_estudiante);
-      }
-
-      const { data: nomina, error: nomErr } = await queryNomina;
-      if (nomErr) throw nomErr;
-
-      // Carga de Asistencias del mes
-      const { data: asistenciasDocente, error: asistErr } = await supabase
-         .from('asistencia')
-         .select('*')
-         .eq('grado', gradoFmt)
-         .eq('seccion', seleccion.seccion)
-         .or(`observaciones.eq."${seleccion.area}",observaciones.eq.GENERAL`)
-
-      const mapa = {};
-      asistenciasDocente.forEach(a => {
-      const dni = String(a.dni_estudiante);
-      const diaNum = new Date(a.fecha + 'T00:00:00').getDate();
+ const cargarDatos = useCallback(async () => {
+  if (!isReady || !perfilUsuario || !seleccion.grado) return;
   
-      if (!mapa[dni]) mapa[dni] = {};
-      if (!mapa[dni][diaNum] || a.observaciones === 'GENERAL') {
-        mapa[dni][diaNum] = a.estado;
-      }
-    });
+  setLoading(true);
+  try {
+    // 1. Formateo exacto (Aseguramos el "1°")
+    const gradoFmt = seleccion.grado.includes('°') ? seleccion.grado : `${seleccion.grado}°`;
+    const anio = 2026;
+    const mesFmt = String(seleccion.mes).padStart(2, '0');
+    const primerDia = `${anio}-${mesFmt}-01`;
+    const ultimoDia = `${anio}-${mesFmt}-${new Date(anio, seleccion.mes, 0).getDate()}`;
 
-      setEstudiantes(nomina || []);
-      setDatos(mapa);
-    } catch (err) {
-      console.error("Error cargando datos:", err.message);
-    } finally {
-      setLoading(false);
+    // 2. Consulta de Nómina (Sin cambios)
+    const { data: nomina } = await supabase.from('matriculas')
+      .select('dni_estudiante, apellido_paterno, apellido_materno, nombres')
+      .eq('grado', gradoFmt)
+      .eq('seccion', seleccion.seccion)
+      .order('apellido_paterno', { ascending: true });
+
+    const { data: asistencias, error: asistErr } = await supabase
+      .from('asistencia')
+      .select('*')
+      .eq('grado', gradoFmt)
+      .eq('seccion', seleccion.seccion)
+      .eq('turno', seleccion.turno) // Debe ser "MAÑANA Y TARDE"
+      .or(`observaciones.ilike.%${seleccion.area}%,observaciones.eq.GENERAL`)
+      .gte('fecha', primerDia)
+      .lte('fecha', ultimoDia);
+
+    if (asistErr) throw asistErr;
+
+    // 4. Mapeo de datos (Asegurando que el DNI sea la llave correcta)
+    const nuevoMapa = {};
+    if (asistencias) {
+      asistencias.forEach(reg => {
+        const dni = String(reg.dni_estudiante).trim();
+        const diaNum = new Date(reg.fecha + 'T12:00:00').getDate();
+        
+        if (!nuevoMapa[dni]) nuevoMapa[dni] = {};
+        
+        // Prioridad: Si es GENERAL (Auxiliar) pisa cualquier otro estado
+        if (reg.observaciones === 'GENERAL' || !nuevoMapa[dni][diaNum]) {
+          nuevoMapa[dni][diaNum] = reg.estado;
+        }
+      });
     }
-    }, [isReady, perfilUsuario, seleccion.grado, seleccion.seccion, seleccion.area]);
+
+    setEstudiantes(nomina || []);
+    setDatos(nuevoMapa);
+
+  } catch (error) {
+    console.error("Error en la carga:", error);
+  } finally {
+    setLoading(false);
+  }
+  }, [isReady, perfilUsuario, seleccion.grado, seleccion.seccion, seleccion.area, seleccion.mes, seleccion.turno]);
 
     // 2. ÚNICO EFECTO DE INICIALIZACIÓN (Sustituye a los 4 anteriores)
    useEffect(() => {
@@ -143,10 +169,22 @@ const ConsolidadoAsistencia = () => {
     inicializarSistema();
   }, []);
 
+  useEffect(() => {
+   // Mañana: 1° y 2° | Tarde: 3°, 4° y 5°
+   const gradoNum = parseInt(seleccion.grado);
+   if (gradoNum >= 3) {
+     setSeleccion(prev => ({ ...prev, turno: 'TARDE' }));
+   } else {
+     setSeleccion(prev => ({ ...prev, turno: 'MAÑANA' }));
+   }
+   }, [seleccion.grado]);
+
   // 3. EFECTO DISPARADOR DE CARGA
   useEffect(() => {
-    if (isReady) cargarDatos();
-  }, [isReady, cargarDatos]);
+   if (isReady) {
+     cargarDatos();
+   }
+  }, [isReady, seleccion.grado, seleccion.seccion, seleccion.area, seleccion.mes, seleccion.turno, cargarDatos]);
 
   // Memorización de días y filtrado
   const diasDelMes = useMemo(() => {
@@ -166,6 +204,24 @@ const ConsolidadoAsistencia = () => {
       return nombreCompleto.includes(searchTerm.toLowerCase());
     });
   }, [estudiantes, searchTerm]);
+
+  useEffect(() => {
+    const canalAsistencia = supabase
+      .channel('cambios-asistencia')
+      .on('postgres_changes', { 
+         event: '*', 
+         table: 'asistencia',
+         filter: `turno=eq.${seleccion.turno}` 
+     }, (payload) => {
+       console.log("Cambio detectado:", payload);
+       cargarDatos(); // Recarga la tabla automáticamente
+     })
+     .subscribe();
+
+    return () => {
+     supabase.removeChannel(canalAsistencia);
+   };
+  }, [seleccion.turno, cargarDatos]);
 
   const handleExportExcel = async () => {
   const workbook = new ExcelJS.Workbook();
@@ -485,8 +541,8 @@ const ConsolidadoAsistencia = () => {
          </tr>
        ) : (
        filtrados.map((est, index) => {
-       const asistenciaEst = datos[est.dni_estudiante] || {};
-       // 1. CÁLCULO PREVIO: Contamos las faltas antes de retornar el JSX
+       const dniKey = String(est.dni_estudiante);
+       const asistenciaEst = datos[dniKey] || {};
        let totalFaltas = 0;
         diasDelMes.forEach(dia => {
          const valorBD = asistenciaEst[dia.numero] || '';
@@ -495,9 +551,9 @@ const ConsolidadoAsistencia = () => {
          });
         const enRiesgo = totalFaltas >= 3;
         return (
-            <tr key={est.id_matricula || est.dni_estudiante} className="hover:bg-slate-50 transition-colors group">
+            <tr key={est.id_matricula || est.dni_estudiante} className="hover:bg-emerald-50 transition-colors duration-150 group">
               {/* COLUMNA N° */}
-               <td className="sticky left-0 z-30 bg-emerald-100 py-1 text-center text-[8px] md:text-[11px] font-bold text-emerald-600 border-r border-slate-300">
+               <td className={`sticky left-0 z-30 py-1 text-center text-[8px] md:text-[11px] font-bold border-r border-slate-300 bg-emerald-100 text-emerald-600 group-hover:bg-inherit`}>
                 {(index + 1).toString().padStart(2, '0')}
                   </td>
 

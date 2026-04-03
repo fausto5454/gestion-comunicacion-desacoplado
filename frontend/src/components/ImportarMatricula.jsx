@@ -7,6 +7,7 @@ import {
   CheckCircle,
   LogOut, 
   AlertCircle,
+  User,
   UserPlus,
   X
 } from 'lucide-react';
@@ -96,9 +97,9 @@ const ImportarMatricula = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         const { data } = await supabase
-          .from('perfiles') // O la tabla donde guardes los roles
+          .from('usuarios')
           .select('rol')
-          .eq('id', user.id)
+          .eq('id_usuario', user.id)
           .single();
         setUserRole(data?.rol);
       }
@@ -191,39 +192,42 @@ const ImportarMatricula = () => {
   };
 
   return (
-    <div className="max-w-6xl mx-auto p-6">
-      <div className="flex justify-between items-end mb-10">
-        <div>
-          <h1 className="text-4xl font-black text-slate-800 tracking-tighter flex items-center gap-3">
-            <UserPlus className="text-emerald-500" size={40} /> Matrícula 2026
-          </h1>
-          <p className="text-green-600 font-medium ml-1">I.E. № 2079 Antonio Raimondi</p>
-         </div>
-       <div className="flex items-center gap-2">
+    <div className="flex flex-col w-full p-8 pt-4 gap-2 overflow-x-hidden">
+      <div className="w-full flex flex-col items-start -space-y-1">
+       <div className="flex items-center gap-2 text-indigo-700">
+        <UserPlus className="w-7 h-7 text-orange-500" />
+         <h1 className="text-2xl md:text-3xl font-black tracking-tighter uppercase text-slate-800">
+          MATRÍCULA 2026
+         </h1>
+        </div>
+       <p className="text-[11px] md:text-xs font-bold text-green-600 uppercase pl-7">
+       I.E. № 2079 Antonio Raimondi
+      </p>
+      </div>
+       <div className="flex flex-col sm:flex-row gap-3 mt-2 w-full justify-end px-6 sm:px-0">
        {userRole !== 3 && (
         <>
-      <button 
+      <button
         onClick={() => {
           console.log("Abriendo Modal de Baja...");
             setIsModalBajaOpen(true);
              }} 
-            className="flex items-center gap-2 bg-amber-600 hover:bg-amber-700 text-white font-medium py-3 px-6 rounded-2xl shadow-lg transition-all active:scale-95">
-            <LogOut size={20} className="rotate-180" />
-            Registrar Baja
-          </button>
-         <div className="relative z-[9999]">
-         <ModalTrasladado 
-          isOpen={isModalBajaOpen} 
-          onClose={() => setIsModalBajaOpen(false)} 
-          onUpdate={cargarDatos}/>
-         </div> 
-         <button onClick={() => setIsModalOpen(true)} className="bg-slate-900 text-white px-6 py-3 rounded-2xl font-bold flex items-center gap-2 hover:bg-slate-800 transition-all shadow-xl active:scale-95">
-          <UserPlus size={20} className="text-emerald-400"/> Registro Manual
-         </button>
-         </>
+              className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 bg-orange-600 hover:bg-orange-400 transition-colors text-white rounded-xl font-bold shadow-lg order-2 sm:order-1">
+               <LogOut size={20} className="rotate-180" />
+                Registrar Baja
+                </button>
+              <div className="relative z-[9999]">
+             <ModalTrasladado 
+            isOpen={isModalBajaOpen} 
+            onClose={() => setIsModalBajaOpen(false)} 
+            onUpdate={cargarDatos}/>
+             </div> 
+             <button onClick={() => setIsModalOpen(true)}  className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 bg-slate-900 hover:bg-slate-600 transition-colors text-white rounded-xl font-bold shadow-lg order-1 sm:order-2">
+             <UserPlus size={20} className="text-emerald-400"/> Registro Manual
+             </button>
+           </>
          )}
-        </div>
-      </div>
+       </div>
       {!preview.length ? (
         <div className="bg-white border-2 border-dashed border-emerald-300 rounded-[2.5rem] p-16 text-center hover:border-emerald-500 transition-all group">
           <input type="file" accept=".xlsx, .xls" onChange={handleFileUpload} className="hidden" id="upload" />

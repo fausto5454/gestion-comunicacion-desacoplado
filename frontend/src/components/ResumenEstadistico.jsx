@@ -330,7 +330,7 @@ const ResumenEstadistico = ({
                     <td className="p-1 border bg-slate-50 text-slate-400 text-[10px] font-medium">{index + 1}</td>
                     {/* Manteniendo lógica de rowSpan intacta para diseño original */}
                     {index === 0 && (
-                      <td rowSpan={6} className="p-2 border font-black bg-white text-slate-400 border-r-2 uppercase [writing-mode:vertical-lr] rotate-180">
+                      <td rowSpan={6} className="p-2 border font-black bg-white text-blue-700 border-r-2 uppercase [writing-mode:vertical-lr] rotate-180">
                         Mañana
                       </td>
                     )}

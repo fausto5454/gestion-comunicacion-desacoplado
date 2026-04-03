@@ -59,22 +59,22 @@ const ModalRegistroIndividual = ({ isOpen, onClose, onRefresh }) => {
     <div className="fixed inset-0 bg-slate-900 backdrop-blur-md flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-[2rem] w-full max-w-md shadow-2xl overflow-hidden border border-white/20 animate-in fade-in zoom-in duration-200">
         <div className="bg-slate-900 p-6 flex justify-between items-center text-white">
-          <div className="flex items-center gap-2"><UserPlus size={20} className="text-emerald-400" /><h3 className="font-bold">Registro Individual</h3></div>
+          <div className="flex items-center gap-2"><UserPlus size={26} className="text-orange-500" /><h3 className="font-bold">Registro Individual</h3></div>
           <button onClick={onClose} className="hover:bg-white/10 p-1 rounded-full"><X size={20}/></button>
         </div>
         <form onSubmit={handleSubmit} className="p-8 space-y-4">
-          <input required placeholder="DNI" className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-mono" value={formData.dni_estudiante} onChange={e => setFormData({...formData, dni_estudiante: e.target.value.replace(/[^0-9]/g, '')})} maxLength={8} />
+          <input required placeholder="DNI" className="w-full p-3 bg-gray-50 border border-orange-300 rounded-xl text-sm font-mono" value={formData.dni_estudiante} onChange={e => setFormData({...formData, dni_estudiante: e.target.value.replace(/[^0-9]/g, '')})} maxLength={8} />
           <div className="grid grid-cols-2 gap-4">
-            <input required placeholder="Ap. Paterno" className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-sm uppercase" value={formData.apellido_paterno} onChange={e => setFormData({...formData, apellido_paterno: e.target.value})} />
-            <input required placeholder="Ap. Materno" className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-sm uppercase" value={formData.apellido_materno} onChange={e => setFormData({...formData, apellido_materno: e.target.value})} />
+            <input required placeholder="Ap. Paterno" className="w-full p-3 bg-gray-50 border border-orange-300 rounded-xl text-sm uppercase" value={formData.apellido_paterno} onChange={e => setFormData({...formData, apellido_paterno: e.target.value})} />
+            <input required placeholder="Ap. Materno" className="w-full p-3 bg-gray-50 border border-orange-300 rounded-xl text-sm uppercase" value={formData.apellido_materno} onChange={e => setFormData({...formData, apellido_materno: e.target.value})} />
           </div>
-          <input required placeholder="Nombres" className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-sm uppercase" value={formData.nombres} onChange={e => setFormData({...formData, nombres: e.target.value})} />
+          <input required placeholder="Nombres" className="w-full p-3 bg-gray-50 border border-orange-300 rounded-xl text-sm uppercase" value={formData.nombres} onChange={e => setFormData({...formData, nombres: e.target.value})} />
           <div className="grid grid-cols-3 gap-3">
-            <select className="p-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold" value={formData.grado} onChange={e => setFormData({...formData, grado: e.target.value})}><option value="1°">1°</option><option value="2°">2°</option><option value="3°">3°</option><option value="4°">4°</option><option value="5°">5°</option></select>
-            <select className="p-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold" value={formData.seccion} onChange={e => setFormData({...formData, seccion: e.target.value})}><option value="A">A</option><option value="B">B</option><option value="C">C</option></select>
-            <select className="p-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold" value={formData.genero} onChange={e => setFormData({...formData, genero: e.target.value})}><option value="H">Masc</option><option value="M">Fem</option></select>
+            <select className="p-3 bg-gray-50 border border-orange-300 rounded-xl text-sm font-bold" value={formData.grado} onChange={e => setFormData({...formData, grado: e.target.value})}><option value="1°">1°</option><option value="2°">2°</option><option value="3°">3°</option><option value="4°">4°</option><option value="5°">5°</option></select>
+            <select className="p-3 bg-gray-50 border border-orange-300 rounded-xl text-sm font-bold" value={formData.seccion} onChange={e => setFormData({...formData, seccion: e.target.value})}><option value="A">A</option><option value="B">B</option><option value="C">C</option></select>
+            <select className="p-3 bg-gray-50 border border-orange-300 rounded-xl text-sm font-bold" value={formData.genero} onChange={e => setFormData({...formData, genero: e.target.value})}><option value="H">Hombre</option><option value="M">Mujer</option></select>
           </div>
-          <button disabled={loading} className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-black py-4 rounded-2xl shadow-lg shadow-emerald-500/20">{loading ? "GUARDANDO..." : "GUARDAR ESTUDIANTE"}</button>
+          <button disabled={loading} className="w-full bg-orange-500 hover:bg-orange-400 text-white font-black py-4 rounded-2xl shadow-lg shadow-emerald-500/20">{loading ? "GUARDANDO..." : "GUARDAR ESTUDIANTE"}</button>
         </form>
       </div>
     </div>

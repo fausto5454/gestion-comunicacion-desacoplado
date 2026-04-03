@@ -553,14 +553,15 @@ const ConsolidadoAsistencia = () => {
         return (
             <tr key={est.id_matricula || est.dni_estudiante} className="hover:bg-emerald-50 transition-colors duration-150 group">
               {/* COLUMNA N° */}
-               <td className={`sticky left-0 z-30 py-1 text-center text-[8px] md:text-[11px] font-bold border-r border-slate-300 bg-emerald-100 text-emerald-600 group-hover:bg-inherit`}>
+               <td className={`sticky left-0 z-30 py-1 text-center text-[8px] md:text-[11px] font-bold border-r border-slate-300 bg-emerald-50 text-emerald-600 group-hover:bg-inherit`}>
                 {(index + 1).toString().padStart(2, '0')}
                   </td>
 
                  {/* COLUMNA APELLIDOS Y NOMBRES */}
-               <td className="bg-white py-1 px-3 text-[8px] md:text-[10px] font-semibold text-slate-700 border-r border-slate-300/80 uppercase">
-              {est.apellido_paterno} {est.apellido_paterno_materno || est.apellido_materno} {est.nombres}
-             </td>
+               <td className="py-1 px-3 text-[8px] md:text-[10px] font-semibold text-slate-700 border-r border-slate-300/80 uppercase 
+               bg-white group-hover:bg-emerald-50 transition-colors duration-150">
+              {est.apellido_paterno} {est.apellido_materno} {est.nombres}
+              </td>
              {/* COLUMNAS DE DÍAS (ASISTENCIA) - ACTUALIZADO PARA SIGESCOM 2079 */}
              {diasDelMes.map(dia => {
              const valorBD = (asistenciaEst[dia.numero] || '').toString().trim().toUpperCase();
@@ -581,7 +582,7 @@ const ConsolidadoAsistencia = () => {
             return (
                 <td 
                   key={dia.numero} 
-                    className={`text-center py-0 border-r border-slate-300/80 min-w-[32px] md:min-w-[40px] ${esFinde ? 'bg-red-50' : 'bg-white'}`}
+                    className={`text-center py-0 border-r border-slate-300/80 min-w-[32px] md:min-w-[40px] ${esFinde ? 'bg-red-50' : 'bg-white'} group-hover:bg-emerald-50 transition-colors duration-150`}
                       >
                      <span className={`text-[10px] md:text-[11px] select-none ${colorClass}`}>
                     {visualChar}

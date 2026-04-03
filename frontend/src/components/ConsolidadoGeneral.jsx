@@ -407,13 +407,15 @@ const [seleccion, setSeleccion] = useState({
                 const enRiesgo = totalFaltas >= 3;
                 
                 return (
-                  <tr key={est.dni_estudiante} className="hover:bg-slate-50 transition-colors">
-                    <td className="sticky left-0 z-30 bg-emerald-100 py-1 text-center text-[8px] md:text-[11px] font-bold text-emerald-600 border-r border-slate-300">
-                      {(index + 1).toString().padStart(2, '0')}
-                    </td>
-                    <td className="bg-white py-1 px-3 text-[9px] md:text-[10px] font-semibold text-slate-700 border-r border-slate-300/80 uppercase">
-                      {est.apellido_paterno} {est.apellido_materno} {est.nombres}
-                    </td>
+                  <tr key={est.id_matricula || est.dni_estudiante} className="hover:bg-emerald-50 transition-colors duration-150 group">
+                   {/* COLUMNA N° */}
+                    <td className={`sticky left-0 z-30 py-1 text-center text-[8px] md:text-[11px] font-bold border-r border-slate-300 bg-emerald-50 text-emerald-600 group-hover:bg-inherit`}>
+                     {(index + 1).toString().padStart(2, '0')}
+                      </td>
+                       <td className="py-1 px-3 text-[8px] md:text-[10px] font-semibold text-slate-700 border-r border-slate-300/80 uppercase 
+                       bg-white group-hover:bg-emerald-50 transition-colors duration-150">
+                       {est.apellido_paterno} {est.apellido_materno} {est.nombres}
+                     </td>
                     {diasDelMes.map((dia) => {
                     const fechaAnalizar = new Date(2026, seleccion.mes - 1, dia.numero);
                     const esFinDeSemana = fechaAnalizar.getDay() === 0 || fechaAnalizar.getDay() === 6;

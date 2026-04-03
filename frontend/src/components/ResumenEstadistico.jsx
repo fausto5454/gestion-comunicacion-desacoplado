@@ -109,16 +109,7 @@ const ResumenEstadistico = ({
   title.value = 'ASISTENCIA NIVEL SECUNDARIA 2026';
   title.font = { name: 'Arial Black', size: 18, bold: true, underline: true };
   title.alignment = { horizontal: 'center', vertical: 'middle' };
-
-  titleCell.value = {
-  richText: [
-    { text: 'SIGESCOM ', font: { name: 'Arial Black', size: 18, bold: true, color: { argb: 'FF1A222E' } } },
-    { text: '2079', font: { name: 'Arial Black', size: 18, bold: true, color: { argb: 'FF22C55E' } } },
-    { text: ' | ASISTENCIA NIVEL SECUNDARIA', font: { name: 'Arial Black', size: 14, bold: true, color: { argb: 'FF444444' } } }
-   ]
-  };
-  titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
-
+  
   const headerRow = worksheet.getRow(4);
   headerRow.values = ['N°', 'TURNO', 'SECCIÓN', 'ESTUDIANTES MATRICULADOS', 'TRASLADADOS SIAGIE', 'ESTUDIANTES EN AULA', fechaHoyStr];
   headerRow.height = 35;
@@ -321,6 +312,8 @@ const ResumenEstadistico = ({
             <tbody className="font-bold text-slate-700">
               {datosResumen.map((s, index) => {
                 const faltas = s.enAula - s.asistenciasHoy;
+
+                const esFinTurnoMañana = index === 5;
                 
                 // Lógica de Semáforo Quirúrgica
                 let colorClase = "bg-[#FFF176] text-gray-900"; // Amarillo Intermedio (0 faltas)
@@ -333,9 +326,8 @@ const ResumenEstadistico = ({
                 }
 
                 return (
-                  <tr key={s.id} className="hover:bg-blue-50/50 border-b transition-colors group">
+                  <tr key={index} className={`hover:bg-slate-50 transition-colors ${esFinTurnoMañana ? 'border-b-2 border-slate-500' : 'border-b border-slate-200'}`}>
                     <td className="p-1 border bg-slate-50 text-slate-400 text-[10px] font-medium">{index + 1}</td>
-                    
                     {/* Manteniendo lógica de rowSpan intacta para diseño original */}
                     {index === 0 && (
                       <td rowSpan={6} className="p-2 border font-black bg-white text-slate-400 border-r-2 uppercase [writing-mode:vertical-lr] rotate-180">
@@ -347,7 +339,6 @@ const ResumenEstadistico = ({
                         Tarde
                       </td>
                     )}
-
                     <td className="p-1.5 border bg-[#C6EFCE] text-green-800 font-black">{s.sec}</td>
                     <td className="p-1.5 border group-hover:bg-white">{s.matriculadosSec}</td>
                     <td className="p-1.5 border text-red-500 group-hover:bg-white">{s.trasladosSec}</td>

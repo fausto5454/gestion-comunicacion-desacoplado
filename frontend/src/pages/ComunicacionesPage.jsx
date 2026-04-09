@@ -372,7 +372,7 @@ const ComunicacionesPage = ({ session }) => {
         const t1 = performance.now();
         const duracion = Math.round(t1 - t0);
         
-        // Obtener correo para la auditoría
+        // Obtener correo_electronico para la auditoría
         const { data: { user } } = await supabase.auth.getUser();
 
         await supabase.from('auditoria').insert([{

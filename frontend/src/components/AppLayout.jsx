@@ -58,7 +58,7 @@ const AppLayout = ({ session, onLogout, currentView, setCurrentView, onCursoSele
             setPerfilUsuario({ 
                 ...baseData, 
                 id: baseData.id_usuario, 
-                correo: baseData.correo_electronico,
+                correo_electronico: baseData.correo_electronico,
                 asignaciones: [] 
             });
             // Seteamos IDs básicos
@@ -269,14 +269,14 @@ const AppLayout = ({ session, onLogout, currentView, setCurrentView, onCursoSele
                         <Menu className="w-7 h-7" />
                     </button>
                     <h1 className="hidden md:block text-xl font-black tracking-tighter uppercase">
-                        {currentView.replace('-', ' ')}
+                        {currentView ? currentView.replace('-', ' ') : 'Cargando...'}
                     </h1>
                 </div>
 
                 <div className="flex items-center gap-1">
                     <div className="flex items-center gap-2 pr-3 border-r border-white/20">
                         <div className="flex flex-col items-end leading-none hidden sm:flex">
-                            <span className="text-xs font-bold">{userName.split(' ')[0]}</span>
+                            <span className="text-xs font-bold">{userName?.split(' ')[0]}</span>
                             <span className="text-[10px] font-medium text-green-100 uppercase">En línea</span>
                         </div>
                         <div className="w-9 h-9 rounded-full bg-white flex items-center justify-center font-black text-green-600 border-2 border-green-400">

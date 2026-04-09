@@ -93,15 +93,20 @@ const ImportarMatricula = () => {
   const [userRole, setUserRole] = useState(null);
 
   useEffect(() => {
-    const getProfile = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { data } = await supabase
-          .from('usuarios')
-          .select('rol')
-          .eq('id_usuario', user.id)
-          .single();
-        setUserRole(data?.rol);
+  const getProfile = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const { data, error } = await supabase
+        .from('usuarios')
+        .select('rol')
+        .eq('correo_electronico', user.email) 
+        .maybeSingle();
+
+      if (error) {
+        console.error("Error en getProfile:", error.message);
+      }
+      
+       setUserRole(data?.rol);
       }
     };
     getProfile();

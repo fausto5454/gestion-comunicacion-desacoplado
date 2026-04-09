@@ -40,7 +40,7 @@ const RegisterPage = ({ onSwitchToLogin }) => {
 
       if (!user) {
         setSuccess(
-          "Registro exitoso. Por favor, revisa tu correo para confirmar la cuenta."
+          "Registro exitoso. Por favor, revisa tu correo_electronico para confirmar la cuenta."
         );
         setLoading(false);
         return;
@@ -51,7 +51,7 @@ const RegisterPage = ({ onSwitchToLogin }) => {
         {
           id_usuario: user.id,
           nombre_completo: nombreCompleto,
-          correo_electronico: email,
+          correo_electronico_electronico: email,
           rol: rol,
         },
       ]);
@@ -66,7 +66,7 @@ const RegisterPage = ({ onSwitchToLogin }) => {
     } catch (err) {
       console.error("Error al registrar:", err.message);
       if (err.message.includes("User already registered"))
-        setError("Ya existe un usuario con este correo.");
+        setError("Ya existe un usuario con este correo_electronico.");
       else if (err.message.includes("Password"))
         setError("La contraseña debe tener al menos 6 caracteres.");
       else setError(`Error: ${err.message}`);
@@ -137,7 +137,7 @@ const RegisterPage = ({ onSwitchToLogin }) => {
 
           <div>
             <label className="block text-sm font-medium text-gray-700">
-              Correo Electrónico
+              Correo_electronico Electrónico
             </label>
             <input
               type="email"

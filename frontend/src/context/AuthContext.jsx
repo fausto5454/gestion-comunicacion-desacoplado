@@ -23,7 +23,7 @@ export const AuthProvider = ({ children }) => {
       const { data: studentData, error: studentError } = await supabase
         .from('matriculas')
         .select('*, dni_estudiante, grado, seccion') // Aquí está el DNI real del alumno
-        .eq('id_auth', user.id) // Asegúrate que 'id_auth' sea el campo que vincula con Supabase Auth
+        .eq('id_usuario', user.id) // Asegúrate que 'id_usuario' sea el campo que vincula con Supabase Auth
         .maybeSingle();
 
       if (studentError) throw studentError;
@@ -71,7 +71,7 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const signIn = async (emailOrDni, password) => {
-    // Si el usuario ingresa un DNI (solo números), podrías transformarlo a correo 
+    // Si el usuario ingresa un DNI (solo números), podrías transformarlo a correo_electronico 
     // si tu lógica de Supabase así lo requiere, o usarlo directamente.
     const { data, error } = await supabase.auth.signInWithPassword({ 
       email: emailOrDni, 

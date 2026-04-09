@@ -24,16 +24,20 @@ const ModalTrasladado = ({ isOpen, onClose, onUpdate }) => {
     }
 
     const buscar = async () => {
-      try {
-        const { data, error } = await supabase.rpc('buscar_estudiante_activo', { 
-          query_text: busqueda.trim() 
-        });
-        if (error) throw error;
-        setResultados(data || []);
-      } catch (err) {
-        console.error("Error SIGESCOM:", err.message);
+     try {
+       const { data, error } = await supabase.rpc('buscar_estudiante_activo', { 
+        query_text: busqueda.trim() 
+      });
+    
+      if (error) {
+        console.error("Error de parámetros en RPC:", error.message);
+        throw error;
       }
-    };
+      setResultados(data || []);
+    } catch (err) {
+      toast.error("Error al buscar: Verifique conexión con el servidor.");
+    }
+   };
 
     const timer = setTimeout(buscar, 400);
     return () => clearTimeout(timer);

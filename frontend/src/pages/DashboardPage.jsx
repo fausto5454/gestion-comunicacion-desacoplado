@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../config/supabaseClient';
-import { Monitor, GraduationCap, ClipboardCheck, Send, AlertTriangle, CheckCircle2, MessageSquare, Loader2 } from 'lucide-react';
+import { Monitor, GraduationCap, ClipboardCheck, Send, AlertTriangle, MessageSquare} from 'lucide-react';
 import { Doughnut } from 'react-chartjs-2';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js';
 import { percentageLabelPlugin } from "../utils/dashboardPlugins";
+import ConfigurarSeguridad from '../components/ConfigurarSeguridad';
 
 ChartJS.register(ArcElement, Tooltip, Legend, percentageLabelPlugin);
 
@@ -92,8 +93,40 @@ const DashboardPage = ({ session }) => {
         fetchAllData();
     }, [aula, area, bimestre, session]);
 
+    const [showSecurityConfig, setShowSecurityConfig] = useState(false);
+    const [userData, setUserData] = useState(null);
+
+    useEffect(() => {
+      const checkSecurityData = async () => {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) {
+            const { data, error } = await supabase
+                .from('usuarios')
+                .select('pregunta_seguridad, correo_electronico, id_usuario')
+                .eq('correo_electronico', user.email)
+                .single();
+
+            if (data && (!data.pregunta_seguridad || data.pregunta_seguridad.trim() === "")) {
+               setUserData(data);
+               setShowSecurityConfig(true);
+           }
+         }
+     };
+      checkSecurityData();
+     }, []);
+
      return (
-        <div className="p-6 space-y-6 bg-gray-200 min-h-screen relative">
+        <div className="p-6 space-y-6 bg-gray-200/70 min-h-screen relative">
+         {/* MODAL DE SEGURIDAD (INTERCEPTOR) */}
+           {showSecurityConfig && (
+            <ConfigurarSeguridad 
+              user={userData} 
+              onComplete={() => {
+              setShowSecurityConfig(false);
+              toast.success("¡Tu cuenta ahora está protegida!");
+            }} 
+          />
+        )}
         {/* CABECERA DINÁMICA CORREGIDA */}
        <header className="bg-sky-900 p-4 md:p-6 rounded-[1.5rem] md:rounded-[2.5rem] shadow-sm border border-slate-200 flex flex-col xl:flex-row justify-between items-center gap-4">
        {/* Título e Icono: Se alinean al centro en móvil, a la izquierda en desktop */}

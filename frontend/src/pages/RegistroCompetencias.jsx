@@ -444,7 +444,7 @@ if (idx < 4) {
 
   try {
     const { data: { user } } = await supabase.auth.getUser();
-    const correoResponsable = user?.email || 'usuario_desconocido';
+    const correo_electronicoResponsable = user?.email || 'usuario_desconocido';
 
     const partes = grado.trim().split(" "); 
     let numGrado = partes[0]?.trim().toUpperCase() || "";
@@ -519,7 +519,7 @@ if (idx < 4) {
         promedio_c4: p4,
         logro_bimestral: logroFinal,
         estado_estudiante: situacionAcademica,
-        correo_electronico: correoResponsable
+        correo_electronico_electronico: correo_electronicoResponsable
       });
     });
 
@@ -546,7 +546,7 @@ if (idx < 4) {
             </div>
           </div>
           <p style="font-size: 11px; color: #94a3b8; text-align: center; margin-top: 15px;">
-            Responsable de envío: <br/> <b>${correoResponsable}</b>
+            Responsable de envío: <br/> <b>${correo_electronicoResponsable}</b>
           </p>
         </div>`,
       icon: 'question',
@@ -588,7 +588,7 @@ if (idx < 4) {
            // ENVIAMOS LA HORA EXACTA DE TU PC
            fecha_registro_lima: new Date().toISOString(),
            metadatos: {
-               correo: correoResponsable,
+               correo_electronico: correo_electronicoResponsable,
                version: "2.0-LIMA"
           }
        }]);

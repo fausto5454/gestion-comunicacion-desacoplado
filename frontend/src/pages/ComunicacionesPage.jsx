@@ -3,7 +3,7 @@ import {
     Send, X, Megaphone, ChevronRight, Clock, CheckCircle, AlertCircle, Loader2, Trash2, AlertTriangle, LogOut
 } from 'lucide-react';
 import { supabase } from '../config/supabaseClient';
-import { toast, Toaster } from 'react-hot-toast';
+import { toast, Toaster } from 'sonner';
 import Select from 'react-select';
 
 const ComunicacionesPage = ({ session }) => {

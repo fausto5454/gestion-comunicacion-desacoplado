@@ -4,7 +4,7 @@ import {
     File, Loader2, Globe, Lock, Eye, FileSpreadsheet, X
 } from 'lucide-react';
 import { supabase } from '../config/supabaseClient';
-import { toast, Toaster } from 'react-hot-toast';
+import { toast, Toaster } from 'sonner';
 import { registrarAuditoria } from '../services/auditoriaService';
 
 const DocumentosPage = ({ session }) => {

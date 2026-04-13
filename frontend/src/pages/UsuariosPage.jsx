@@ -123,55 +123,81 @@ const UsuariosPage = () => {
     // --- OPERACIONES CRUD ---
    const handleCreate = async (e) => {
     e.preventDefault();
-    if (isLoading) return; // Bloqueo de seguridad preventivo
+    
+    if (isLoading || isSubmitting) return; 
+
+    const emailLimpio = (form.correo_electronico || "").toLowerCase().trim();
+    const nombreLimpio = (form.nombre_completo || "").trim();
+    const passwordLimpio = form.contraseña || "";
+    const rolId = parseInt(form.rol_id, 10);
+
+    // 2. Validaciones locales (Pre-fetch)
+    if (!emailLimpio || !passwordLimpio) {
+        return toast.error("El correo y la contraseña son obligatorios");
+    }
+    
+    if (passwordLimpio.length < 6) {
+        return toast.error("La contraseña debe tener al menos 6 caracteres");
+    }
+
+    if (isNaN(rolId)) {
+        return toast.error("Debes seleccionar un rol válido");
+    }
+
+    setIsSubmitting(true);
 
     try {
-      // Normalización para evitar duplicados por espacios o mayúsculas
-      const emailLimpio = form.correo_electronico.toLowerCase().trim();
-      const nombreLimpio = form.nombre_completo.trim();
+        const { data: existingUser, error: checkError } = await supabase
+            .from('usuarios')
+            .select('correo_electronico')
+            .eq('correo_electronico', emailLimpio)
+            .maybeSingle();
 
-      // 1. Validar si el correo_electronico ya existe en la tabla usuarios antes de registrar
-      const { data: existingUser, error: checkError } = await supabase
-        .from('usuarios')
-        .select('correo_electronico')
-        .eq('correo_electronico', emailLimpio)
-        .maybeSingle();
+        if (checkError) throw checkError;
+        if (existingUser) {
+            setIsSubmitting(false);
+            return toast.error("Este correo ya está registrado en el sistema");
+        }
 
-      if (checkError) throw checkError;
+        const { data: authData, error: signError } = await supabase.auth.signUp({
+            email: emailLimpio,
+            password: passwordLimpio,
+        });
 
-      if (existingUser) {
-        toast.error("Este correo_electronico ya está registrado en el sistema");
-        return;
-      }
+        if (signError) throw signError;
+        if (!authData?.user) throw new Error("No se pudo obtener la información del usuario creado.");
 
-      // 2. Si no existe, proceder con el registro en Auth
-      const { data: authData, error: signError } = await supabase.auth.signUp({
-        email: emailLimpio,
-        password: form.contraseña,
-      });
-
-      if (signError) throw signError;
-
-      // Usamos upsert con onConflict para blindar contra inserciones concurrentes
-      const { error: insertError } = await supabase.from('usuarios').upsert([
-        {
-          id_usuario: authData.user.id,
-          nombre_completo: nombreLimpio,
-          correo_electronico: emailLimpio,
-          rol_id: parseInt(form.rol_id, 10),
+        // 5. Inserción en tabla 'usuarios' vinculando con el ID de Auth
+       const { error: insertError } = await supabase.from('usuarios').insert([
+       {
+           id_usuario: authData.user.id,
+           nombre_completo: nombreLimpio,
+           correo_electronico: emailLimpio,
+           rol_id: parseInt(form.rol_id, 10),
+          // Agregamos estas columnas con NULL o valores vacíos para evitar errores de restricción
+          grado: null,
+          seccion: null,
+          area: null,
+          pregunta_seguridad: 'pendiente_configuracion',
+          respuesta_seguridad: "pendiente",
         },
-      ], { onConflict: 'id_usuario' });
 
-      if (insertError) throw insertError;
+        ], { onConflict: 'id_usuario' });
 
-      // 4. Auditoría y éxito
-      await registrarAuditoria('CREAR', `Usuario creado: ${nombreLimpio}`);
-      setIsModalOpen(false);
-      fetchUsers();
-      toast.success('Usuario registrado correctamente');
+        if (insertError) throw insertError;
+
+        // 6. Auditoría y éxito
+        await registrarAuditoria('CREAR', `Usuario creado: ${nombreLimpio}`);
+        
+        setIsModalOpen(false);
+        fetchUsers();
+        toast.success('Usuario registrado correctamente');
 
     } catch (err) {
-      toast.error(err.message || "Error al procesar el registro");
+        console.error("Error detallado:", err);
+        toast.error(err.message || "Error al procesar el registro");
+    } finally {
+        setIsSubmitting(false); // Liberar bloqueo
     }
   };
 
@@ -187,7 +213,7 @@ const UsuariosPage = () => {
         .from('usuarios')
         .update({
           nombre_completo: nombreLimpio,
-          correo_electronico_electronico: emailLimpio,
+          correo_electronico: emailLimpio,
           rol_id: parseInt(form.rol_id, 10),
         })
         .eq('id_usuario', form.id_usuario);
@@ -303,7 +329,7 @@ const UsuariosPage = () => {
                 {user.nombre_completo}
               </td>
              <td className="px-6 py-1.5 text-sm text-slate-600 whitespace-nowrap">
-             {user.correo_electronico_electronico}
+             {user.correo_electronico}
             </td>
             <td className="px-6 py-1.5 text-sm whitespace-nowrap">
              <span className={`px-3 py-0.5 text-[10px] font-bold rounded-full uppercase border ${
@@ -384,8 +410,8 @@ const UsuariosPage = () => {
                                 <input type="text" className="w-full p-3 rounded-xl border focus:ring-2 focus:ring-green-500 outline-none" value={form.nombre_completo} onChange={(e) => setForm({...form, nombre_completo: e.target.value})} required />
                             </div>
                             <div>
-                                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Correo_electronico Electrónico</label>
-                                <input type="email" className="w-full p-3 rounded-xl border focus:ring-2 focus:ring-green-500 outline-none" value={form.correo_electronico_electronico} onChange={(e) => setForm({...form, correo_electronico_electronico: e.target.value})} required />
+                                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Correo Electrónico</label>
+                                <input type="email" className="w-full p-3 rounded-xl border focus:ring-2 focus:ring-green-500 outline-none" value={form.correo_electronico} onChange={(e) => setForm({...form, correo_electronico: e.target.value})} required />
                             </div>
                             {!isEdit && (
                                 <div>

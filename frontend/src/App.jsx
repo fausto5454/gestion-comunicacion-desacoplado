@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from './config/supabaseClient';
-import { Toaster } from 'sonner';
+import { toast, Toaster } from 'sonner';
 import AppLayout from './components/AppLayout';
 import LoginPage from './pages/LoginPage';
 

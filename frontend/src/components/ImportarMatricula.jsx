@@ -32,6 +32,12 @@ const ModalRegistroIndividual = ({ isOpen, onClose, onRefresh }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    // Validación de 8 dígitos
+    if (formData.dni_estudiante.length !== 8) {
+      return toast.warning("DNI Inválido", {
+        description: "El DNI debe tener exactamente 8 dígitos."
+      });
+    }
     setLoading(true);
     try {
       const { error } = await supabase.from('matriculas').upsert({
@@ -141,9 +147,11 @@ const ImportarMatricula = () => {
           else { apP = p[0]; nom = p[1] || ''; }
         }
 
-        const dniLimpio = String(item.DNI || '').trim().replace(/[^0-9]/g, '');
+        // LIMPIEZA Y VALIDACIÓN DE DNI EN CARGA MASIVA
+        let dniLimpio = String(item.DNI || '').trim().replace(/[^0-9]/g, '');
+        if (dniLimpio.length > 8) dniLimpio = dniLimpio.substring(0, 8);
         return {
-          dni_estudiante: dniLimpio.substring(0, 8),
+          dni_estudiante: dniLimpio,
           apellido_paterno: limpiarTexto(apP),
           apellido_materno: limpiarTexto(apM),
           nombres: limpiarTexto(nom),

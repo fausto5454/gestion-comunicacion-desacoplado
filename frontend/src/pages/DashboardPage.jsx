@@ -5,6 +5,7 @@ import { Doughnut } from 'react-chartjs-2';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js';
 import { percentageLabelPlugin } from "../utils/dashboardPlugins";
 import ConfigurarSeguridad from '../components/ConfigurarSeguridad';
+import { toast } from 'sonner';
 
 ChartJS.register(ArcElement, Tooltip, Legend, percentageLabelPlugin);
 
@@ -123,8 +124,12 @@ const DashboardPage = ({ session }) => {
               user={userData} 
               onComplete={() => {
               setShowSecurityConfig(false);
-              toast.success("¡Tu cuenta ahora está protegida!");
-            }} 
+              setTimeout(() => {
+              toast.success("Seguridad establecida", {
+              description: "Contraseña actualizada y seguridad configurada correctamente.",
+              });
+              }, 1500);
+            }}
           />
         )}
         {/* CABECERA DINÁMICA CORREGIDA */}

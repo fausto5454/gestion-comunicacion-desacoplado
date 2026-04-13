@@ -519,7 +519,7 @@ if (idx < 4) {
         promedio_c4: p4,
         logro_bimestral: logroFinal,
         estado_estudiante: situacionAcademica,
-        correo_electronico_electronico: correo_electronicoResponsable
+        correo_electronico: correo_electronicoResponsable
       });
     });
 

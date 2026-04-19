@@ -16,7 +16,7 @@ const Sidebar = ({ rol_id, userName, userEmail, setCurrentView, currentView, isS
         setOpenMenus(prev => ({ ...prev, [name]: !prev[name] }));
     };
     const navItems = [
-        { name: 'Panel Principal', view: 'dashboard', icon: LayoutDashboard, roles: [1, 2, 3, 4, 5] },
+        { name: 'Panel Principal', view: 'panel principal', icon: LayoutDashboard, roles: [1, 2, 3, 4, 5] },
         { name: 'Gestión de Usuarios', view: 'usuarios', icon: Users, roles: [1] },
         { 
             name: 'Comunicaciones', 

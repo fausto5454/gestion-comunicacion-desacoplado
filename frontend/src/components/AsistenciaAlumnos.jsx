@@ -35,49 +35,74 @@ const AsistenciaAlumnos = ({ perfilUsuario, session }) => {
   const [seccion, setSeccion] = useState("");
   const [areaSeleccionada, setAreaSeleccionada] = useState("");
 
-  // 1. EFECTO DE AUTO-CONFIGURACIÓN (Elimina lo estático)
-  useEffect(() => {
-    if (perfilUsuario?.asignaciones?.length > 0) {
-      const primera = perfilUsuario.asignaciones[0];
-      setGrado(primera.grado.toString().replace('°', ''));
-      setSeccion(primera.seccion);
-      setAreaSeleccionada(primera.area.toUpperCase());
-    }
-  }, [perfilUsuario]);
+  const [asignacionesDocente, setAsignacionesDocente] = useState([]);
 
- const opcionesPermitidas = useMemo(() => {
+  const opcionesPermitidas = useMemo(() => {
     const esAdmin = Number(perfilUsuario?.rol_id) === 1;
-    const asignaciones = perfilUsuario?.asignaciones || [];
+    if (!asignacionesDocente) return { grados: [], areas: [] }; 
 
     if (esAdmin) {
         return {
-            grados: [
-                "1° A", "1° B", "1° C", "2° A", "2° B", "2° C", 
-                "3° A", "3° B", "4° A", "4° B", "5° A", "5° B"
-            ],
+            grados: ["1° A", "1° B", "1° C", "2° A", "2° B", "2° C", "3° A", "3° B", "4° A", "4° B", "5° A", "5° B"],
             areas: Object.keys(areasConfig || {}).map(a => a.toUpperCase())
-          };
+        };
+    }
+
+   const gradosUnicos = [...new Set(asignacionesDocente.map(a => 
+      `${a.grado.toString().replace('°', '')}° ${a.seccion}`
+    ))];
+    
+    const aulaActual = `${grado.replace('°', '')}° ${seccion}`;
+    const areasDocente = [...new Set(
+      asignacionesDocente
+        .filter(a => `${a.grado.toString().replace('°', '')}° ${a.seccion}` === aulaActual)
+        .map(a => a.area.toUpperCase())
+    )];
+
+    return { grados: gradosUnicos, areas: areasDocente.length > 0 ? areasDocente : ["Seleccione Área"] };
+  }, [grado, seccion, asignacionesDocente]);
+
+  // 3. DEFINICIÓN DE FUNCIONES - Debe estar ARRIBA de los useEffect
+  const cargarAlumnos = async (gradoFinal, seccionFinal) => {
+    console.log("Consultando Supabase para:", gradoFinal, seccionFinal);
+    const { data, error } = await supabase
+      .from('matriculas')
+      .select('id_estudiante, apellidos_nombres, estado')
+      .eq('grado', gradoFinal) // Usará el formato con ° de tu DB
+      .eq('seccion', seccionFinal)
+      .order('apellidos_nombres');
+
+    if (!error) setEstudiantes(data || []);
+  };
+
+  // 4. EFECTOS (Al final)
+  useEffect(() => {
+    const fetchAsignaciones = async () => {
+      if (!perfilUsuario?.id_usuario) return;
+      const { data } = await supabase
+        .from('docente_asignaciones')
+        .select('grado, seccion, area')
+        .eq('id_usuario', perfilUsuario.id_usuario);
+      
+      if (data) {
+        setAsignacionesDocente(data);
+        if (data.length > 0 && !grado) {
+          setGrado(data[0].grado.toString().replace('°', ''));
+          setSeccion(data[0].seccion);
+          setAreaSeleccionada(data[0].area.toUpperCase());
         }
+      }
+    };
+    fetchAsignaciones();
+   }, [perfilUsuario]);
 
-        const gradosUnicos = [...new Set(asignaciones.map(a => {
-            const gnum = a.grado.toString().replace('°', '');
-            return `${gnum}° ${a.seccion}`;
-        }))];
+  useEffect(() => {
+    if (grado && seccion && areaSeleccionada && areaSeleccionada !== "Seleccione Área") {
+      const gradoConSimbolo = grado.includes('°') ? grado : `${grado}°`;
+      cargarAlumnos(gradoConSimbolo, seccion);
+    }
+  }, [grado, seccion, areaSeleccionada]);
 
-        const gradoLimpio = grado?.toString().replace('°', '') || "";
-        const aulaActual = `${gradoLimpio}° ${seccion}`;
-        
-        const areasDocente = asignaciones
-            .filter(a => `${a.grado.toString().replace('°', '')}° ${a.seccion}` === aulaActual)
-            .map(a => a.area.toUpperCase());
-
-        return { grados: gradosUnicos, areas: areasDocente };
-    }, [perfilUsuario, grado, seccion, areasConfig]);
-
-    useEffect(() => {
-    }, [grado, seccion, areaSeleccionada]);
-
-  // --- LÓGICA DE RECUPERACIÓN (Sin cambios en tu lógica funcional) ---
   const fetchAsistenciaExistente = async (nomina, init) => {
     try {
       const dnis = nomina.map(n => n.dni_estudiante);
@@ -140,6 +165,30 @@ const AsistenciaAlumnos = ({ perfilUsuario, session }) => {
 
     return () => supabase.removeChannel(canalDocente);
    }, [fetchAsistenciaArea]);
+
+   const cargarAsistencia = async () => {
+  // 1. Identificamos si es estudiante y obtenemos su DNI
+  const esEstudiante = Number(perfilUsuario?.rol_id) === 3; // Suponiendo 3 = Estudiante
+  const dniUsuario = perfilUsuario?.id_dni || perfilUsuario?.id_usuario;
+
+  let query = supabase
+    .from('asistencia')
+    .select('*')
+    .eq('grado', grado)
+    .eq('seccion', seccion)
+    .eq('observaciones', areaSeleccionada);
+
+   // 2. APLICAR FILTRO INDIVIDUAL (Esto es lo que falta)
+   if (esEstudiante) {
+    query = query.eq('dni_estudiante', dniUsuario);
+   }
+
+   const { data, error } = await query.order('fecha', { ascending: true });
+
+   if (!error) {
+     setAsistenciaData(data || []);
+   }
+  };
 
   // --- FUNCIÓN DE CARGA DE NÓMINA (Optimizada) ---
   const fetchNomina = useCallback(async () => {
@@ -580,16 +629,21 @@ const guardarAsistenciaTotal = async () => {
               </div>     
   
              {/* SELECTOR DE ÁREA */}
-           <div className="relative">
-           <select 
-           value={areaSeleccionada}
-           onChange={(e) => setAreaSeleccionada(e.target.value)}
-          // Estética unificada con fondo verde suave y texto resaltado
-          className="pl-5 pr-10 py-2 bg-green-50 text-green-700 font-bold rounded-full border-none shadow-md appearance-none cursor-pointer hover:bg-green-50 transition-all text-[10px] md:text-[11px] uppercase"
-           >
-          {opcionesPermitidas.areas.map(area => (
-            <option key={area} value={area}>{area}</option>
-             ))}
+            <div className="relative">
+             <select 
+             disabled={Number(perfilUsuario?.rol_id) === 6} 
+             value={areaSeleccionada}
+             onChange={(e) => setAreaSeleccionada(e.target.value)}
+            className="appearance-none bg-green-50 border-slate-100 text-green-700 text-[10px] font-bold pl-3 pr-8 py-2 rounded-xl outline-none focus:ring-2 focus:ring-green-500 transition-all w-full disabled:bg-gray-100 disabled:cursor-not-allowed">
+           {opcionesPermitidas.areas.length > 0 ? (
+           opcionesPermitidas.areas.map((area, index) => (
+           <option key={`${area}-${index}`} value={area}>
+           {area}
+           </option>
+           ))
+            ) : (
+            <option value="">Selccione Área</option>
+              )}
               </select>
                <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-gray-600">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -668,6 +722,7 @@ const guardarAsistenciaTotal = async () => {
                         return (
                           <button
                            key={letra}
+                           disabled={perfilUsuario?.rol_id === 6}
                            onClick={() => manejarCambioAsistencia(est.dni_estudiante, valorReal)}
                            className={`
                            w-8 h-8 rounded-md border text-[11px] font-black transition-all duration-200

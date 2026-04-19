@@ -72,6 +72,7 @@ const ConsolidadoAsistencia = () => {
     const mesFmt = String(seleccion.mes).padStart(2, '0');
     const primerDia = `${anio}-${mesFmt}-01`;
     const ultimoDia = `${anio}-${mesFmt}-${new Date(anio, seleccion.mes, 0).getDate()}`;
+    const esEstudiante = Number(perfilUsuario?.rol_id) === 6;
 
     // 2. Consulta de Nómina (Sin cambios)
     const { data: nomina } = await supabase.from('matriculas')
@@ -80,15 +81,23 @@ const ConsolidadoAsistencia = () => {
       .eq('seccion', seleccion.seccion)
       .order('apellido_paterno', { ascending: true });
 
-    const { data: asistencias, error: asistErr } = await supabase
+    let queryAsistencias = supabase
       .from('asistencia')
       .select('*')
       .eq('grado', gradoFmt)
       .eq('seccion', seleccion.seccion)
-      .eq('turno', seleccion.turno) // Debe ser "MAÑANA Y TARDE"
-      .or(`observaciones.ilike.%${seleccion.area}%,observaciones.eq.GENERAL`)
+      .eq('turno', seleccion.turno)
+      .eq('observaciones', seleccion.area)
       .gte('fecha', primerDia)
       .lte('fecha', ultimoDia);
+
+    if (esEstudiante && perfilUsuario?.dni_estudiante) {
+       queryAsistencias = queryAsistencias.eq('dni_estudiante', perfilUsuario.dni_estudiante);
+    } else {
+       queryAsistencias = queryAsistencias.or(`observaciones.ilike.%${seleccion.area}%,observaciones.eq.GENERAL`);
+    }
+
+    const { data: asistencias, error: asistErr } = await queryAsistencias;
 
     if (asistErr) throw asistErr;
 
@@ -102,7 +111,8 @@ const ConsolidadoAsistencia = () => {
         if (!nuevoMapa[dni]) nuevoMapa[dni] = {};
         
         // Prioridad: Si es GENERAL (Auxiliar) pisa cualquier otro estado
-        if (reg.observaciones === 'GENERAL' || !nuevoMapa[dni][diaNum]) {
+        if (reg.observaciones === seleccion.area) {
+          if (!nuevoMapa[dni]) nuevoMapa[dni] = {};
           nuevoMapa[dni][diaNum] = reg.estado;
         }
       });
@@ -199,11 +209,15 @@ const ConsolidadoAsistencia = () => {
   }, [seleccion.mes]);
 
   const filtrados = useMemo(() => {
-    return estudiantes.filter(e => {
-      const nombreCompleto = `${e.apellido_paterno} ${e.apellido_materno} ${e.nombres}`.toLowerCase();
-      return nombreCompleto.includes(searchTerm.toLowerCase());
-    });
-  }, [estudiantes, searchTerm]);
+  const esEstudiante = Number(perfilUsuario?.rol_id) === 6;
+  return estudiantes.filter(e => {
+    if (esEstudiante) {
+      return String(e.dni_estudiante) === String(perfilUsuario?.dni_estudiante);
+    }
+    const nombreCompleto = `${e.apellido_paterno} ${e.apellido_materno} ${e.nombres}`.toLowerCase();
+    return nombreCompleto.includes(searchTerm.toLowerCase());
+  });
+  }, [estudiantes, searchTerm, perfilUsuario, seleccion.area]);
 
   useEffect(() => {
     const canalAsistencia = supabase
@@ -443,27 +457,31 @@ const ConsolidadoAsistencia = () => {
     <div className="bg-emerald-700 p-4 rounded-[2rem] shadow-lg mb-6 flex flex-col lg:flex-row gap-4 items-center justify-between">
       <div className="flex flex-wrap gap-2 w-full lg:w-auto">
         {/* GRADO/SEC SELECTOR */}
-        <div className="min-w-[120px] flex items-center gap-2 bg-slate-100 px-3 py-2 rounded-2xl border">
-          <Filter size={14} className="text-emerald-600" />
-          <select 
-            className="bg-transparent font-black text-slate-700 outline-none text-[10px] uppercase w-full cursor-pointer"
-            value={`${seleccion.grado}-${seleccion.seccion}`}
-            onChange={(e) => {
-              const val = e.target.value;
-              if (val && val.includes('-')) {
-                const [g, s] = val.split('-');
-                setSeleccion(prev => ({...prev, grado: g, seccion: s}));
-              }
-            }}>
-            {opcionesPermitidas.grados.length > 0 ? (
-              opcionesPermitidas.grados.map(opt => (
-                <option key={opt} value={opt}>{opt.replace('-', '° ')}</option>
-              ))
-            ) : (
-              <option value="">{loading ? 'CARGANDO...' : 'SIN ACCESO'}</option>
-            )}
-          </select>
-        </div>
+        <div className={`min-w-[120px] flex items-center gap-2 bg-slate-100 px-3 py-2 rounded-2xl border transition-opacity ${esEstudiante ? 'opacity-60' : 'opacity-100'}`}>
+         <Filter size={14} className="text-emerald-600" />
+         <select 
+        // Restricción: Si es estudiante, el selector queda inhabilitado
+        disabled={esEstudiante} 
+       className={`bg-transparent font-black text-slate-700 outline-none text-[10px] uppercase w-full ${
+       esEstudiante ? 'cursor-not-allowed' : 'cursor-pointer'
+      }`}
+      value={`${seleccion.grado}-${seleccion.seccion}`}
+      onChange={(e) => {
+      const val = e.target.value;
+       if (val && val.includes('-')) {
+        const [g, s] = val.split('-');
+        setSeleccion(prev => ({...prev, grado: g, seccion: s}));
+        }
+       }}>
+      {opcionesPermitidas.grados.length > 0 ? (
+      opcionesPermitidas.grados.map(opt => (
+        <option key={opt} value={opt}>{opt.replace('-', '° ')}</option>
+       ))
+       ) : (
+        <option value="">{loading ? 'CARGANDO...' : 'SIN ACCESO'}</option>
+       )}
+       </select>
+       </div>
         {/* ÁREA SELECTOR */}
         <div className="flex-1 min-w-[150px] flex items-center gap-2 bg-slate-100 px-3 py-2 rounded-2xl border">
           <Menu size={14} className="text-emerald-600" />

@@ -85,19 +85,6 @@ const App = () => {
   const esCambioObligatorio = localStorage.getItem('require_password_change') === 'true';
   const isRecoveryURL = window.location.hash.includes('type=recovery') || window.location.pathname === '/recovery';
 
-  // PRIORIDAD MÁXIMA
-  if (isRecoveryURL || esCambioObligatorio) {
-    return (
-       <UpdatePasswordPage 
-       onComplete={async () => {
-          localStorage.removeItem('require_password_change');
-          await supabase.auth.signOut(); // Forzamos nueva sesión con clave nueva
-          window.location.href = '/';
-        }} 
-      />
-    );
-  }
-
   if (loading) {
     return (
       <div className="h-screen flex items-center justify-center bg-slate-50 text-slate-600 font-medium">

@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '../config/supabaseClient'; 
 import { registrarAuditoria } from '../services/auditoriaService'; 
-import { toast } from 'react-hot-toast';
+import { toast, Toaster } from 'sonner';
 import * as XLSX from 'xlsx';
 
 const UsuariosPage = () => {
@@ -121,87 +121,90 @@ const UsuariosPage = () => {
     };
 
     // --- OPERACIONES CRUD ---
-   const handleCreate = async (e) => {
-    e.preventDefault();
-    
-    if (isLoading || isSubmitting) return; 
+    const handleCreate = async (e) => {
+       e.preventDefault();
+       
+       if (isLoading || isSubmitting) return; 
+   
+       const emailLimpio = (form.correo_electronico || "").toLowerCase().trim();
+       const nombreLimpio = (form.nombre_completo || "").trim();
+       const passwordLimpio = form.contraseña || "";
+       const rolId = parseInt(form.rol_id, 10);
+   
+       // 2. Validaciones locales (Pre-fetch)
+       if (!emailLimpio || !passwordLimpio) {
+           return toast.error("El correo y la contraseña son obligatorios");
+       }
+       
+       if (passwordLimpio.length < 6) {
+           return toast.error("La contraseña debe tener al menos 6 caracteres");
+       }
+   
+       if (isNaN(rolId)) {
+           return toast.error("Debes seleccionar un rol válido");
+       }
+   
+       setIsSubmitting(true);
+   
+       try {
+           const { data: existingUser, error: checkError } = await supabase
+               .from('usuarios')
+               .select('correo_electronico')
+               .eq('correo_electronico', emailLimpio)
+               .maybeSingle();
+   
+           if (checkError) throw checkError;
+           if (existingUser) {
+               setIsSubmitting(false);
+               return toast.error("Este correo ya está registrado en el sistema");
+           }
+   
+           const { data: authData, error: signError } = await supabase.auth.signUp({
+               email: emailLimpio,
+               password: passwordLimpio,
+           });
+   
+           if (signError) throw signError;
+           if (!authData?.user) throw new Error("No se pudo obtener la información del usuario creado.");
+   
+           // 5. Inserción en tabla 'usuarios' vinculando con el ID de Auth
+          const { error: insertError } = await supabase
+             .from('usuarios')
+             .upsert({
+             id_usuario: authData.user.id,
+             nombre_completo: nombreLimpio,
+             correo_electronico: emailLimpio,
+             rol_id: rolId,
+             pregunta_seguridad: 'pendiente_configuracion',
+             respuesta_seguridad: "pendiente",
+          }, { 
+             onConflict: 'id_usuario'
+          })
+            .select('id_usuario') 
+            .single();
+   
+           if (insertError) throw insertError;
+   
+           // 6. Auditoría y éxito
+           await registrarAuditoria('CREAR', `Usuario creado: ${nombreLimpio}`);
+           
+            toast.success(`¡Usuario ${nombreLimpio} creado con éxito!`, {
+            description: "Se ha vinculado correctamente con Supabase Auth.",
+           });
 
-    const emailLimpio = (form.correo_electronico || "").toLowerCase().trim();
-    const nombreLimpio = (form.nombre_completo || "").trim();
-    const passwordLimpio = form.contraseña || "";
-    const rolId = parseInt(form.rol_id, 10);
+           setForm({ nombre_completo: '', correo_electronico: '', contraseña: '', rol_id: '' }); // Reset opcional
+           setIsModalOpen(false);
+           fetchUsers();
+   
+        } catch (err) {
+           console.error("Error detallado:", err);
+           toast.error(err.message || "Error al procesar el registro");
+       } finally {
+           setIsSubmitting(false); // Liberar bloqueo
+       }
+     };
 
-    // 2. Validaciones locales (Pre-fetch)
-    if (!emailLimpio || !passwordLimpio) {
-        return toast.error("El correo y la contraseña son obligatorios");
-    }
-    
-    if (passwordLimpio.length < 6) {
-        return toast.error("La contraseña debe tener al menos 6 caracteres");
-    }
-
-    if (isNaN(rolId)) {
-        return toast.error("Debes seleccionar un rol válido");
-    }
-
-    setIsSubmitting(true);
-
-    try {
-        const { data: existingUser, error: checkError } = await supabase
-            .from('usuarios')
-            .select('correo_electronico')
-            .eq('correo_electronico', emailLimpio)
-            .maybeSingle();
-
-        if (checkError) throw checkError;
-        if (existingUser) {
-            setIsSubmitting(false);
-            return toast.error("Este correo ya está registrado en el sistema");
-        }
-
-        const { data: authData, error: signError } = await supabase.auth.signUp({
-            email: emailLimpio,
-            password: passwordLimpio,
-        });
-
-        if (signError) throw signError;
-        if (!authData?.user) throw new Error("No se pudo obtener la información del usuario creado.");
-
-        // 5. Inserción en tabla 'usuarios' vinculando con el ID de Auth
-       const { error: insertError } = await supabase.from('usuarios').insert([
-       {
-           id_usuario: authData.user.id,
-           nombre_completo: nombreLimpio,
-           correo_electronico: emailLimpio,
-           rol_id: parseInt(form.rol_id, 10),
-          // Agregamos estas columnas con NULL o valores vacíos para evitar errores de restricción
-          grado: null,
-          seccion: null,
-          area: null,
-          pregunta_seguridad: 'pendiente_configuracion',
-          respuesta_seguridad: "pendiente",
-        },
-
-        ], { onConflict: 'id_usuario' });
-
-        if (insertError) throw insertError;
-
-        // 6. Auditoría y éxito
-        await registrarAuditoria('CREAR', `Usuario creado: ${nombreLimpio}`);
-        
-        setIsModalOpen(false);
-        fetchUsers();
-        toast.success('Usuario registrado correctamente');
-
-    } catch (err) {
-        console.error("Error detallado:", err);
-        toast.error(err.message || "Error al procesar el registro");
-    } finally {
-        setIsSubmitting(false); // Liberar bloqueo
-    }
-  };
-
-  const handleUpdate = async (e) => {
+    const handleUpdate = async (e) => {
     e.preventDefault();
     const t0 = performance.now(); // Inicio de medición de rendimiento
     

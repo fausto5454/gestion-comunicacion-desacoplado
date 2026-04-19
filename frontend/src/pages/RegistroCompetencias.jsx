@@ -42,61 +42,81 @@ const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion
   const esDocente = rolActual === 3;
   const esAdmin = rolActual === 1;
 
+  const [asignacionesDocente, setAsignacionesDocente] = useState([]);
+  useEffect(() => {
+    const fetchGradosYAreas = async () => {
+     if (!perfilUsuario?.id_usuario) return;
+      const { data, error } = await supabase
+       .from('docente_asignaciones')
+       .select('grado, seccion, area')
+       .eq('id_usuario', perfilUsuario.id_usuario);
+
+     if (!error) setAsignacionesDocente(data || []);
+   };
+   fetchGradosYAreas();
+  }, [perfilUsuario]);
+
+  // 3. useMemo CORREGIDO
   const opcionesPermitidas = useMemo(() => {
-    const rolActual = Number(perfilUsuario?.rol_id);
-    const esAdmin = rolActual === 1;
-    const esEstudiante = rolActual === 6; // Definimos el rol de estudiante
-    const asignaciones = perfilUsuario?.asignaciones || [];
+  const rolActual = Number(perfilUsuario?.rol_id);
+  const esAdmin = rolActual === 1;
+  const esEstudiante = rolActual === 6;
 
-    // --- CASO 1: ADMINISTRADOR ---
-    if (esAdmin) {
-        return {
-            grados: ["1° A", "1° B", "1° C", "2° A", "2° B", "2° C", "3° A", "3° B", "4° A", "4° B", "5° A", "5° B"],
-            areas: Object.keys(areasConfig || {})
-        };
-    }
+   // CASO 1: ADMINISTRADOR
+   if (esAdmin) {
+     return {
+       grados: ["1° A", "1° B", "1° C", "2° A", "2° B", "2° C", "3° A", "3° B", "4° A", "4° B", "5° A", "5° B"],
+       areas: Object.keys(areasConfig || {})
+     };
+   }
 
-    // --- CASO 2: ESTUDIANTE (Mejora integrada) ---
-    if (esEstudiante && perfilUsuario?.grado) {
-        // El estudiante solo puede ver su propio grado y sección
-        return {
-            grados: [`${perfilUsuario.grado} ${perfilUsuario.seccion}`],
-            areas: Object.keys(areasConfig || {}) // El estudiante puede consultar cualquier área
-        };
-    }
+   // CASO 2: ESTUDIANTE
+   if (esEstudiante && perfilUsuario?.grado) {
+     return {
+       grados: [`${perfilUsuario.grado} ${perfilUsuario.seccion}`],
+       areas: Object.keys(areasConfig || {})
+     };
+   }
 
-    // --- CASO 3: DOCENTE (Lógica original restaurada) ---
-    const gradosUnicos = [...new Set(asignaciones.map(a => `${a.grado} ${a.seccion}`))];
-    const areasDelGrado = asignaciones
-        .filter(a => `${a.grado} ${a.seccion}` === (grado || gradosUnicos[0]))
-        .map(a => a.area.toUpperCase());
+  // CASO 3: DOCENTE (Usamos los datos de Supabase)
+  const gradosUnicos = [...new Set(asignacionesDocente.map(a => `${a.grado} ${a.seccion}`))];
+  const gradoReferencia = grado || gradosUnicos[0];
+  const areasDelGrado = asignacionesDocente
+    .filter(a => `${a.grado} ${a.seccion}` === gradoReferencia)
+    .map(a => a.area);
 
-    return { 
-        grados: gradosUnicos.length > 0 ? gradosUnicos : ["Cargando grados..."], 
-        areas: areasDelGrado.length > 0 ? areasDelGrado : ["Cargando áreas..."] 
-    };
-    }, [perfilUsuario, grado]);
-    // 3. Efectos al final
-    useEffect(() => {
-        if (opcionesPermitidas.grados.length > 0 && !grado) {
-            setGrado(opcionesPermitidas.grados[0]);
-        }
-    }, [opcionesPermitidas.grados]);
+   return {
+     grados: gradosUnicos,
+     areas: areasDelGrado.length > 0 ? areasDelGrado : ["Seleccione Área"]
+   };
+  
+   }, [perfilUsuario, grado, asignacionesDocente]); 
+
+  // 4. Auto-selección inicial (Mantenemos tu lógica original)
+  useEffect(() => {
+   if (opcionesPermitidas.grados.length > 0 && !grado) {
+     setGrado(opcionesPermitidas.grados[0]);
+   }
+   if (opcionesPermitidas.areas.length > 0 && !area) {
+     setArea(opcionesPermitidas.areas[0]);
+   }
+  }, [opcionesPermitidas, grado, area]);
 
   const cargarDatos = useCallback(async () => {
-  if (!grado || !area || !bimestre || !perfilUsuario?.id_usuario) return;
+   // 1. VALIDACIÓN ANTIBLOQUEO: Si el selector tiene el texto inicial, apagamos el loading y salimos.
+   if (!grado || grado.includes("Cargando") || !area || !bimestre || !perfilUsuario?.id_usuario) {
+     setLoading(false); 
+     return;
+   }
 
   setLoading(true);
   try {
     const partes = grado.split(" ");
-    const gradoDB = partes[0].trim();
-    const seccionDB = partes[1]?.trim() || "A";
+    const gradoDB = partes[0].trim(); // Ejemplo: "1°"
+    const seccionDB = partes[1]?.trim() || "A"; // Ejemplo: "A"
     
     // --- PASO A: OBTENCIÓN DIRECTA DEL DNI ---
     let dniFinal = perfilUsuario?.dni || perfilUsuario?.dni_estudiante;
-
-    // --- PASO B: CARGAR MATRICULADOS (Sincronización de Género, DNI y ESTADO) ---
-    // INTEGRACIÓN: Se añade 'estado_estudiante' a la selección para evitar el ReferenceError
     let queryMat = supabase
       .from('matriculas')
       .select('dni_estudiante, apellido_paterno, apellido_materno, nombres, genero, estado_estudiante')
@@ -655,20 +675,25 @@ return (
             {/* Selectores con mejor espaciado y responsividad */}
           <div className="flex flex-wrap gap-2">
           <select 
-            value={grado} 
-               onChange={(e) => setGrado(e.target.value)}
-               disabled={esEstudiante} 
-               className="bg-green-50 border-slate-100 text-[10px] font-bold px-3 py-2 rounded-xl outline-none focus:ring-2 focus:ring-green-500 transition-all">
-              {opcionesPermitidas.grados.length > 0 ? (
-              opcionesPermitidas.grados.map(g => <option key={g} value={g}>{g}</option>)
-           ) : (
+           value={grado} 
+           onChange={(e) => setGrado(e.target.value)}
+           disabled={esEstudiante} 
+           className="bg-green-50 border-slate-100 text-[10px] font-bold px-3 py-2 rounded-xl outline-none focus:ring-2 focus:ring-green-500 transition-all"
+           >
+          {opcionesPermitidas.grados.length > 0 ? (
+           <>
+          <option value="" disabled>Seleccione Grado</option>
+          {opcionesPermitidas.grados.map(g => (
+         <option key={g} value={g}>{g}</option>
+         ))}
+        </>
+       ) : (
        <option value="">Cargando grados...</option>
-      )}
-     </select>
-     <select 
+       )}
+       </select>
+      <select 
       value={area} 
         onChange={(e) => setArea(e.target.value)}
-         disabled={esEstudiante} 
           className="bg-green-50 text-green-700 border border-green-200 text-[10px] font-bold px-3 py-2 rounded-xl outline-none focus:ring-2 focus:ring-green-500 transition-all">
           {opcionesPermitidas.areas.length > 0 ? (
            opcionesPermitidas.areas.map(a => <option key={a} value={a}>{a}</option>)

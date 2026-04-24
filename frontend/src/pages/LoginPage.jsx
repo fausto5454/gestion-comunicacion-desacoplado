@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { supabase } from '../config/supabaseClient';
-import { AlertTriangle, Loader, User, Mail, Lock } from 'lucide-react';
+import { AlertTriangle, Loader, User, Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import RecuperarPassword from "../components/RecuperarPassword";
 
 const LoginPage = ({ onLoginSuccess }) => {
@@ -9,6 +9,7 @@ const LoginPage = ({ onLoginSuccess }) => {
     const [error, setError] = useState(null);
     const [loading, setLoading] = useState(false);
     const [mostrarRecuperar, setMostrarRecuperar] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
 
    const handleSubmit = async (e) => {
     e.preventDefault();
@@ -133,21 +134,27 @@ const LoginPage = ({ onLoginSuccess }) => {
                         {/^\d+$/.test(identifier) ? <User size={18} /> : <Mail size={18} />}
                     </div>
                 </div>
-
+                
+                {/* Input: Contraseña con OJITO */}
                 <div className="relative">
                     <input 
-                        type="password" 
+                        type={showPassword ? "text" : "password"} 
                         placeholder="Contraseña" 
                         value={password} 
                         onChange={(e) => setPassword(e.target.value)} 
-                        className="w-full py-3 pl-11 pr-4 rounded-xl bg-white text-gray-800 outline-none focus:ring-2 focus:ring-green-500 transition-all shadow-sm" 
-                        required 
-                    />
+                        className="w-full py-3 pl-11 pr-12 rounded-xl bg-white text-gray-800 outline-none focus:ring-2 focus:ring-green-500 transition-all shadow-sm" 
+                        required />
                     <div className="absolute left-3 top-3.5 text-green-600">
                         <Lock size={18} />
                     </div>
+                    {/* Botón del Ojito */}
+                    <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-3.5 text-green-400 hover:text-green-600 transition-colors">
+                        {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
                 </div>
-
                 <div className="text-right">
                    <button 
                     type="button" 
@@ -157,15 +164,12 @@ const LoginPage = ({ onLoginSuccess }) => {
                    ¿Olvidaste tu contraseña?
                  </button>
                 </div>
-
                 <button 
                     type="submit" 
                     disabled={loading} 
-                    className="w-full bg-red-600 hover:bg-green-600 text-white font-bold py-3.5 rounded-2xl flex justify-center items-center transition-all shadow-lg active:scale-95"
-                >
+                    className="w-full bg-red-600 hover:bg-green-600 text-white font-bold py-3.5 rounded-2xl flex justify-center items-center transition-all shadow-lg active:scale-95">
                     {loading ? <Loader className="animate-spin mr-2" /> : 'Iniciar Sesión'}
                 </button>
-
                 <div className="pt-2 text-center">
                      <p className="text-[11px] text-green-900 font-medium leading-tight opacity-75">
                          <strong> * Estudiantes: </strong>

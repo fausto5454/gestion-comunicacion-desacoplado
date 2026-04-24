@@ -210,7 +210,7 @@ const DashboardPage = ({ session }) => {
         labels: ['AD', 'A', 'B', 'C'],
         datasets: [{
             data: stats.chartData, 
-            backgroundColor: ['#05aa13', '#0b61ec', '#d1bd05', '#f82c2c'],
+            backgroundColor: ['#05aa13', '#0b61ec', '#fad503', '#fa1212'],
             // ✅ PROPIEDADES DE SEPARACIÓN
             spacing: 3,           // Espacio entre las secciones del pie
             borderRadius: 4,     // Bordes redondeados para un look moderno

@@ -154,7 +154,7 @@ const RegistroCompetencias = ({ perfilUsuario, session, areaNombre, gradoSeccion
     setAlumnos(listaAlumnosFinal);
     setDnis(mapaDnis);
     setGeneros(mapaGeneros);
-    setEstadosAlumnos(mapaEstados); // <--- CORRECCIÓN: Define la variable que faltaba en la consola
+    setEstadosAlumnos(mapaEstados);
 
     if (matriculados?.length > 0) {
       const areaQuery = area.toUpperCase().trim();

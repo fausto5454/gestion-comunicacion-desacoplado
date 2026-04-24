@@ -64,15 +64,16 @@ const AsistenciaAlumnos = ({ perfilUsuario, session }) => {
 
   // 3. DEFINICIÓN DE FUNCIONES - Debe estar ARRIBA de los useEffect
   const cargarAlumnos = async (gradoFinal, seccionFinal) => {
-    console.log("Consultando Supabase para:", gradoFinal, seccionFinal);
     const { data, error } = await supabase
       .from('matriculas')
-      .select('id_estudiante, apellidos_nombres, estado')
-      .eq('grado', gradoFinal) // Usará el formato con ° de tu DB
+      .select('id_matricula, apellido_paterno, apellido_materno, nombres') 
+      .eq('grado', gradoFinal)
       .eq('seccion', seccionFinal)
-      .order('apellidos_nombres');
+      .order('apellido_paterno', { ascending: true });
 
-    if (!error) setEstudiantes(data || []);
+    if (!error) {
+        setEstudiantes(data || []); // Esto guardará los objetos con los nombres de la BD
+    }
   };
 
   // 4. EFECTOS (Al final)
@@ -251,10 +252,6 @@ const AsistenciaAlumnos = ({ perfilUsuario, session }) => {
      }
   }, [perfilUsuario, opcionesPermitidas, grado, areaSeleccionada]);
 
-  useEffect(() => {
-    fetchNomina();
-  }, [fetchNomina]);
-  
   const exportarExcel = async () => {
   const workbook = new ExcelJS.Workbook();
   const worksheet = workbook.addWorksheet('Asistencia');
@@ -565,7 +562,9 @@ const guardarAsistenciaTotal = async () => {
     // Ejecución directa del Upsert
     const { error } = await supabase
       .from('asistencia')
-      .upsert(records, { onConflict: 'dni_estudiante, fecha, observaciones' });
+      .upsert(records, { 
+      onConflict: 'dni_estudiante,fecha,observaciones' 
+    });
 
     if (error) throw error;
 
@@ -684,7 +683,7 @@ const guardarAsistenciaTotal = async () => {
             </thead>
             <tbody className="divide-y divide-gray-200">
            {estudiantes.map((est, index) => (
-            <tr key={est.dni_estudiante} className="hover:bg-slate-50 transition-colors">
+           <tr key={est.dni_estudiante || index} className="hover:bg-slate-50 transition-colors">
               <td className="border border-gray-300 px-3 py-1.5 text-center text-[11px] font-bold text-emerald-600 bg-emerald-100/60">
                 {index + 1}
               </td>
@@ -696,14 +695,12 @@ const guardarAsistenciaTotal = async () => {
               <td className="border border-gray-300 px-2 py-1.5 bg-emerald-100/60">
               <div className="flex justify-center gap-1">
                {['P', 'F', 'T', 'J'].map((letra) => {
-                // Sincronizamos con el nuevo término 'Falta' que pide tu BD
-                  const valorReal = letra === 'P' ? 'Presente' : 
-                        letra === 'F' ? 'Falta' : 
-                        letra === 'T' ? 'Tardanza' : 'Justificado';
-      
-                    // Usamos 'Presente' como fallback si aún no se ha marcado nada
-                     const estadoActual = asistencia[est.dni_estudiante] || 'Presente';
-                     const isActive = estadoActual === valorReal;
+                const valorReal = letra === 'P' ? 'Presente' : 
+                     letra === 'F' ? 'Falta' : 
+                     letra === 'T' ? 'Tardanza' : 'Justificado';
+                   // IMPORTANTE: Asegurar que el DNI sea string para comparar correctamente
+                   const estadoActual = asistencia[String(est.dni_estudiante)] || 'Presente';
+                   const isActive = estadoActual === valorReal;
 
                         const stylesBase = {
                               'P': 'text-slate-600 border-slate-200 hover:bg-slate-100',
@@ -721,15 +718,11 @@ const guardarAsistenciaTotal = async () => {
 
                         return (
                           <button
-                           key={letra}
+                           key={`${est.dni_estudiante}-${letra}`} 
                            disabled={perfilUsuario?.rol_id === 6}
                            onClick={() => manejarCambioAsistencia(est.dni_estudiante, valorReal)}
-                           className={`
-                           w-8 h-8 rounded-md border text-[11px] font-black transition-all duration-200
-                           ${isActive 
-                           ? activeStyles[letra] 
-                           : `bg-white ${stylesBase[letra]}` 
-                           }`}>
+                           className={`w-8 h-8 rounded-md border text-[11px] font-black transition-all duration-200 ${
+                           isActive ? activeStyles[letra] : `bg-white ${stylesBase[letra]}`}`}>
                         {letra}
                       </button>
                      );

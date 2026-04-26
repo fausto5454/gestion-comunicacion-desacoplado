@@ -675,25 +675,20 @@ return (
             {/* Selectores con mejor espaciado y responsividad */}
           <div className="flex flex-wrap gap-2">
           <select 
-           value={grado} 
-           onChange={(e) => setGrado(e.target.value)}
-           disabled={esEstudiante} 
-           className="bg-green-50 border-slate-100 text-[10px] font-bold px-3 py-2 rounded-xl outline-none focus:ring-2 focus:ring-green-500 transition-all"
-           >
-          {opcionesPermitidas.grados.length > 0 ? (
-           <>
-          <option value="" disabled>Seleccione Grado</option>
-          {opcionesPermitidas.grados.map(g => (
-         <option key={g} value={g}>{g}</option>
-         ))}
-        </>
-       ) : (
+            value={grado} 
+               onChange={(e) => setGrado(e.target.value)}
+               disabled={esEstudiante} 
+               className="bg-green-50 border-slate-100 text-[10px] font-bold px-3 py-2 rounded-xl outline-none focus:ring-2 focus:ring-green-500 transition-all">
+              {opcionesPermitidas.grados.length > 0 ? (
+              opcionesPermitidas.grados.map(g => <option key={g} value={g}>{g}</option>)
+           ) : (
        <option value="">Cargando grados...</option>
-       )}
-       </select>
-      <select 
+      )}
+     </select>
+     <select 
       value={area} 
         onChange={(e) => setArea(e.target.value)}
+         disabled={esEstudiante} 
           className="bg-green-50 text-green-700 border border-green-200 text-[10px] font-bold px-3 py-2 rounded-xl outline-none focus:ring-2 focus:ring-green-500 transition-all">
           {opcionesPermitidas.areas.length > 0 ? (
            opcionesPermitidas.areas.map(a => <option key={a} value={a}>{a}</option>)

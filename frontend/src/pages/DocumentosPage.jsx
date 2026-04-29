@@ -20,40 +20,35 @@ const DocumentosPage = ({ session }) => {
     const [confirmacionText, setConfirmacionText] = useState('');
 
     const categorias = ['Todos', 'Administrativo', 'Académico', 'Planificaciones', 'Recursos', 'Otros'];
+    const fileInputRef = useRef(null);
+    const triggerFileInput = () => {
+        fileInputRef.current?.click();
+    };
 
     const fetchDocumentos = useCallback(async () => {
-    // 1. Evitar ejecuciones innecesarias si no hay usuario en modo privado
     if (!userId && viewMode !== 'publicos') return;
 
     setLoading(true);
-    const t0 = performance.now();
-
     try {
         let query = supabase
             .from('documentos')
             .select(`*, usuarios:subido_por(nombre_completo)`)
             .order('fecha_subida', { ascending: false });
 
+        // APLICACIÓN DE FILTROS ESTRICTOS
         if (viewMode === 'publicos') {
+            // Solo documentos marcados como públicos (Generales)
             query = query.eq('es_publico', true);
         } else {
+            // Solo documentos del usuario logueado Y que sean privados
             query = query.eq('subido_por', userId).eq('es_publico', false);
         }
 
         const { data, error } = await query;
         if (error) throw error;
-        setDocumentos(data || []);
 
-        const t1 = performance.now();
-        const duracion = Math.round(t1 - t0);
-        
-        // 2. Registro de Auditoría ÚNICO
-        await registrarAuditoria(
-            'SELECT', 
-            `Consulta: ${data?.length || 0} docs (${viewMode})`, 
-            'Documentos', 
-            duracion
-        );
+        // Seteamos los datos limpios
+        setDocumentos(data || []);
 
     } catch (error) {
         console.error("Error:", error.message);
@@ -61,17 +56,11 @@ const DocumentosPage = ({ session }) => {
     } finally {
         setLoading(false);
     }
-    
     }, [userId, viewMode]);
 
-    const isInitialMount = useRef(true);
-
-    useEffect(() => {
-    if (isInitialMount.current) {
-        fetchDocumentos();
-        isInitialMount.current = false;
-    }
-    }, []);
+     useEffect(() => {
+       fetchDocumentos();
+    }, [viewMode, fetchDocumentos]);
 
     const handleVerDocumento = (url) => {
         if (!url) return;
@@ -85,43 +74,66 @@ const DocumentosPage = ({ session }) => {
         }
     };
 
-    const handleUpload = async (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
+   const handleUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
 
-        setIsUploading(true);
-        try {
-            const cleanFileName = file.name.replace(/[^a-zA-Z0-9.]/g, '_');
-            const storagePath = `docs/${userId}/${Date.now()}_${cleanFileName}`;
+    // 1. Comprobación de duplicados por nombre antes de gastar recursos en la subida
+    const esDuplicado = documentos.some(doc => doc.nombre_archivo === file.name);
 
-            const { error: uploadError } = await supabase.storage
-                .from('institucion_docs')
-                .upload(storagePath, file);
+    if (esDuplicado) {
+        toast.error(`El archivo "${file.name}" ya existe en el repositorio.`);
+        e.target.value = ''; // Limpiar el input para permitir re-intentar
+        return;
+    }
 
-            if (uploadError) throw uploadError;
+    setIsUploading(true);
+    const toastId = toast.loading("Subiendo archivo...");
 
-            const { data: urlData } = supabase.storage
-                .from('institucion_docs')
-                .getPublicUrl(storagePath);
+    try {
+        // 2. Limpieza de nombre (para evitar problemas con puntos o espacios)
+        const cleanFileName = file.name.replace(/[^a-zA-Z0-9.]/g, '_');
+        const storagePath = `docs/${userId}/${Date.now()}_${cleanFileName}`;
 
-            const { error: dbError } = await supabase.from('documentos').insert([{
-                nombre_archivo: file.name,
-                url_archivo: urlData.publicUrl,
-                categoria: filterCategory === 'Todos' ? 'Otros' : filterCategory,
-                subido_por: userId,
-                tamanio: (file.size / 1024).toFixed(2) + ' KB',
-                es_publico: viewMode === 'publicos',
-                fecha_subida: new Date().toISOString()
-            }]);
+        // 3. Subida a Storage
+        const { error: uploadError } = await supabase.storage
+            .from('institucion_docs')
+            .upload(storagePath, file);
 
-            if (dbError) throw dbError;
-            toast.success("Documento guardado");
-            fetchDocumentos();
-        } catch (error) {
-            toast.error("Error al subir");
-        } finally {
-            setIsUploading(false);
-        }
+        if (uploadError) throw uploadError;
+
+        // 4. Obtener URL
+        const { data: urlData } = supabase.storage
+            .from('institucion_docs')
+            .getPublicUrl(storagePath);
+
+        // 5. Inserción en Base de Datos
+        const { error: dbError } = await supabase.from('documentos').insert([{
+            nombre_archivo: file.name,
+            url_archivo: urlData.publicUrl,
+            categoria: filterCategory === 'Todos' ? 'Otros' : filterCategory,
+            subido_por: userId,
+            tamanio: (file.size / 1024).toFixed(2) + ' KB',
+            es_publico: viewMode === 'publicos',
+            fecha_subida: new Date().toISOString()
+        }]);
+
+        if (dbError) throw dbError;
+
+        toast.success("Documento guardado", { id: toastId });
+        
+        // 6. ACTUALIZACIÓN CRÍTICA: 
+        // Limpiamos el input ANTES de refrescar la lista para evitar duplicidad por eventos
+        e.target.value = ''; 
+        
+        await fetchDocumentos();
+
+      } catch (error) {
+        console.error("Error:", error);
+        toast.error("Error al subir", { id: toastId });
+      } finally {
+        setIsUploading(false);
+     }
     };
 
     const ejecutarEliminacion = async () => {
@@ -151,10 +163,13 @@ const DocumentosPage = ({ session }) => {
         setConfirmacionText('');
     };
 
-    const filteredDocs = documentos.filter(doc => 
-        doc.nombre_archivo.toLowerCase().includes(searchTerm.toLowerCase()) &&
-        (filterCategory === 'Todos' || doc.categoria === filterCategory)
-    );
+   const filteredDocs = (documentos || []).filter(doc => {
+    const nombre = doc.nombre_archivo ? doc.nombre_archivo.toLowerCase() : '';
+    const busqueda = searchTerm ? searchTerm.toLowerCase() : '';
+    const coincideBusqueda = nombre.includes(busqueda);
+    const coincideCategoria = filterCategory === 'Todos' || doc.categoria === filterCategory;
+    return coincideBusqueda && coincideCategoria;
+   });
 
     return (
         <div className="p-4 md:p-6 bg-gray-200 min-h-screen">
@@ -193,14 +208,21 @@ const DocumentosPage = ({ session }) => {
                     />
                 </div>
                 <div className="md:col-span-4">
-                    <label className="w-full cursor-pointer bg-green-600 hover:bg-green-700 text-white py-4 rounded-[1.8rem] font-black text-[10px] uppercase tracking-widest transition shadow-xl shadow-green-100 flex items-center justify-center">
+                    <button 
+                        onClick={triggerFileInput}
+                        disabled={isUploading}
+                        className="w-full bg-green-600 hover:bg-green-700 text-white py-4 rounded-[1.8rem] font-black text-[10px] uppercase tracking-widest transition shadow-xl shadow-green-100 flex items-center justify-center disabled:opacity-50">
                         {isUploading ? <Loader2 className="animate-spin mr-2" /> : <Upload className="mr-2 w-4 h-4" />}
                         {viewMode === 'publicos' ? 'Subir al Repositorio' : 'Guardar Privado'}
-                        <input type="file" className="hidden" onChange={handleUpload} disabled={isUploading} />
-                    </label>
+                    </button>
+                    <input 
+                        type="file" 
+                        ref={fileInputRef}
+                        className="hidden" 
+                        onChange={handleUpload} 
+                        accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.png,.jpeg,.jpg"/>
                 </div>
             </div>
-
             {loading ? (
                 <div className="flex justify-center py-20"><Loader2 className="animate-spin w-10 h-10 text-green-600" /></div>
             ) : (
@@ -215,26 +237,22 @@ const DocumentosPage = ({ session }) => {
                                     {doc.categoria}
                                 </span>
                             </div>
-                            
                             <h3 className="font-black text-gray-500 text-sm mb-1 truncate" title={doc.nombre_archivo}>
                                 {doc.nombre_archivo}
                             </h3>
                             <p className="text-[10px] text-gray-400 font-bold uppercase mb-6">
                                 {doc.tamanio} • {new Date(doc.fecha_subida).toLocaleDateString()}
                             </p>
-
                             <div className="flex gap-2">
                                 <button 
                                     onClick={() => handleVerDocumento(doc.url_archivo)}
-                                    className="flex-1 flex justify-center items-center py-3 bg-gray-50 hover:bg-green-600 hover:text-white text-gray-500 rounded-xl text-[10px] font-black uppercase transition-all"
-                                >
+                                    className="flex-1 flex justify-center items-center py-3 bg-gray-50 hover:bg-green-600 hover:text-white text-gray-500 rounded-xl text-[10px] font-black uppercase transition-all">
                                     <Eye className="w-3.5 h-3.5 mr-2" /> Abrir
                                 </button>
                                 {doc.subido_por === userId && (
                                     <button 
                                         onClick={() => setDocAEliminar(doc)}
-                                        className="p-3 text-red-300 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
-                                    >
+                                        className="p-3 text-red-300 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all">
                                         <Trash2 className="w-4 h-4" />
                                     </button>
                                 )}
@@ -243,7 +261,14 @@ const DocumentosPage = ({ session }) => {
                     ))}
                 </div>
             )}
-
+    
+            <div className="flex flex-col items-center justify-center py-20 bg-white rounded-[2.5rem] border-2 border-dashed border-gray-200 animate-in fade-in duration-500">
+                <FileText className="w-12 h-12 text-gray-300 mb-4" />
+              <p className="text-gray-400 font-bold uppercase text-[10px] tracking-widest text-center">
+                No hay documentos en esta sección
+              </p>
+            </div>
+        
             {/* MODAL SEGURO DE ELIMINACIÓN UNIFORMIZADO */}
             {docAEliminar && (
                 <div className="fixed inset-0 bg-gray-800 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -251,36 +276,29 @@ const DocumentosPage = ({ session }) => {
                         {/* Botón X superior derecho */}
                         <button 
                             onClick={Eliminar}
-                            className="absolute top-5 right-5 text-gray-400 hover:text-gray-600 transition-colors"
-                        >
+                            className="absolute top-5 right-5 text-gray-400 hover:text-gray-600 transition-colors">
                             <X size={20} />
                         </button>
-
                         <div className="flex flex-col items-center text-center">
                             <div className="w-16 h-16 bg-red-50 text-red-500 rounded-2xl flex items-center justify-center mb-6">
                                 <AlertTriangle size={32} />
                             </div>
-                            
                             <h2 className="text-xl font-black text-gray-800 mb-2">¿Confirmar eliminación?</h2>
                             <p className="text-[11px] font-bold text-gray-500 mb-6">
                                 Eliminarás a <span className="text-gray-800 font-black italic">"{docAEliminar.nombre_archivo}"</span>
                             </p>
-
                             {/* Campo de validación - Diseño adaptado a capturas */}
                             <input 
                                 type="text"
                                 className="w-full p-3 bg-white border border-gray-400 rounded-xl mb-6 text-center font-bold text-red-500 placeholder:text-gray-300 focus:border-red-300 focus:ring-0 outline-none uppercase text-xs"
                                 placeholder="Escribe ELIMINAR"
                                 value={confirmacionText}
-                                onChange={(e) => setConfirmacionText(e.target.value.toUpperCase())}
-                            />
-                            
+                                onChange={(e) => setConfirmacionText(e.target.value.toUpperCase())}/>
                             <div className="flex w-full gap-3">
                                 <button 
                                     onClick={Eliminar}
                                     disabled={isDeleting}
-                                    className="flex-1 py-3 bg-green-500 text-white rounded-xl font-black text-[11px] uppercase tracking-wide hover:bg-green-600 transition-all"
-                                >
+                                    className="flex-1 py-3 bg-green-500 text-white rounded-xl font-black text-[11px] uppercase tracking-wide hover:bg-green-600 transition-all">
                                     Cancelar
                                 </button>
                                 <button 
@@ -289,8 +307,7 @@ const DocumentosPage = ({ session }) => {
                                     className={`flex-1 py-3 rounded-xl font-black text-[11px] uppercase tracking-wide transition-all flex items-center justify-center 
                                         ${confirmacionText === 'ELIMINAR' 
                                             ? 'bg-red-500 text-white hover:bg-red-600' 
-                                            : 'bg-red-300 text-white cursor-not-allowed'}`}
-                                >
+                                            : 'bg-red-300 text-white cursor-not-allowed'}`}>
                                     {isDeleting ? <Loader2 className="animate-spin" size={16}/> : 'Eliminar'}
                                 </button>
                             </div>

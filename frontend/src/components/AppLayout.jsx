@@ -76,15 +76,16 @@ const AppLayout = ({ session, onLogout, currentView, setCurrentView, onCursoSele
                 .select('*');
             if (dataTras) setTrasladados(dataTras); 
 
-            // Cargamos el mapa de asistencia
-            const { data: dataAsist } = await supabase
-                .from('asistencia')
-                .select('*');
-            
-            if (dataAsist) {
-           setAsistencia(dataAsist); 
-           console.log(`✅ ${dataAsist.length} registros de asistencia sincronizados para SIGESCOM 2079`);
-           }
+            const { data: dataAsist, error } = await supabase
+               .from('asistencia')
+               .select('*')
+               .order('created_at', { ascending: false }) // <--- ESTO TRAE LO DE HOY PRIMERO
+               .range(0, 5000); // <--- Aumentamos el margen
+
+           if (dataAsist) {
+             console.log("Asistencias cargadas con éxito:", dataAsist.length);
+             setAsistencia(dataAsist);
+            }
 
             // --- CASO DOCENTE/ADMIN (Roles 1, 2, 3) ---
             if (baseData.rol_id !== 6) {

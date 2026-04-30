@@ -244,7 +244,7 @@ const AuditoriaPage = () => {
            </div>
             <div className="flex flex-col">
              <h1 className="text-sm font-black text-white uppercase tracking-tighter leading-none">Auditoría</h1>
-              <span className="text-[10px] text-yellow-300 font-bold uppercase tracking-widest">
+              <span className="text-[10px] text-yellow-200 font-bold uppercase tracking-widest">
                 {totalRegistros || 0} Registros Totales
             </span>
            </div>

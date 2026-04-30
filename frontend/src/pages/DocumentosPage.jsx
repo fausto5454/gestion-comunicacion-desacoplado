@@ -119,15 +119,9 @@ const DocumentosPage = ({ session }) => {
         }]);
 
         if (dbError) throw dbError;
-
         toast.success("Documento guardado", { id: toastId });
-        
-        // 6. ACTUALIZACIÓN CRÍTICA: 
-        // Limpiamos el input ANTES de refrescar la lista para evitar duplicidad por eventos
         e.target.value = ''; 
-        
         await fetchDocumentos();
-
       } catch (error) {
         console.error("Error:", error);
         toast.error("Error al subir", { id: toastId });

@@ -382,7 +382,7 @@ const IGAEstadistica = () => {
                         </div>
                     </div>
                 </div>
-                <button onClick={exportarExcelCompleto} className="bg-green-500 text-white p-2 rounded-xl font-black text-xs flex items-center justify-center gap-2 hover:bg-green-600 transition-all shadow-lg h-[48px]">
+                <button onClick={exportarExcelCompleto} className="bg-green-600 text-white p-2 rounded-xl font-black text-xs flex items-center justify-center gap-2 hover:bg-green-600 transition-all shadow-lg h-[48px]">
                     <FileDown size={18} /> EXPORTAR EXCEL + GRÁFICO
                 </button>
                 <div className="flex items-center gap-2 text-[12px] font-bold text-sky-200 p-3">

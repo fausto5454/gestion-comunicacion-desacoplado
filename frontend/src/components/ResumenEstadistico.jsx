@@ -10,16 +10,15 @@ const ResumenEstadistico = ({
   fechaConsulta, 
   onExport 
 }) => {
+  // 1. FECHA: Normalización para Perú (Asegura YYYY-MM-DD)
   const fechaHoyISO = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Lima' });
-  const hoy = new Date();
   const [fechaSeleccionada, setFechaSeleccionada] = useState(fechaHoyISO);
-  const fKey = fechaSeleccionada;
+  
+  // 2. LIMPIEZA: Ultra-agresiva para evitar errores de espacios o tildes
   const superClean = (val) => String(val || "").replace(/[^a-zA-Z0-9]/g, "").toUpperCase().trim();
+
   const fechaHoyStr = new Date(fechaSeleccionada + 'T12:00:00').toLocaleDateString('es-PE', { 
-      weekday: 'long', 
-      day: 'numeric', 
-      month: 'long', 
-      year: 'numeric',
+      weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
       timeZone: 'America/Lima'
   }).toUpperCase();
 
@@ -27,54 +26,48 @@ const ResumenEstadistico = ({
   const [loading, setLoading] = useState(true);
 
   const generarDatosSecciones = useCallback(() => {
-  const seccionesConfig = [
-     { id: 1, turno: 'MAÑANA', sec: '1 A' }, { id: 2, turno: 'MAÑANA', sec: '1 B' },
-     { id: 3, turno: 'MAÑANA', sec: '1 C' }, { id: 4, turno: 'MAÑANA', sec: '2 A' },
-     { id: 5, turno: 'MAÑANA', sec: '2 B' }, { id: 6, turno: 'MAÑANA', sec: '2 C' },
-     { id: 7, turno: 'TARDE', sec: '3 A' }, { id: 8, turno: 'TARDE', sec: '3 B' },
-     { id: 9, turno: 'TARDE', sec: '4 A' }, { id: 10, turno: 'TARDE', sec: '4 B' },
-     { id: 11, turno: 'TARDE', sec: '5 A' }, { id: 12, turno: 'TARDE', sec: '5 B' },
-   ];
+    const seccionesConfig = [
+       { id: 1, turno: 'MAÑANA', sec: '1 A' }, { id: 2, turno: 'MAÑANA', sec: '1 B' },
+       { id: 3, turno: 'MAÑANA', sec: '1 C' }, { id: 4, turno: 'MAÑANA', sec: '2 A' },
+       { id: 5, turno: 'MAÑANA', sec: '2 B' }, { id: 6, turno: 'MAÑANA', sec: '2 C' },
+       { id: 7, turno: 'TARDE', sec: '3 A' }, { id: 8, turno: 'TARDE', sec: '3 B' },
+       { id: 9, turno: 'TARDE', sec: '4 A' }, { id: 10, turno: 'TARDE', sec: '4 B' },
+       { id: 11, turno: 'TARDE', sec: '5 A' }, { id: 12, turno: 'TARDE', sec: '5 B' },
+    ];
 
-   // Función de limpieza ultra-agresiva
-   const superClean = (val) => String(val || "").replace(/[^a-zA-Z0-9]/g, "").toUpperCase().trim();
+    return seccionesConfig.map(s => {
+      const todosEnSeccion = estudiantes?.filter(e => {
+        const dbSec = superClean(e.grado_seccion || `${e.grado}${e.seccion}`);
+        return dbSec === superClean(s.sec);
+      }) || [];
 
-   return seccionesConfig.map(s => {
-    // 1. Filtrar estudiantes de la sección
-    const todosEnSeccion = estudiantes?.filter(e => {
-      const dbSec = superClean(e.grado_seccion || `${e.grado}${e.seccion}`);
-      return dbSec === superClean(s.sec);
-    }) || [];
+      const trasladosSec = todosEnSeccion.filter(e => 
+        ['Trasladado', 'Retirado'].includes(e.estado_estudiante)
+      ).length;
 
-    const trasladosSec = todosEnSeccion.filter(e => 
-      ['Trasladado', 'Retirado'].includes(e.estado_estudiante)
-    ).length;
+      const matriculadosSec = todosEnSeccion.length;
+      const enAula = matriculadosSec - trasladosSec;
 
-    const matriculadosSec = todosEnSeccion.length;
-    const enAula = matriculadosSec - trasladosSec;
+     const asistenciasHoy = todosEnSeccion.filter(e => {
+     if (!Array.isArray(asistencia)) return false;
 
-    // 2. CONTEO DE ASISTENCIA (Punto de falla)
-   const asistenciasHoy = todosEnSeccion.filter(e => {
-   if (!Array.isArray(asistencia)) return false;
+     return asistencia.some(a => {
+     const dniEstudiante = String(e.dni_estudiante || "").trim();
+     const dniAsistencia = String(a.dni_estudiante || "").trim();
+     const matchDNI = dniEstudiante !== "" && dniEstudiante === dniAsistencia;
 
-   return asistencia.some(a => {
-    const dniMatch = String(e.dni_estudiante).trim() === String(a.dni_estudiante).trim();
-    
-    // Simplificamos el match de fecha para evitar errores de formato ISO
-    const fechaDB = String(a.fecha || "").split('T')[0];
-    const fechaMatch = fechaDB === fKey;
+       const fechaDB = String(a.fecha || "").split('T')[0];
+       const matchFecha = fechaDB === fechaSeleccionada;
 
-    // Si tu tabla de asistencia tiene 'grado' y 'seccion' separados:
-    const seccionDB = superClean(`${a.grado}${a.seccion}`);
-    const seccionMatch = seccionDB === superClean(s.sec);
+       const matchEstado = String(a.estado || "").toUpperCase() === 'P';
 
-       return dniMatch && fechaMatch && seccionMatch && a.estado === 'P';
-     });
-    }).length;
+       return matchDNI && matchFecha && matchEstado;
+      });
+     }).length;
 
       return { ...s, matriculadosSec, trasladosSec, enAula, asistenciasHoy };
     });
-   }, [estudiantes, asistencia, trasladados, fKey]);
+  }, [estudiantes, asistencia, fechaSeleccionada]); // Eliminado fKey por claridad
 
   const totalMatriculados = datosResumen.reduce((acc, curr) => acc + curr.matriculadosSec, 0);
   const totalEnAula = datosResumen.reduce((acc, curr) => acc + curr.enAula, 0);
@@ -82,10 +75,10 @@ const ResumenEstadistico = ({
   const totalFaltas = totalEnAula - totalAsistencias;
 
   useEffect(() => {
-     setLoading(true); 
-     const data = generarDatosSecciones();
-     setDatosResumen(data);
-     setLoading(false);
+      setLoading(true); 
+      const data = generarDatosSecciones();
+      setDatosResumen(data);
+      setLoading(false);
   }, [generarDatosSecciones]);
 
  const handleExportResumen = async () => {

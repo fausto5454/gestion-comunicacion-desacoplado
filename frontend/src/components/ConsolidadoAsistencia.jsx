@@ -508,16 +508,19 @@ const ConsolidadoAsistencia = () => {
         </select>
       </div>
       {/* BÚSQUEDA */}
-      <div className="relative w-full lg:w-64">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+      {!localStorage.getItem('dni_estudiante') && (
+       <div className="relative w-full lg:w-64">
+        <Search 
+         className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" 
+         size={16}/>
         <input 
-          type="text" 
-          placeholder="BUSCAR ESTUDIANTE..." 
-          className="w-full pl-10 pr-4 py-2.5 bg-slate-50 rounded-2xl text-[11px] font-bold uppercase outline-none focus:ring-2 focus:ring-emerald-500" 
-          value={searchTerm} 
-          onChange={(e) => setSearchTerm(e.target.value)} 
-        />
-      </div>
+         type="text" 
+         placeholder="BUSCAR ESTUDIANTE..." 
+         className="w-full pl-10 pr-4 py-2.5 bg-slate-50 rounded-2xl text-[11px] font-bold uppercase outline-none focus:ring-2 focus:ring-emerald-500" 
+         value={searchTerm} 
+         onChange={(e) => setSearchTerm(e.target.value)}/>
+       </div>
+      )}
     </div>
     {/* TABLA DE RESULTADOS */}
     <div className="bg-white rounded-[1rem] shadow-xl border border-gray-300 overflow-hidden">

@@ -688,7 +688,7 @@ return (
      <select 
       value={area} 
         onChange={(e) => setArea(e.target.value)}
-         disabled={esEstudiante} 
+         enabled={esEstudiante} 
           className="bg-green-50 text-green-700 border border-green-200 text-[10px] font-bold px-3 py-2 rounded-xl outline-none focus:ring-2 focus:ring-green-500 transition-all">
           {opcionesPermitidas.areas.length > 0 ? (
            opcionesPermitidas.areas.map(a => <option key={a} value={a}>{a}</option>)
@@ -696,21 +696,21 @@ return (
             <option value="">Cargando áreas...</option>
             )}
           </select>
-
-              {/* Selector de ESTADOS (Estadística eliminada como solicitaste) */}
-              <div className="flex items-center bg-slate-900 border border-pink-400 rounded-2xl h-[40px] overflow-hidden shadow-lg">
-                <select 
-                  value={filtroEstado}
-                  onChange={(e) => setFiltroEstado(e.target.value)}
-                  className="bg-pink-600 hover:bg-pink-400 text-white text-[10px] font-bold px-4 outline-none cursor-pointer uppercase tracking-tight h-full transition-colors"
-                  >
-                  <option value="Todos" className="bg-slate-800">TODOS</option>
-                  <option value="Activo" className="bg-slate-800">ACTIVO</option>
-                  <option value="Retirado" className="bg-slate-800">RETIRADO</option>
-                  <option value="Trasladado" className="bg-slate-800">TRASLADADO</option>
-                  <option value="Ingresante" className="bg-slate-800">INGRESANTE</option>
-                </select>
-              </div>
+          {/* Selector de ESTADOS (Estadística eliminada como solicitaste) */}
+          {!localStorage.getItem('dni_estudiante') && (
+           <div className="flex items-center bg-slate-900 border border-pink-400 rounded-2xl h-[40px] overflow-hidden shadow-lg">
+            <select
+              value={filtroEstado}
+               onChange={(e) => setFiltroEstado(e.target.value)}
+                 className="bg-pink-600 hover:bg-pink-400 text-white text-[10px] font-bold px-4 outline-none cursor-pointer uppercase tracking-tight h-full transition-colors">
+                   <option value="Todos" className="bg-slate-800">TODOS</option>
+                   <option value="Activo" className="bg-slate-800">ACTIVO</option>
+                   <option value="Retirado" className="bg-slate-800">RETIRADO</option>
+                   <option value="Trasladado" className="bg-slate-800">TRASLADADO</option>
+                   <option value="Ingresante" className="bg-slate-800">INGRESANTE</option>
+                 </select>
+               </div>
+               )}
             </div>
           </div>
         </div>

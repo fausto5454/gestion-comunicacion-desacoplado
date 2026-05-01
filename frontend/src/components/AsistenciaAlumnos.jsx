@@ -62,76 +62,93 @@ const AsistenciaAlumnos = ({ perfilUsuario, session }) => {
     return { grados: gradosUnicos, areas: areasDocente.length > 0 ? areasDocente : ["Seleccione Área"] };
   }, [grado, seccion, asignacionesDocente]);
 
-  // 3. DEFINICIÓN DE FUNCIONES - Debe estar ARRIBA de los useEffect
   const cargarAlumnos = async (gradoFinal, seccionFinal) => {
+    setAsistencia({}); 
+    setEstudiantes([]);
+
     const { data, error } = await supabase
       .from('matriculas')
-      .select('id_matricula, apellido_paterno, apellido_materno, nombres') 
+      .select('dni_estudiante, apellido_paterno, apellido_materno, nombres')
       .eq('grado', gradoFinal)
       .eq('seccion', seccionFinal)
       .order('apellido_paterno', { ascending: true });
 
-    if (!error) {
-        setEstudiantes(data || []); // Esto guardará los objetos con los nombres de la BD
-    }
+    if (!error && data) {
+        setEstudiantes(data);
+        const estadoInicial = {};
+        data.forEach(est => {
+            estadoInicial[String(est.dni_estudiante)] = 'Presente';
+        });
+        await fetchAsistenciaExistente(data, estadoInicial);
+     }
   };
 
   // 4. EFECTOS (Al final)
   useEffect(() => {
-    const fetchAsignaciones = async () => {
-      if (!perfilUsuario?.id_usuario) return;
-      const { data } = await supabase
-        .from('docente_asignaciones')
-        .select('grado, seccion, area')
-        .eq('id_usuario', perfilUsuario.id_usuario);
-      
-      if (data) {
-        setAsignacionesDocente(data);
-        if (data.length > 0 && !grado) {
-          setGrado(data[0].grado.toString().replace('°', ''));
-          setSeccion(data[0].seccion);
-          setAreaSeleccionada(data[0].area.toUpperCase());
-        }
+  const fetchAsignaciones = async () => {
+    if (!perfilUsuario?.id_usuario) return;
+    const { data } = await supabase
+      .from('docente_asignaciones')
+      .select('grado, seccion, area')
+      .eq('id_usuario', perfilUsuario.id_usuario);
+    
+    if (data && data.length > 0) {
+      setAsignacionesDocente(data);
+      // Solo inicializar si el estado está vacío para evitar sobrescribir
+      if (!grado || !areaSeleccionada) {
+        setGrado(data[0].grado.toString().replace('°', ''));
+        setSeccion(data[0].seccion);
+        // CAMBIO: Si es administrador, no forzar EPT, dejarlo en blanco o "Seleccione"
+        const esAdmin = Number(perfilUsuario?.rol_id) === 1;
+        setAreaSeleccionada(esAdmin ? "" : data[0].area.toUpperCase());
       }
-    };
-    fetchAsignaciones();
-   }, [perfilUsuario]);
+    }
+  };
+  fetchAsignaciones();
+  }, [perfilUsuario]);
 
   useEffect(() => {
-    if (grado && seccion && areaSeleccionada && areaSeleccionada !== "Seleccione Área") {
-      const gradoConSimbolo = grado.includes('°') ? grado : `${grado}°`;
-      cargarAlumnos(gradoConSimbolo, seccion);
-    }
-  }, [grado, seccion, areaSeleccionada]);
+  setAsistencia({}); 
+  if (grado && seccion && areaSeleccionada && areaSeleccionada !== "Seleccione Área") {
+    const gradoConSimbolo = grado.toString().includes('°') ? grado : `${grado}°`;
+    cargarAlumnos(gradoConSimbolo, seccion);
+  }
+  }, [grado, seccion, areaSeleccionada, fecha]);
 
   const fetchAsistenciaExistente = async (nomina, init) => {
-    try {
-      const dnis = nomina.map(n => n.dni_estudiante);
-      const { data, error } = await supabase
-        .from('asistencia')
-        .select('dni_estudiante, estado')
-        .in('dni_estudiante', dnis)
-        .eq('fecha', fecha)
-        .eq('observaciones', areaSeleccionada);
+  try {
+    const dnisNomina = nomina.map(n => String(n.dni_estudiante));
+    const { data, error } = await supabase
+      .from('asistencia')
+      .select('dni_estudiante, estado')
+      .in('dni_estudiante', dnisNomina)
+      .eq('fecha', fecha)
+      .eq('observaciones', areaSeleccionada);
 
-      if (error) throw error;
+    if (error) throw error;
 
-      if (data && data.length > 0) {
-        const guardada = { ...init };
-        data.forEach(reg => {
-          guardada[reg.dni_estudiante] = reg.estado;
-        });
-        setAsistencia(guardada);
-      } else {
-        setAsistencia(init);
-      }
-    } catch (e) {
-      console.error("Error al recuperar asistencia previa:", e);
-      setAsistencia(init);
+    const guardada = { ...init }; 
+
+    if (data && data.length > 0) {
+      data.forEach(reg => {
+        const dniStr = String(reg.dni_estudiante);
+        if (dnisNomina.includes(dniStr)) {
+          guardada[dniStr] = reg.estado;
+        }
+      });
     }
+    setAsistencia(guardada);
+  } catch (e) {
+    console.error("Error:", e);
+    setAsistencia(init);
+  }
   };
 
   const fetchAsistenciaArea = useCallback(async () => {
+  if (!grado || !seccion || !areaSeleccionada) return;
+
+  setAsistencia({}); 
+
   const fechaPeru = typeof fecha === 'string' 
     ? fecha.split('T')[0] 
     : new Date(fecha).toLocaleDateString('sv-SE', { timeZone: 'America/Lima' });
@@ -142,32 +159,64 @@ const AsistenciaAlumnos = ({ perfilUsuario, session }) => {
       .select('*')
       .eq('grado', `${grado.toString().replace('°', '')}°`)
       .eq('seccion', seccion)
-      .eq('fecha', fechaPeru);
+      .eq('fecha', fechaPeru)
+      .eq('observaciones', areaSeleccionada); // Filtro crucial por área
 
     if (error) throw error;
-    if (data) {
-      const mapa = {};
-      data.forEach(reg => mapa[reg.dni_estudiante] = reg.estado);
-      setAsistencia(mapa);
+
+    const mapa = {};
+    
+    if (estudiantes) {
+      estudiantes.forEach(est => {
+        mapa[String(est.dni_estudiante)] = 'Presente';
+      });
     }
+
+    if (data && data.length > 0) {
+      data.forEach(reg => {
+        mapa[String(reg.dni_estudiante)] = reg.estado;
+      });
+    }
+
+    setAsistencia(mapa);
   } catch (err) {
-    console.error("Error:", err);
+    console.error("Error en fetchAsistenciaArea:", err);
   }
- }, [grado, seccion, fecha]);
+ }, [grado, seccion, fecha, areaSeleccionada, estudiantes]);
 
  // 2. useEffect para Realtime
  useEffect(() => {
-   const canalDocente = supabase
-    .channel('realtime_docente')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'asistencia' }, 
-      () => fetchAsistenciaArea()
+  if (!grado || !seccion) return;
+  const gradoFmt = `${grado.toString().replace('°', '')}°`;
+  const seccionFmt = seccion.trim().toUpperCase();
+  const canalNombre = `asistencia_${gradoFmt}_${seccionFmt}`;
+  const canalDocente = supabase
+    .channel(canalNombre)
+    .on(
+      'postgres_changes', 
+      { 
+        event: '*', 
+        schema: 'public', 
+        table: 'asistencia',
+        filter: `grado=eq.${gradoFmt}` 
+      }, 
+      (payload) => {
+        if (payload.new && payload.new.seccion === seccionFmt) {
+          fetchAsistenciaArea();
+        }
+      }
     )
-    .subscribe();
+    .subscribe((status) => {
+      if (status === 'SUBSCRIBED') {
+        console.log(`Sincronización en tiempo real activa para: ${gradoFmt} ${seccionFmt}`);
+      }
+    });
+  return () => {
+    supabase.removeChannel(canalDocente);
+  };
+  }, [grado, seccion, fetchAsistenciaArea]);
 
-    return () => supabase.removeChannel(canalDocente);
-   }, [fetchAsistenciaArea]);
-
-   const cargarAsistencia = async () => {
+  const cargarAsistencia = async () => {
   // 1. Identificamos si es estudiante y obtenemos su DNI
   const esEstudiante = Number(perfilUsuario?.rol_id) === 3; // Suponiendo 3 = Estudiante
   const dniUsuario = perfilUsuario?.id_dni || perfilUsuario?.id_usuario;
@@ -218,7 +267,10 @@ const AsistenciaAlumnos = ({ perfilUsuario, session }) => {
         if (data && data.length > 0) {
             setEstudiantes(data); // Esto llena la lista blanca
             const init = {};
-            data.forEach(est => init[est.dni_estudiante] = 'Presente');
+            data.forEach(est => {
+            init[String(est.dni_estudiante)] = 'Presente';
+        });
+        setAsistencia(init);
             await fetchAsistenciaExistente(data, init);
         } else {
             setEstudiantes([]);
@@ -251,6 +303,10 @@ const AsistenciaAlumnos = ({ perfilUsuario, session }) => {
         setAreaSeleccionada(opcionesPermitidas.areas[0]);
      }
   }, [perfilUsuario, opcionesPermitidas, grado, areaSeleccionada]);
+
+  useEffect(() => {
+  setAsistencia({});
+  }, [grado, seccion, areaSeleccionada]);
 
   const exportarExcel = async () => {
   const workbook = new ExcelJS.Workbook();
@@ -339,7 +395,7 @@ const AsistenciaAlumnos = ({ perfilUsuario, session }) => {
   // --- 4. DATOS DE ESTUDIANTES ---
   estudiantes.forEach((est, i) => {
   // Declaramos estadoActual (llave: dni_estudiante)
-  const estadoActual = asistencia[est.dni_estudiante] || 'Presente'; 
+  const estadoActual = asistencia[String(est.dni_estudiante)] || null; 
   
   const row = worksheet.addRow([
     null,
@@ -695,36 +751,41 @@ const guardarAsistenciaTotal = async () => {
               <td className="border border-gray-300 px-2 py-1.5 bg-emerald-100/60">
               <div className="flex justify-center gap-1">
                {['P', 'F', 'T', 'J'].map((letra) => {
-                const valorReal = letra === 'P' ? 'Presente' : 
-                     letra === 'F' ? 'Falta' : 
-                     letra === 'T' ? 'Tardanza' : 'Justificado';
-                   // IMPORTANTE: Asegurar que el DNI sea string para comparar correctamente
-                   const estadoActual = asistencia[String(est.dni_estudiante)] || 'Presente';
-                   const isActive = estadoActual === valorReal;
+               const valorMapping = {
+                  'P': 'Presente',
+                  'F': 'Falta',
+                  'T': 'Tardanza',
+                  'J': 'Justificado'
+               };
+  
+              const valorReal = valorMapping[letra];
+              const estadoActual = asistencia[String(est.dni_estudiante)] || 'Presente';
+              const isActive = estadoActual === valorReal;
 
-                        const stylesBase = {
-                              'P': 'text-slate-600 border-slate-200 hover:bg-slate-100',
-                              'F': 'text-red-400 border-red-100 hover:bg-red-50',
-                              'T': 'text-amber-400 border-amber-100 hover:bg-amber-50',
-                              'J': 'text-green-400 border-green-100 hover:bg-green-50',
-                            };
+              const stylesBase = {
+                 'P': 'text-slate-600 border-slate-200 hover:bg-slate-100',
+                 'F': 'text-red-400 border-red-100 hover:bg-red-50',
+                 'T': 'text-amber-400 border-amber-100 hover:bg-amber-50',
+                 'J': 'text-green-400 border-green-100 hover:bg-green-50',
+              };
 
-                       const activeStyles = {
-                              'P': '!bg-slate-600 !text-white !border-slate-700 shadow-md',
-                              'F': '!bg-red-500 !text-white !border-red-600 shadow-md',
-                              'T': '!bg-amber-500 !text-white !border-amber-600 shadow-md',
-                              'J': '!bg-green-600 !text-white !border-green-700 shadow-md',
-                            };
+              const activeStyles = {
+                 'P': '!bg-slate-600 !text-white !border-slate-700 shadow-md',
+                 'F': '!bg-red-500 !text-white !border-red-600 shadow-md',
+                 'T': '!bg-amber-500 !text-white !border-amber-600 shadow-md',
+                 'J': '!bg-green-600 !text-white !border-green-700 shadow-md',
+              };
 
-                        return (
-                          <button
-                           key={`${est.dni_estudiante}-${letra}`} 
-                           disabled={perfilUsuario?.rol_id === 6}
-                           onClick={() => manejarCambioAsistencia(est.dni_estudiante, valorReal)}
-                           className={`w-8 h-8 rounded-md border text-[11px] font-black transition-all duration-200 ${
-                           isActive ? activeStyles[letra] : `bg-white ${stylesBase[letra]}`}`}>
-                        {letra}
-                      </button>
+              return (
+                    <button
+                      key={`${est.dni_estudiante}-${letra}`}
+                      disabled={perfilUsuario?.rol_id === 6}
+                      onClick={() => manejarCambioAsistencia(est.dni_estudiante, valorReal)}
+                      className={`w-8 h-8 rounded-md border text-[11px] font-black transition-all duration-200 ${
+                      isActive ? activeStyles[letra] : `bg-white ${stylesBase[letra]}`
+                      }`}>
+                      {letra}
+                    </button>
                      );
                   })}
                 </div>

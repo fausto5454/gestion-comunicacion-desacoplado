@@ -11,7 +11,7 @@ const LoginPage = ({ onLoginSuccess }) => {
     const [mostrarRecuperar, setMostrarRecuperar] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
 
-   const handleSubmit = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
@@ -21,38 +21,60 @@ const LoginPage = ({ onLoginSuccess }) => {
         const isDNI = /^\d{8}$/.test(input);
         const finalAuthEmail = isDNI ? `${input}@estudiante.ai` : input;
 
-        // 1. INTENTO DE INICIO DE SESIÓN
+        // 1. INTENTO DE INICIO DE SESIÓN DIRECTO
         let { data, error: authError } = await supabase.auth.signInWithPassword({ 
             email: finalAuthEmail, 
             password 
         });
 
-        // 2. LÓGICA DE AUTO-REGISTRO PARA ESTUDIANTES
-        if (authError && authError.message === 'Invalid login credentials' && isDNI) {
-            const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-                email: finalAuthEmail,
-                password: password
-            });
+        // 2. MANEJO DE AUTO-REGISTRO (Solo si no existe en Auth pero sí en Matrículas)
+        if (authError && isDNI) {
+            // Verificamos si el error es realmente que no existe el usuario
+            // En Supabase, a veces el error de "no existe" se confunde con credenciales inválidas
+            if (authError.message.includes('Invalid login credentials')) {
+                
+                // Antes de registrar, verificamos si el DNI existe en nuestra base de datos académica
+                const { data: mCheck } = await supabase
+                    .from('matriculas')
+                    .select('dni_estudiante')
+                    .eq('dni_estudiante', input)
+                    .maybeSingle();
 
-            if (signUpError) throw signUpError;
-            
-            data = signUpData;
-            authError = null;
+                if (mCheck) {
+                    // Si el DNI existe en matrículas pero no en Auth, lo registramos
+                    const { data: sData, error: sError } = await supabase.auth.signUp({
+                        email: finalAuthEmail,
+                        password: password
+                    });
+
+                    if (sError) {
+                        // Si aquí sale "User already registered", intentamos login una vez más
+                        // o informamos que la contraseña es incorrecta.
+                        if (sError.message.includes("already registered")) {
+                            throw new Error("La contraseña es incorrecta para este DNI.");
+                        }
+                        throw sError;
+                    }
+                    data = sData;
+                } else {
+                    throw new Error("El DNI no se encuentra matriculado en el sistema.");
+                }
+            } else {
+                throw authError;
+            }
         } else if (authError) {
             throw authError;
         }
 
-        // 3. PROCESAMIENTO DE SESIÓN EXITOSA
+        // 3. VINCULACIÓN Y SESIÓN
         if (data?.session) {
             const user = data.session.user;
 
             if (isDNI) {
                 localStorage.setItem('dni_estudiante', input);
+                if (password === input) localStorage.setItem('require_password_change', 'true');
 
-                if (password === input) {
-                   localStorage.setItem('require_password_change', 'true');
-                }
-
+                // Vinculación con matriculas (usando maybeSingle para evitar errores de objeto)
                 const { data: matricula } = await supabase
                     .from('matriculas')
                     .select('id_matricula, id_usuario')
@@ -65,29 +87,17 @@ const LoginPage = ({ onLoginSuccess }) => {
                         .update({ id_usuario: user.id })
                         .eq('id_matricula', matricula.id_matricula);
                 }
-            } else {
-                localStorage.removeItem('dni_estudiante');
-                localStorage.removeItem('require_password_change');
-                
-                const { data: usuarioExistente } = await supabase
-                    .from('usuarios')
-                    .select('id_usuario')
-                    .eq('correo_electronico', user.email)
-                    .is('id_usuario', null)
-                    .maybeSingle();
-
-                if (usuarioExistente) {
-                    await supabase
-                        .from('usuarios')
-                        .update({ id_usuario: user.id })
-                        .eq('id_usuario', usuarioExistente.id);
-                }
             }
             onLoginSuccess(data.session);
-         }
-      } catch (err) {
-        setError(err.message === 'Invalid login credentials' ? 'DNI/Correo_electronico o contraseña incorrectos' : err.message);
-     } finally {
+        }
+    } catch (err) {
+        // Traducción de errores comunes para el usuario final
+        let mensaje = err.message;
+        if (mensaje.includes('Invalid login credentials')) mensaje = 'DNI o contraseña incorrectos';
+        if (mensaje.includes('already registered')) mensaje = 'Este usuario ya tiene una cuenta activa. Verifique su contraseña.';
+        
+        setError(mensaje);
+    } finally {
         setLoading(false);
     }
    };
@@ -151,7 +161,7 @@ const LoginPage = ({ onLoginSuccess }) => {
                     <button
                         type="button"
                         onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-3 top-3.5 text-green-400 hover:text-green-600 transition-colors">
+                        className="absolute right-3 top-3.5 text-green-600 hover:text-green-600 transition-colors">
                         {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                     </button>
                 </div>

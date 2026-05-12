@@ -238,7 +238,7 @@ const AppLayout = ({ session, onLogout, currentView, setCurrentView, onCursoSele
         <div className="hidden md:block">
             <Sidebar 
                 rol_id={rolID} 
-                userName={userName} 
+                userName={perfilUsuario?.nombre_completo || userName}
                 userEmail={userEmail} 
                 onLogout={onLogout} 
                 currentView={currentView} 
@@ -253,7 +253,7 @@ const AppLayout = ({ session, onLogout, currentView, setCurrentView, onCursoSele
                 <div className="absolute inset-0 bg-slate-300 backdrop-blur-sm" onClick={() => setIsSidebarOpen(false)}></div>
                 <div className="relative w-80 h-full">
                     <Sidebar 
-                        rol_id={rolID} userName={userName} userEmail={userEmail} 
+                        rol_id={rolID} userName={perfilUsuario?.nombre_completo || userName} userEmail={userEmail} 
                         onLogout={onLogout} currentView={currentView} setCurrentView={setCurrentView}
                         isSidebarOpen={isSidebarOpen} setIsSidebarOpen={setIsSidebarOpen}
                         onCursoSelect={onCursoSelect}
@@ -277,11 +277,13 @@ const AppLayout = ({ session, onLogout, currentView, setCurrentView, onCursoSele
                 <div className="flex items-center gap-1">
                     <div className="flex items-center gap-2 pr-3 border-r border-white/20">
                         <div className="flex flex-col items-end leading-none hidden sm:flex">
-                            <span className="text-xs font-bold">{userName?.split(' ')[0]}</span>
+                            <span className="text-xs font-bold">{perfilUsuario?.nombre_completo 
+                             ? perfilUsuario.nombre_completo.split(' ')[0] 
+                             : userName.split(' ')[0]}</span>
                             <span className="text-[10px] font-medium text-green-100 uppercase">En línea</span>
                         </div>
                         <div className="w-9 h-9 rounded-full bg-white flex items-center justify-center font-black text-green-600 border-2 border-green-400">
-                            {userName?.charAt(0).toUpperCase()}
+                            {(perfilUsuario?.nombre_completo || userName).charAt(0).toUpperCase()}
                         </div>
                     </div>
                    <div className="relative p-2 cursor-pointer transition-transform hover:scale-110" onClick={() => setCurrentView('bandeja')}>

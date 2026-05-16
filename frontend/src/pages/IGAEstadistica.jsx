@@ -178,17 +178,30 @@ const IGAEstadistica = () => {
 
         // 4. DATOS
       let countH = 0; let countM = 0;
-         (stats?.estudiantes || []).forEach((est, i) => {
-         const genero = est.genero?.toUpperCase(); 
-         if (genero === 'M') countM++; if (genero === 'H') countH++;
+
+        const estudiantesOrdenados = [...(stats?.estudiantes || [])].sort((a, b) => {
+            const nombreA = (a.nombre_estudiante || '').trim().toUpperCase();
+            const nombreB = (b.nombre_estudiante || '').trim().toUpperCase();
+            return nombreA.localeCompare(nombreB, 'es', { sensitivity: 'base' });
+        });
+
+         estudiantesOrdenados.forEach((est, i) => {
+            const genero = est.genero?.toUpperCase(); 
+            if (genero === 'M') countM++; 
+            if (genero === 'H') countH++;
 
          const row = worksheet.addRow([
-            null, i + 1, est.nombre_estudiante.trim().toUpperCase(),
-            genero === 'H' ? 'X' : '', genero === 'M' ? 'X' : '', 
-            est.logro_bimestral === 'AD' ? 'X' : '', est.logro_bimestral === 'A' ? 'X' : '',
-            est.logro_bimestral === 'B' ? 'X' : '', est.logro_bimestral === 'C' ? 'X' : '',
-            est.logro_bimestral
-         ]);
+                null, 
+                i + 1, // La numeración se mantiene correlativa (1, 2, 3...) tras el ordenamiento
+                est.nombre_estudiante.trim().toUpperCase(),
+                genero === 'H' ? 'X' : '', 
+                genero === 'M' ? 'X' : '', 
+                est.logro_bimestral === 'AD' ? 'X' : '', 
+                est.logro_bimestral === 'A' ? 'X' : '',
+                est.logro_bimestral === 'B' ? 'X' : '', 
+                est.logro_bimestral === 'C' ? 'X' : '',
+                est.logro_bimestral
+            ]);
          
          // MAPA DE COLORES PARA LAS LETRAS (Sin relleno, solo fuente)
          const coloresLetraNota = {
@@ -302,7 +315,7 @@ const IGAEstadistica = () => {
                 const dataUrl = await toPng(chartRef.current, { backgroundColor: '#ffffff', pixelRatio: 2 });
                 const imageId = workbook.addImage({ base64: dataUrl, extension: 'png' });
                 worksheet.addImage(imageId, {
-                   tl: { col: 1, row: 29 }, // Posición en la celda
+                   tl: { col: 1, row: 50 }, // Posición en la celda
                    ext: { width: 650, height: 280 }, // FUERZA QUE SEA CUADRADO
                    editAs: 'oneCell'
                 });

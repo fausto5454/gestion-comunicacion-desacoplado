@@ -529,7 +529,7 @@ const ConsolidadoAsistencia = () => {
           <thead>
             <tr className="bg-slate-900 text-white">
               <th className="sticky left-0 top-0 z-50 w-[40px] bg-emerald-700 py-3 text-[10px] font-black border-r border-emerald-800 text-center uppercase tracking-wider">N°</th>
-              <th className="bg-slate-900 py-3 px-2 text-center border-r border-slate-800 w-[120px] md:w-[250px] text-[8px] md:text-[11px] font-black uppercase tracking-wider">Apellidos y Nombres</th>
+              <th className="sticky left-[40px] bg-slate-900 py-3 px-2 text-center border-r border-slate-800 w-[120px] md:w-[250px] text-[8px] md:text-[11px] font-black uppercase tracking-wider">Apellidos y Nombres</th>
               {diasDelMes.map(dia => {
                 const esFinde = dia.nombre === "Sáb" || dia.nombre === "Dom";
                 return (
@@ -579,9 +579,8 @@ const ConsolidadoAsistencia = () => {
                   </td>
 
                  {/* COLUMNA APELLIDOS Y NOMBRES */}
-               <td className="py-1 px-3 text-[8px] md:text-[10px] font-semibold text-slate-700 border-r border-slate-300/80 uppercase 
-               bg-white group-hover:bg-emerald-50 transition-colors duration-150">
-              {est.apellido_paterno} {est.apellido_materno} {est.nombres}
+               <td className="sticky left-[40px] z-10 py-1 px-3 text-[8px] md:text-[10px] font-semibold text-slate-700 border-r border-slate-300/80 uppercase bg-white group-hover:bg-emerald-50 transition-colors duration-150">
+               {est.apellido_paterno} {est.apellido_materno} {est.nombres}
               </td>
              {/* COLUMNAS DE DÍAS (ASISTENCIA) - ACTUALIZADO PARA SIGESCOM 2079 */}
              {diasDelMes.map(dia => {

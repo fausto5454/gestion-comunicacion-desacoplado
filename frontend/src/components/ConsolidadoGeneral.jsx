@@ -368,7 +368,7 @@ const [seleccion, setSeleccion] = useState({
             <thead>
               <tr className="bg-slate-900 text-white">
                 <th className="sticky left-0 top-0 z-50 w-[40px] bg-emerald-700 py-3 text-[10px] font-black border-r border-emerald-800 text-center uppercase">N°</th>
-                <th className="bg-slate-900 py-3 px-2 text-center border-r border-slate-800 w-[120px] md:w-[250px] text-[8px] md:text-[11px] font-black uppercase">Apellidos y Nombres</th>
+                <th className="sticky left-[40px] bg-slate-900 py-3 px-2 text-center border-r border-slate-800 w-[120px] md:w-[250px] text-[8px] md:text-[11px] font-black uppercase">Apellidos y Nombres</th>
                {diasDelMes.map(dia => {
                const esFinde = dia.nombre === "Sáb" || dia.nombre === "Dom";
 
@@ -412,8 +412,7 @@ const [seleccion, setSeleccion] = useState({
                     <td className={`sticky left-0 z-30 py-1 text-center text-[8px] md:text-[11px] font-bold border-r border-slate-300 bg-emerald-50 text-emerald-600 group-hover:bg-inherit`}>
                      {(index + 1).toString().padStart(2, '0')}
                       </td>
-                       <td className="py-1 px-3 text-[8px] md:text-[10px] font-semibold text-slate-700 border-r border-slate-300/80 uppercase 
-                       bg-white group-hover:bg-emerald-50 transition-colors duration-150">
+                       <td className="sticky left-[40px] z-10 py-1 px-3 text-[8px] md:text-[10px] font-semibold text-slate-700 border-r border-slate-300/80 uppercase bg-white group-hover:bg-emerald-50 transition-colors duration-150">
                        {est.apellido_paterno} {est.apellido_materno} {est.nombres}
                      </td>
                     {diasDelMes.map((dia) => {

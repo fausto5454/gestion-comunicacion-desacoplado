@@ -29,46 +29,69 @@ const IGAEstadistica = () => {
     useEffect(() => {
         const fetchDatos = async () => {
             setLoading(true);
-            const { data } = await supabase.from('calificaciones').select('*');
+            
+            // ¡EL SECRETO! Filtramos directamente en Supabase para evitar el límite de 1000 filas
+            const { data, error } = await supabase
+                .from('calificaciones')
+                .select('*')
+                .eq('bimestre', filtros.bimestre)
+                .eq('grado', filtros.grado.trim())
+                .eq('seccion', filtros.seccion.trim())
+                .eq('area', filtros.area.trim());
+
+            if (error) {
+                console.error("Error obteniendo datos de Supabase:", error);
+            }
+
             setAllData(data || []);
             setLoading(false);
         };
+        
         fetchDatos();
 
+        // Actualizamos Realtime
         const channel = supabase.channel('cambios-notas')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'calificaciones' }, () => fetchDatos())
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'calificaciones' }, () => {
+                fetchDatos(); // Vuelve a consultar si alguien inserta una nota nueva
+            })
             .subscribe();
 
         return () => supabase.removeChannel(channel);
-    }, []);
+        
+    }, [filtros]);
 
-    const stats = useMemo(() => {
-        const filtered = allData.filter(d => {
-            return d.bimestre.toString() === filtros.bimestre &&
-                   d.grado.trim() === filtros.grado.trim() &&
-                   d.seccion.trim() === filtros.seccion.trim() &&
-                   d.area.toUpperCase() === filtros.area.toUpperCase();
+   const stats = useMemo(() => {
+        const notasValidas = ['AD', 'A', 'B', 'C'];
+
+        // 1. Descartamos a los 4 trasladados (quedan exactamente los 31 con notas)
+        const estudiantesEvaluados = allData.filter(d => {
+            const notaLimpia = (d.logro_bimestral || '').trim().toUpperCase();
+            return notasValidas.includes(notaLimpia);
         });
 
-        const count = (nota) => filtered.filter(d => d.logro_bimestral === nota).length;
-        const total = filtered.length;
+        // 2. Contamos basados en los 31 activos
+        const count = (nota) => estudiantesEvaluados.filter(d => 
+            (d.logro_bimestral || '').trim().toUpperCase() === nota
+        ).length;
+        
+        const total = estudiantesEvaluados.length; // ¡Ahora dará 31 inamovible!
 
         const dataValues = [count('AD'), count('A'), count('B'), count('C')];
         const colors = ['#05aa13', '#0b61ec', '#d1bd05', '#f82c2c'];
 
        return {
-            estudiantes: filtered,
-            total,
-            values: dataValues, // Solo los números para Chart.js
-            colors: colors,
-            resumen: [
-                { name: 'DESTACADO (AD)', cant: dataValues[0], color: colors[0], percent: total > 0 ? Math.round((dataValues[0] / total) * 100) : 0 },
-                { name: 'LOGRADO (A)', cant: dataValues[1], color: colors[1], percent: total > 0 ? Math.round((dataValues[1] / total) * 100) : 0 },
-                { name: 'PROCESO (B)', cant: dataValues[2], color: colors[2], percent: total > 0 ? Math.round((dataValues[2] / total) * 100) : 0 },
-                { name: 'INICIO (C)', cant: dataValues[3], color: colors[3], percent: total > 0 ? Math.round((dataValues[3] / total) * 100) : 0 }
-            ]
-        };
-    }, [allData, filtros]);
+           estudiantes: estudiantesEvaluados, // Exporta los 31 al Excel
+           total, // 31
+           values: dataValues,
+           colors: colors,
+           resumen: [
+               { name: 'DESTACADO (AD)', cant: dataValues[0], color: colors[0], percent: total > 0 ? Math.round((dataValues[0] / total) * 100) : 0 },
+               { name: 'LOGRADO (A)', cant: dataValues[1], color: colors[1], percent: total > 0 ? Math.round((dataValues[1] / total) * 100) : 0 },
+               { name: 'PROCESO (B)', cant: dataValues[2], color: colors[2], percent: total > 0 ? Math.round((dataValues[2] / total) * 100) : 0 },
+               { name: 'INICIO (C)', cant: dataValues[3], color: colors[3], percent: total > 0 ? Math.round((dataValues[3] / total) * 100) : 0 }
+           ]
+       };
+    }, [allData]);
 
     // Manejador para el selector de Grado y Sección
     const handleGradoChange = (valorCombo) => {
@@ -250,10 +273,9 @@ const IGAEstadistica = () => {
 
         // 5. FILA TOTAL (AJUSTE: Combinación B y C corregida)
         const totalRowIndex = worksheet.lastRow.number + 1;
-        worksheet.mergeCells(`B${totalRowIndex}:C${totalRowIndex}`); // Aquí se combinan B y C
+        worksheet.mergeCells(`B${totalRowIndex}:C${totalRowIndex}`);
         const totalRow = worksheet.getRow(totalRowIndex);
         
-        // Asignamos el valor 'TOTAL' a la celda B (que ahora abarca B y C)
         totalRow.getCell(2).value = 'TOTAL';
         totalRow.getCell(4).value = countH;
         totalRow.getCell(5).value = countM;
@@ -261,7 +283,9 @@ const IGAEstadistica = () => {
         totalRow.getCell(7).value = stats.estudiantes.filter(e => e.logro_bimestral === 'A').length;
         totalRow.getCell(8).value = stats.estudiantes.filter(e => e.logro_bimestral === 'B').length;
         totalRow.getCell(9).value = stats.estudiantes.filter(e => e.logro_bimestral === 'C').length;
-        totalRow.getCell(10).value = stats.estudiantes.length;
+        
+        // CORRECCIÓN: Usar stats.total en lugar de medir el array de forma estática
+        totalRow.getCell(10).value = stats.total;
 
         totalRow.eachCell((c, colNum) => {
             if (colNum >= 2) {

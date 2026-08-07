@@ -481,19 +481,32 @@ if (idx < 4) {
       const dni = dnis[nombreKey];
       
       if (!dni) {
-        alumnosOmitidos.push({ nombre: nombreKey, razon: "Sin DNI" });
+        alumnosOmitidos.push({ nombre: nombreKey, razon: "DNI no vinculado" });
         return;
       }
 
       const gen = generos[nombreKey] || ""; 
       const situacionAcademica = estadosAlumnos[dni] || 'Activo';
 
-      if (situacionAcademica === 'Retirado' || situacionAcademica === 'Trasladado') {
-        return; 
+      // 1. Recopilamos los desempeños y verificamos si el docente dejó alguna nota
+      const desempenos = {};
+      let tieneAlgunaNotaEnFrontend = false;
+
+      for (let c = 1; c <= 4; c++) {
+        for (let d = 1; d <= 4; d++) {
+          const valor = notas[`${dni}-${c - 1}-${d}`];
+          if (valor && valor !== '-') tieneAlgunaNotaEnFrontend = true;
+          
+          // Convertimos los vacíos a null para la BD
+          desempenos[`c${c}_d${d}`] = (valor === '-' || !valor) ? null : valor;
+        }
       }
 
-      if (!dni) {
-        alumnosOmitidos.push({ nombre: nombreKey, razon: "DNI no vinculado" });
+      // 2. NUEVA LÓGICA DE OMITIDOS: 
+      // Solo omitimos al estudiante si es Activo/Ingresante Y realmente no tiene ninguna nota.
+      // Si es Trasladado/Retirado, NO lo omitimos para poder enviarle "nulls" a la BD y limpiarlo.
+      if (!tieneAlgunaNotaEnFrontend && (situacionAcademica === 'Activo' || situacionAcademica === 'Ingresante')) {
+        alumnosOmitidos.push({ nombre: nombreKey, razon: "Sin calificaciones" });
         return;
       }
 
@@ -501,27 +514,23 @@ if (idx < 4) {
         const notasValidas = [1, 2, 3, 4]
           .map(d => notas[`${dni}-${compIdx}-${d}`])
           .filter(n => n && n !== '-' && n !== '');
-        return notasValidas.length > 0 ? notasValidas[notasValidas.length - 1] : '-';
+        return notasValidas.length > 0 ? notasValidas[notasValidas.length - 1] : null; // Cambiado a null
       };
 
-      const p1 = obtenerUltimaNota(0);
-      const p2 = obtenerUltimaNota(1);
-      const p3 = obtenerUltimaNota(2);
-      const p4 = obtenerUltimaNota(3);
+      // 3. Forzamos la limpieza extrema si es Trasladado/Retirado
+      const esInactivo = situacionAcademica === 'Retirado' || situacionAcademica === 'Trasladado';
 
-      const logroFinal = calcularLogroBimestral(dni);
+      const p1 = esInactivo ? null : obtenerUltimaNota(0);
+      const p2 = esInactivo ? null : obtenerUltimaNota(1);
+      const p3 = esInactivo ? null : obtenerUltimaNota(2);
+      const p4 = esInactivo ? null : obtenerUltimaNota(3);
 
-      if (logroFinal === '-') {
-        alumnosOmitidos.push({ nombre: nombreKey, razon: "Sin calificaciones" });
-        return;
-      }
+      let logroFinal = calcularLogroBimestral(dni);
+      logroFinal = (logroFinal === '-' || esInactivo) ? null : logroFinal;
 
-      const desempenos = {};
-      for (let c = 1; c <= 4; c++) {
-        for (let d = 1; d <= 4; d++) {
-          const valor = notas[`${dni}-${c - 1}-${d}`];
-          desempenos[`c${c}_d${d}`] = (valor === '-' || !valor) ? null : valor;
-        }
+      // 4. Si es inactivo, forzamos también todos los desempeños a null por seguridad
+      if (esInactivo) {
+          Object.keys(desempenos).forEach(key => desempenos[key] = null);
       }
 
       batchCalificaciones.push({
@@ -532,7 +541,7 @@ if (idx < 4) {
         area: areaNormalizada,
         bimestre: bimestreInt,
         genero: gen,
-        ...desempenos,
+        ...desempenos, // Aquí viajan las notas o los nulls
         promedio_c1: p1,
         promedio_c2: p2,
         promedio_c3: p3,

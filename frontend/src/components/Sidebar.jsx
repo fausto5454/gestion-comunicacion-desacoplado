@@ -33,6 +33,7 @@ const Sidebar = ({ rol_id, userName, userEmail, setCurrentView, currentView, isS
             roles: [1, 2, 3, 6],
             children: [
                 { name: 'Calificaciones', view: 'calificaciones', icon: GraduationCap, roles: [1, 3, 6] },
+                { name: 'Orden de Mérito', view: 'orden-merito', icon: GraduationCap, roles: [1, 3] },
                 { name: 'Asistencia', view: 'asistencia', icon: CalendarCheck, roles: [1, 3] },
                 { name: 'Consolidado Asistencia', view: 'consolidado-asistencia', icon: LayoutGrid, roles: [1, 2, 3, 6] },
                 { name: 'Matrícula', view: 'matricula', icon: FileSpreadsheet, roles: [1] },

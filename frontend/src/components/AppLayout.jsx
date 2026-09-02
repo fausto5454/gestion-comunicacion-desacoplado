@@ -9,7 +9,8 @@ import DocumentosPage from '../pages/DocumentosPage';
 import ReportesPage from '../pages/ReportesPage';
 import AuditoriaPage from '../pages/AuditoriaPage';
 import RegistroCompetencias from '../pages/RegistroCompetencias';
-import IGAEstadistica from '../pages/IGAEstadistica'; 
+import IGAEstadistica from '../pages/IGAEstadistica';
+import OrdenMerito from '../pages/OrdenMerito'; 
 
 // ✅ 1. IMPORTACIONES FALTANTES PARA ASISTENCIA
 import AsistenciaAlumnos from './AsistenciaAlumnos';
@@ -198,6 +199,7 @@ const AppLayout = ({ session, onLogout, currentView, setCurrentView, onCursoSele
         bandeja: ComunicacionesPage,
         calificaciones: RegistroCompetencias,
         'iga-estadistica': IGAEstadistica,
+        'orden-merito': OrdenMerito,
         // ASISTENCIA DOCENTE (Solo el nombre del componente, sin < >)
         asistencia: cursoActivo ? AsistenciaAlumnos : PanelAsistencia,
         'consolidado-asistencia': ConsolidadoAsistencia,
